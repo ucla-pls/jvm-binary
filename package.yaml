@@ -1,0 +1,61 @@
+# This YAML file describes your package. Stack will automatically generate a
+# Cabal file when you run `stack build`. See the hpack website for help with
+# this file: <https://github.com/sol/hpack>.
+benchmarks:
+  jvm-binary-benchmarks:
+    dependencies:
+    - base
+    - jvm-binary
+    - criterion
+    - bytestring
+    ghc-options:
+    - -rtsopts
+    - -threaded
+    - -funbox-strict-fields
+    - -with-rtsopts=-N
+    main: Main.hs
+    source-dirs: benchmark
+category: Other
+description: A library for reading Java class-files
+extra-source-files:
+- CHANGELOG.md
+- LICENSE.md
+- package.yaml
+- README.md
+- stack.yaml
+ghc-options: -Wall
+github: kalhauge/jvm-binary
+library:
+  dependencies:
+  - base
+  - binary
+  - bytestring
+  - containers
+  - text
+  - vector
+  source-dirs: src
+license: MIT
+license-file: LICENSE.md
+maintainer: Christian Gram Kalhauge
+name: jvm-binary
+synopsis: A library for reading Java class-files
+tests:
+  jvm-binary-test-suite:
+    dependencies:
+    - base
+    - jvm-binary
+    - tasty
+    - tasty-hspec
+    - tasty-discover
+    - tasty-quickcheck
+    - binary
+    - bytestring
+    - containers
+    ghc-options:
+    - -rtsopts
+    - -threaded
+    - -with-rtsopts=-N
+    - -fno-warn-orphans
+    main: Test.hs
+    source-dirs: test-suite
+version: '0.0.1'
