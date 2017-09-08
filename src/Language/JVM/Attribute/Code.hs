@@ -6,14 +6,15 @@ module Language.JVM.Attribute.Code
   , ByteCode (..)
   , ExceptionTable (..)
 
+  , ByteCodeInst (..)
+  , ByteCodeOpr (..)
+
   , Constant (..)
   , WordSize
   , OneOrTwo (..)
   , ArithmeticType (..)
   , LocalType (..)
   , ArrayType (..)
-
-  , ByteCodeInst (..)
   ) where
 
 import           GHC.Generics          (Generic)
@@ -35,6 +36,8 @@ import qualified Data.Vector           as V
 
 import           Language.JVM.Constant (ConstantRef (..))
 import           Language.JVM.Utils
+
+import           Debug.Trace
 
 data Code a = Code
   { maxStack       :: Int16
@@ -59,7 +62,12 @@ instance Binary ByteCode where
       Right (_,_,bcs) -> return $ ByteCode bcs
       Left (_,_,msg)  -> fail msg
     where
-      go = isEmpty >>= \t -> if t then return [] else (:) <$> get <*> go
+      go = isEmpty >>= \t ->
+        if t
+          then return []
+          else do
+            x <- get
+            (x:) <$> go
 
 
   put (ByteCode lst)= do
@@ -69,17 +77,29 @@ instance Binary ByteCode where
 
 
 data ExceptionTable = ExceptionTable
-  { start     :: Int32
+  { start     :: ! Word16
   -- ^ Inclusive program counter into 'code'
-  , end       :: Int32
+  , end       :: ! Word16
   -- ^ Exclusive program counter into 'code'
-  , handler   :: Int32
-  -- ^ A program counter into 'code' indicating the code.
-  , catchType :: ConstantRef
+  , handler   :: ! Word16
+  -- ^ A program counter into 'code' indicating the handler.
+  , catchType :: ! ConstantRef
   }
   deriving (Show, Eq, Generic)
 
 instance Binary ExceptionTable where
+
+data ByteCodeInst = ByteCodeInst
+  { offset :: LongOffset
+  , opcode :: ByteCodeOpr
+  }
+  deriving (Show, Eq, Generic)
+
+instance Binary ByteCodeInst where
+  get =
+    ByteCodeInst <$> (fromIntegral <$> bytesRead) <*> get
+  put x =
+    put $ opcode x
 
 data ArithmeticType = MInt | MLong | MFloat | MDouble
   deriving (Show, Eq, Enum, Bounded)
@@ -91,7 +111,7 @@ data LocalType = LInt | LLong | LFloat | LDouble | LRef
   deriving (Show, Eq, Enum, Bounded)
 
 data ArrayType a
-  = AByte | AChar | AShort | AInt | ALong
+  = ABoolean | AByte | AChar | AShort | AInt | ALong
   | AFloat | ADouble | ARef a
   deriving (Show, Eq)
 
@@ -166,7 +186,7 @@ data CmpOpr
   = CEq | CNe | CLt | CGe | CGt | CLe
   deriving (Show, Eq)
 
-data ByteCodeInst
+data ByteCodeOpr
   = ArrayLoad (ArrayType ())
   -- ^ aaload baload ...
   | ArrayStore (ArrayType ())
@@ -255,7 +275,7 @@ data ByteCodeInst
 
   deriving (Show, Eq)
 
-instance Binary ByteCodeInst where
+instance Binary ByteCodeOpr where
   get = do
     cmd <- getWord8
     case cmd of
@@ -299,7 +319,7 @@ instance Binary ByteCodeInst where
       0x1d -> return $ Load LInt 3
 
       0x1e -> return $ Load LLong 0
-
+      0x1f -> return $ Load LLong 1
       0x20 -> return $ Load LLong 2
       0x21 -> return $ Load LLong 3
 
@@ -477,8 +497,9 @@ instance Binary ByteCodeInst where
       0xa9 -> Ret <$> get
 
       0xaa -> do
-        offset <- bytesRead
-        skip . fromIntegral $ offset `mod` 4
+        offset' <- bytesRead
+        let skipAmount = (4 - offset' `mod` 4) `mod` 4
+        if skipAmount > 0 then skip $ fromIntegral skipAmount else return ()
         dft <- getInt32be
         low <- getInt32be
         high <- getInt32be
@@ -486,8 +507,9 @@ instance Binary ByteCodeInst where
         return $ TableSwitch dft low high table
 
       0xab -> do
-        offset <- bytesRead
-        skip . fromIntegral $ offset `mod` 4
+        offset' <- bytesRead
+        let skipAmount = (4 - offset' `mod` 4) `mod` 4
+        if skipAmount > 0 then skip $ fromIntegral skipAmount else return ()
         dft <- getInt32be
         npairs <- getInt32be
         pairs <- V.replicateM (fromIntegral npairs) get
@@ -528,7 +550,7 @@ instance Binary ByteCodeInst where
       0xbc -> do
         x <- getWord8
         NewArray <$> case x of
-          4  -> fail "Boolean arrays not supported... Sorry?"
+          4  -> return ABoolean -- $ fail "Boolean arrays not supported... Sorry?"
           5  -> return AChar
           6  -> return AFloat
           7  -> return ADouble

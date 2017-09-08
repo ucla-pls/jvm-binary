@@ -6,8 +6,10 @@ module Language.JVM.Constant
   , ConstantPool (..)
   , poolSize
 
-  , lookup
+  , lookupConstant
   , lookupText
+
+  , toListOfConstants
   ) where
 
 import           GHC.Generics           (Generic)
@@ -95,6 +97,10 @@ newtype ConstantPool = ConstantPool
   { unConstantPool :: IM.IntMap Constant
   } deriving (Show, Eq)
 
+toListOfConstants :: ConstantPool -> [(ConstantRef, Constant)]
+toListOfConstants =
+  map (\(a,b) -> (ConstantRef . fromIntegral $ a, b)) . IM.toList . unConstantPool
+
 poolSize :: Constant -> Int
 poolSize x =
   case x of
@@ -121,13 +127,13 @@ instance Binary ConstantPool where
       Nothing -> do
         putInt16be 0
 
-lookup :: ConstantRef -> ConstantPool -> Maybe Constant
-lookup (ConstantRef ref) (ConstantPool cp) =
+lookupConstant :: ConstantRef -> ConstantPool -> Maybe Constant
+lookupConstant (ConstantRef ref) (ConstantPool cp) =
   IM.lookup (fromIntegral ref) cp
 
 lookupText :: ConstantRef -> ConstantPool -> Maybe Text.Text
 lookupText ref cp = do
-  String str <- lookup ref cp
+  String str <- lookupConstant ref cp
   case TE.decodeUtf8' str of
     Left _    -> Nothing
     Right txt -> Just txt

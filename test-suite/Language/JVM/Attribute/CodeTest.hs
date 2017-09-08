@@ -1,40 +1,24 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Language.JVM.Attribute.CodeTest where
 
 import           SpecHelper
 
-import           Control.Monad                     (forM_)
-import           Data.Either
 import           Data.Word
 
-import           Language.JVM.Attribute     (Attribute, nameIndex, toCode)
+import           Language.JVM.Attribute     (Attribute)
 import           Language.JVM.AttributeTest ()
-import qualified Language.JVM.ClassFile     as CF
+
 import           Language.JVM.Attribute.Code
 import qualified Language.JVM.Constant      as Constant
-import qualified Language.JVM.Method        as Method
-import           Language.JVM.Utils
 import           Language.JVM.UtilsTest ()
 
 
-prop_encode_and_decode_ByteCode :: ByteCode -> Property
-prop_encode_and_decode_ByteCode = isoBinary
+-- prop_encode_and_decode_ByteCode :: ByteCode -> Property
+-- prop_encode_and_decode_ByteCode = isoBinary
 
-prop_encode_and_decode :: Code Attribute -> Property
-prop_encode_and_decode = isoBinary
-
-spec_reading_real_classfile :: Spec
-spec_reading_real_classfile = do
-  beforeAll (blReadFile "test-suite/project/Main.class") $ do
-    it "can read the bytestring" $ \bs ->
-      let classfile = decode bs
-          cp = CF.constantPool classfile
-          ms = unSizedList16 . CF.methods $ classfile
-          cs =
-            filter (\a -> (flip Constant.lookupText cp $ nameIndex a) == Just "Code")
-            . concatMap (unSizedList16 . Method.attributes)
-            $ ms
-      in forM_ cs (\c -> toCode c `shouldSatisfy` isRight)
+-- prop_encode_and_decode :: Code Attribute -> Property
+-- prop_encode_and_decode = isoBinary
 
 instance Arbitrary (Code Attribute) where
   arbitrary = Code
@@ -52,6 +36,9 @@ instance Arbitrary LocalType where
   arbitrary = elements [ LInt, LLong, LFloat, LDouble, LRef ]
 
 instance Arbitrary ByteCodeInst where
+  arbitrary = ByteCodeInst <$> arbitrary <*> arbitrary
+
+instance Arbitrary ByteCodeOpr where
   arbitrary = oneof
     [ pure Nop
     , Push <$> arbitrary

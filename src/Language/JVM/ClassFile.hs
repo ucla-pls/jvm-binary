@@ -1,89 +1,53 @@
 {-# LANGUAGE DeriveGeneric #-}
-
 module Language.JVM.ClassFile
   ( ClassFile (..)
-  , AccessFlags (..)
-  , AccessFlag (..)
 
-  , decodeClassFile
-  , decodeClassFileOrFail
+  , cInterfaces'
+  , cFields'
+  , cMethods'
+  , cAttributes'
   ) where
 
-
-import           GHC.Generics (Generic)
+import           GHC.Generics            (Generic)
 import           Data.Binary
-import           Data.Binary.Get
-import           Data.Binary.Put
-import           Data.Bits
-import           Data.List                     (foldl')
-import qualified Data.Set                      as S
 
-import qualified Data.ByteString.Lazy          as BL
 
-import           Language.JVM.Attribute (Attribute)
-import           Language.JVM.Constant  (ConstantPool, ConstantRef)
-import           Language.JVM.Field     (Field)
+import           Language.JVM.AccessFlag
+import           Language.JVM.Attribute  (Attribute)
+import           Language.JVM.Constant   (ConstantPool, ConstantRef)
+import           Language.JVM.Field      (Field)
+import           Language.JVM.Method     (Method)
 import           Language.JVM.Utils
-import           Language.JVM.Method    (Method)
 
 data ClassFile = ClassFile
-  { magicNumber  :: !Word32
+  { cMagicNumber  :: !Word32
 
-  , minorVersion :: !Word16
-  , majorVersion :: !Word16
+  , cMinorVersion :: !Word16
+  , cMajorVersion :: !Word16
 
-  , constantPool :: !ConstantPool
+  , cConstantPool :: !ConstantPool
 
-  , accessFlags  :: !AccessFlags
+  , cAccessFlags  :: BitSet16 CAccessFlag
 
-  , thisClass    :: !ConstantRef
-  , superClass   :: !ConstantRef
+  , cThisClass    :: !ConstantRef
+  , cSuperClass   :: !ConstantRef
 
-  , interfaces   :: SizedList16 ConstantRef
-  , fields       :: SizedList16 Field
-  , methods      :: SizedList16 Method
-  , attributes   :: SizedList16 Attribute
+  , cInterfaces   :: SizedList16 ConstantRef
+  , cFields       :: SizedList16 Field
+  , cMethods      :: SizedList16 Method
+  , cAttributes   :: SizedList16 Attribute
   } deriving (Show, Eq, Generic)
 
 instance Binary ClassFile where
 
-decodeClassFile :: BL.ByteString -> ClassFile
-decodeClassFile = decode
+cInterfaces' :: ClassFile -> [ConstantRef]
+cInterfaces' = unSizedList16 . cInterfaces
 
-decodeClassFileOrFail :: BL.ByteString -> Either String ClassFile
-decodeClassFileOrFail bs = do
-  case decodeOrFail bs of
-    Right (_, _, cf) -> Right cf
-    Left (_, _, msg) -> Left msg
+cFields' :: ClassFile -> [Field]
+cFields' = unSizedList16 . cFields
 
-data AccessFlag
-  = Public
-  | Unused1
-  | Unused2
-  | Unused3
-  | Final
-  | Super
-  | Unused6
-  | Unused7
-  | Unused8
-  | Unused9
-  | Abstract
-  | Unused11
-  | Synthetic
-  | Annotation
-  | Enum
-  | Unused15
-  deriving (Ord, Show, Eq, Enum)
+cMethods' :: ClassFile -> [Method]
+cMethods' = unSizedList16 . cMethods
 
-
-newtype AccessFlags = AccessFlags (S.Set AccessFlag)
-  deriving (Ord, Show, Eq)
-
-instance Binary AccessFlags where
-  get = do
-    word <- getWord16be
-    return . AccessFlags $ S.fromList [ toEnum x | x <- [0..15], testBit word x ]
-
-  put (AccessFlags f) = do
-    let word = foldl' setBit zeroBits (map fromEnum $ S.toList f)
-    putWord16be word
+cAttributes' :: ClassFile -> [Attribute]
+cAttributes' = unSizedList16 . cAttributes

@@ -51,6 +51,9 @@ tests:
     - binary
     - bytestring
     - containers
+    - filepath
+    - directory
+    - text
     ghc-options:
     - -rtsopts
     - -threaded

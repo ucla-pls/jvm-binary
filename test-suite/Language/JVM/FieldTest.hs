@@ -17,9 +17,3 @@ instance Arbitrary Field where
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
-
-instance Arbitrary AccessFlags where
-  arbitrary = AccessFlags <$> arbitrary
-
-instance Arbitrary AccessFlag where
-  arbitrary = toEnum <$> choose (0, 15)

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Language.JVM.AttributeTest where
 
 import SpecHelper
