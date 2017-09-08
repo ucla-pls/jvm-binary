@@ -2,12 +2,14 @@
 -- website for help: <http://www.serpentine.com/criterion/>.
 import Criterion.Main
 
-
-import Language.JVM.ClassFile (decodeClassFileOrFail)
+import Language.JVM
 
 import Data.ByteString.Lazy as BL
 
 main :: IO ()
-main = defaultMain [
-  bench "simple load" (whnfIO $ decodeClassFileOrFail <$> BL.readFile "test-suite/project/Main.class")
+main = defaultMain
+  [ bench "simple load" (
+      whnfIO $ decodeClassFile <$>
+        BL.readFile "test-suite/data/project/Main.class"
+      )
   ]

@@ -37,7 +37,7 @@ import qualified Data.Vector           as V
 import           Language.JVM.Constant (ConstantRef (..))
 import           Language.JVM.Utils
 
-import           Debug.Trace
+
 
 data Code a = Code
   { maxStack       :: Int16
