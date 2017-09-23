@@ -37,20 +37,20 @@ newtype ConstantRef =
 instance Binary ConstantRef where
 
 data Constant
-  = String BS.ByteString
+  = String !BS.ByteString
   | Integer !Word32
   | Float !Word32
   | Long !Word64
   | Double !Word64
   | ClassRef !ConstantRef
   | StringRef !ConstantRef
-  | FieldRef ConstantRef ConstantRef
-  | MethodRef ConstantRef ConstantRef
-  | InterfaceMethodRef ConstantRef ConstantRef
-  | NameAndType ConstantRef ConstantRef
-  | MethodHandle Word8 ConstantRef
-  | MethodType ConstantRef
-  | InvokeDynamic ConstantRef ConstantRef
+  | FieldRef !ConstantRef !ConstantRef
+  | MethodRef !ConstantRef !ConstantRef
+  | InterfaceMethodRef !ConstantRef !ConstantRef
+  | NameAndType !ConstantRef !ConstantRef
+  | MethodHandle !Word8 !ConstantRef
+  | MethodType !ConstantRef
+  | InvokeDynamic !ConstantRef !ConstantRef
   deriving (Show, Eq)
 
 instance Binary Constant where
@@ -58,17 +58,17 @@ instance Binary Constant where
     ident <- getWord8
     case ident of
       1  -> do len <- getInt16be; String <$> getByteString (fromIntegral len)
-      3  -> Integer <$> getWord32be
-      4  -> Float <$> getWord32be
-      5  -> Long <$> getWord64be
-      6  -> Double <$> getWord64be
+      3  -> Integer <$> get
+      4  -> Float <$> get
+      5  -> Long <$> get
+      6  -> Double <$> get
       7  -> ClassRef <$> get
       8  -> StringRef <$> get
       9  -> FieldRef <$> get <*> get
       10 -> MethodRef <$> get <*> get
       11 -> InterfaceMethodRef <$> get <*> get
       12 -> NameAndType <$> get <*> get
-      15 -> MethodHandle <$> getWord8 <*> get
+      15 -> MethodHandle <$> get <*> get
       16 -> MethodType <$> get
       18 -> InvokeDynamic <$> get <*> get
       _  -> fail $ "Unkown identifier " ++ show ident
@@ -79,17 +79,17 @@ instance Binary Constant where
         putWord8 1
         putInt16be . fromIntegral $ BS.length bs
         putByteString bs
-      Integer i              -> do putWord8 3; putWord32be i
-      Float i                -> do putWord8 4; putWord32be i
-      Long i                 -> do putWord8 5; putWord64be i
-      Double i               -> do putWord8 6; putWord64be i
+      Integer i              -> do putWord8 3; put i
+      Float i                -> do putWord8 4; put i
+      Long i                 -> do putWord8 5; put i
+      Double i               -> do putWord8 6; put i
       ClassRef i             -> do putWord8 7; put i
       StringRef i            -> do putWord8 8; put i
       FieldRef i j           -> do putWord8 9; put i; put j
       MethodRef i j          -> do putWord8 10; put i; put j
       InterfaceMethodRef i j -> do putWord8 11; put i; put j
       NameAndType i j        -> do putWord8 12; put i; put j
-      MethodHandle i j       -> do putWord8 15; putWord8 i; put j
+      MethodHandle i j       -> do putWord8 15; put i; put j
       MethodType i           -> do putWord8 16; put i;
       InvokeDynamic i j      -> do putWord8 18; put i; put j
 

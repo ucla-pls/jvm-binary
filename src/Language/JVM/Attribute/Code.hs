@@ -550,7 +550,7 @@ instance Binary ByteCodeOpr where
       0xbc -> do
         x <- getWord8
         NewArray <$> case x of
-          4  -> return ABoolean -- $ fail "Boolean arrays not supported... Sorry?"
+          4  -> return ABoolean
           5  -> return AChar
           6  -> return AFloat
           7  -> return ADouble
