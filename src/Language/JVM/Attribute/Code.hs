@@ -28,10 +28,11 @@ module Language.JVM.Attribute.Code
   , LongOffset
   , Offset
 
-  , LocalAddress
-  , BitOpr
-  , FieldAccess
-  , Invokation
+  , LocalAddress (..)
+  , IncrementAmount (..)
+  , BitOpr (..)
+  , FieldAccess (..)
+  , Invokation (..)
   ) where
 
 import           GHC.Generics          (Generic)
@@ -197,7 +198,16 @@ data BitOpr
 
 type Offset = Int16
 type LongOffset = Int32
-type LocalAddress = Word8
+
+data LocalAddress
+  = LWide Word16
+  | LSingle Word8
+  deriving (Show, Eq)
+
+data IncrementAmount
+  = IWide Int16
+  | ISingle Int8
+  deriving (Show, Eq)
 
 data CmpOpr
   = CEq | CNe | CLt | CGe | CGt | CLe
@@ -224,7 +234,7 @@ data ByteCodeOpr
   | BitOpr BitOpr WordSize
   -- ^ Exclusively on int and long, identified by the word-size
 
-  | IncrLocal LocalAddress Int8
+  | IncrLocal !LocalAddress !IncrementAmount
   -- ^ Only works on ints, increment local #1, with #2
 
   | Cast ArithmeticType ArithmeticType
@@ -324,36 +334,36 @@ instance Binary ByteCodeOpr where
       0x13 -> Push . CRef One <$> get
       0x14 -> Push . CRef Two <$> get
 
-      0x15 -> Load LInt <$> get
-      0x16 -> Load LLong <$> get
-      0x17 -> Load LFloat <$> get
-      0x18 -> Load LDouble <$> get
-      0x19 -> Load LRef <$> get
+      0x15 -> Load LInt . LSingle <$> get
+      0x16 -> Load LLong . LSingle <$> get
+      0x17 -> Load LFloat . LSingle <$> get
+      0x18 -> Load LDouble . LSingle <$> get
+      0x19 -> Load LRef . LSingle <$> get
 
-      0x1a -> return $ Load LInt 0
-      0x1b -> return $ Load LInt 1
-      0x1c -> return $ Load LInt 2
-      0x1d -> return $ Load LInt 3
+      0x1a -> return $ Load LInt (LSingle 0)
+      0x1b -> return $ Load LInt (LSingle 1)
+      0x1c -> return $ Load LInt (LSingle 2)
+      0x1d -> return $ Load LInt (LSingle 3)
 
-      0x1e -> return $ Load LLong 0
-      0x1f -> return $ Load LLong 1
-      0x20 -> return $ Load LLong 2
-      0x21 -> return $ Load LLong 3
+      0x1e -> return $ Load LLong (LSingle 0)
+      0x1f -> return $ Load LLong (LSingle 1)
+      0x20 -> return $ Load LLong (LSingle 2)
+      0x21 -> return $ Load LLong (LSingle 3)
 
-      0x22 -> return $ Load LFloat 0
-      0x23 -> return $ Load LFloat 1
-      0x24 -> return $ Load LFloat 2
-      0x25 -> return $ Load LFloat 3
+      0x22 -> return $ Load LFloat (LSingle 0)
+      0x23 -> return $ Load LFloat (LSingle 1)
+      0x24 -> return $ Load LFloat (LSingle 2)
+      0x25 -> return $ Load LFloat (LSingle 3)
 
-      0x26 -> return $ Load LDouble 0
-      0x27 -> return $ Load LDouble 1
-      0x28 -> return $ Load LDouble 2
-      0x29 -> return $ Load LDouble 3
+      0x26 -> return $ Load LDouble (LSingle 0)
+      0x27 -> return $ Load LDouble (LSingle 1)
+      0x28 -> return $ Load LDouble (LSingle 2)
+      0x29 -> return $ Load LDouble (LSingle 3)
 
-      0x2a -> return $ Load LRef 0
-      0x2b -> return $ Load LRef 1
-      0x2c -> return $ Load LRef 2
-      0x2d -> return $ Load LRef 3
+      0x2a -> return $ Load LRef (LSingle 0)
+      0x2b -> return $ Load LRef (LSingle 1)
+      0x2c -> return $ Load LRef (LSingle 2)
+      0x2d -> return $ Load LRef (LSingle 3)
 
       0x2e -> return $ ArrayLoad AInt
       0x2f -> return $ ArrayLoad ALong
@@ -364,36 +374,36 @@ instance Binary ByteCodeOpr where
       0x34 -> return $ ArrayLoad AChar
       0x35 -> return $ ArrayLoad AShort
 
-      0x36 -> Store LInt <$> get
-      0x37 -> Store LLong <$> get
-      0x38 -> Store LFloat <$> get
-      0x39 -> Store LDouble <$> get
-      0x3a -> Store LRef <$> get
+      0x36 -> Store LInt . LSingle <$> get
+      0x37 -> Store LLong . LSingle <$> get
+      0x38 -> Store LFloat . LSingle <$> get
+      0x39 -> Store LDouble . LSingle <$> get
+      0x3a -> Store LRef . LSingle <$> get
 
-      0x3b -> return $ Store LInt 0
-      0x3c -> return $ Store LInt 1
-      0x3d -> return $ Store LInt 2
-      0x3e -> return $ Store LInt 3
+      0x3b -> return $ Store LInt (LSingle 0)
+      0x3c -> return $ Store LInt (LSingle 1)
+      0x3d -> return $ Store LInt (LSingle 2)
+      0x3e -> return $ Store LInt (LSingle 3)
 
-      0x3f -> return $ Store LLong 0
-      0x40 -> return $ Store LLong 1
-      0x41 -> return $ Store LLong 2
-      0x42 -> return $ Store LLong 3
+      0x3f -> return $ Store LLong (LSingle 0)
+      0x40 -> return $ Store LLong (LSingle 1)
+      0x41 -> return $ Store LLong (LSingle 2)
+      0x42 -> return $ Store LLong (LSingle 3)
 
-      0x43 -> return $ Store LFloat 0
-      0x44 -> return $ Store LFloat 1
-      0x45 -> return $ Store LFloat 2
-      0x46 -> return $ Store LFloat 3
+      0x43 -> return $ Store LFloat (LSingle 0)
+      0x44 -> return $ Store LFloat (LSingle 1)
+      0x45 -> return $ Store LFloat (LSingle 2)
+      0x46 -> return $ Store LFloat (LSingle 3)
 
-      0x47 -> return $ Store LDouble 0
-      0x48 -> return $ Store LDouble 1
-      0x49 -> return $ Store LDouble 2
-      0x4a -> return $ Store LDouble 3
+      0x47 -> return $ Store LDouble (LSingle 0)
+      0x48 -> return $ Store LDouble (LSingle 1)
+      0x49 -> return $ Store LDouble (LSingle 2)
+      0x4a -> return $ Store LDouble (LSingle 3)
 
-      0x4b -> return $ Store LRef 0
-      0x4c -> return $ Store LRef 1
-      0x4d -> return $ Store LRef 2
-      0x4e -> return $ Store LRef 3
+      0x4b -> return $ Store LRef (LSingle 0)
+      0x4c -> return $ Store LRef (LSingle 1)
+      0x4d -> return $ Store LRef (LSingle 2)
+      0x4e -> return $ Store LRef (LSingle 3)
 
       0x4f -> return $ ArrayStore AInt
       0x50 -> return $ ArrayStore ALong
@@ -462,7 +472,7 @@ instance Binary ByteCodeOpr where
       0x82 -> return $ BitOpr XOr One
       0x83 -> return $ BitOpr XOr Two
 
-      0x84 -> IncrLocal <$> get <*> get
+      0x84 -> IncrLocal <$> (LSingle <$> get) <*> (ISingle <$> get)
 
       0x85 -> return $ Cast MInt MLong
       0x86 -> return $ Cast MInt MFloat
@@ -511,7 +521,7 @@ instance Binary ByteCodeOpr where
 
       0xa7 -> Goto . fromIntegral <$> getInt16be
       0xa8 -> Jsr . fromIntegral <$> getInt16be
-      0xa9 -> Ret <$> get
+      0xa9 -> Ret . LSingle <$> get
 
       0xaa -> do
         offset' <- bytesRead
@@ -589,7 +599,28 @@ instance Binary ByteCodeOpr where
       0xc2 -> return $ Monitor True
       0xc3 -> return $ Monitor False
 
-      0xc4 -> fail "Wide not implemented yet"
+      0xc4 -> do
+        subopcode <- getWord8
+        case subopcode of
+          0x15 -> Load LInt . LWide <$> get
+          0x16 -> Load LLong . LWide <$> get
+          0x17 -> Load LFloat . LWide <$> get
+          0x18 -> Load LDouble . LWide <$> get
+          0x19 -> Load LRef . LWide <$> get
+
+          0x36 -> Store LInt . LWide <$> get
+          0x37 -> Store LLong . LWide <$> get
+          0x38 -> Store LFloat . LWide <$> get
+          0x39 -> Store LDouble . LWide <$> get
+          0x3a -> Store LRef . LWide <$> get
+
+          0x84 -> IncrLocal <$> (LWide <$> get)
+                            <*> (IWide <$> get)
+
+          0xa9 -> Ret . LWide <$> get
+
+          _ -> fail $ "Wide does not work for opcode 'Ox"
+                ++ showHex subopcode "'"
 
       0xc5 -> MultiNewArray <$> get <*> get
 
@@ -631,5 +662,4 @@ instance Binary ByteCodeOpr where
       Push (CHalfRef (ConstantRef r)) -> putInt8 0x12 >> putWord8 (fromIntegral r)
       Push (CRef One (ConstantRef r)) -> putInt8 0x13 >> put r
       Push (CRef Two (ConstantRef r)) -> putInt8 0x14 >> put r
-
       _ -> P.fail $ "Is not able to print '" ++ show bc ++ "' yet."
