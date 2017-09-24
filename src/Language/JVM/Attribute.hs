@@ -19,12 +19,12 @@ module Language.JVM.Attribute
   , aName
 
   , IsAttribute (..)
-  -- SubAttributes
---  , module Language.JVM.Attribute.Code
+  -- * SubAttributes
   , Code
+  , ConstantValue
 
+  -- * Helpers
   , Const
-
   ) where
 
 import           GHC.Generics                (Generic)
@@ -41,6 +41,8 @@ import           Language.JVM.Utils          (SizedByteString32, trd,
                                               unSizedByteString)
 
 import qualified Language.JVM.Attribute.Code
+import           Language.JVM.Attribute.ConstantValue (ConstantValue)
+import           Language.JVM.Attribute.Exceptions (Exceptions)
 
 -- | An Attribute, simply contains of a reference to a name and
 -- contains info.
@@ -85,6 +87,10 @@ class IsAttribute a where
        return $ fromAttribute as
     else Nothing
 
+readFromStrict :: Binary a => Attribute -> Either String a
+readFromStrict =
+    bimap trd trd . decodeOrFail . BL.fromStrict . aInfo
+
 -- # Attributes
 
 -- | Code is redefined with Attribute, as it is recursively containing
@@ -93,7 +99,15 @@ type Code = Language.JVM.Attribute.Code.Code Attribute
 
 -- | Code is an Attribute.
 instance IsAttribute Code where
-  attrName =
-    Const "Code"
-  fromAttribute =
-    bimap trd trd . decodeOrFail . BL.fromStrict . aInfo
+  attrName = Const "Code"
+  fromAttribute = readFromStrict
+
+-- | ConstantValue is an Attribute.
+instance IsAttribute ConstantValue where
+  attrName = Const "ConstantValue"
+  fromAttribute = readFromStrict
+
+-- | Exceptions is an Attribute.
+instance IsAttribute Exceptions where
+  attrName = Const "Exceptions"
+  fromAttribute = readFromStrict

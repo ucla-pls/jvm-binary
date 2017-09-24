@@ -1,7 +1,11 @@
 # Change log
 
-jvm-binary uses [Semantic Versioning][].
-The change log is available through the [releases on GitHub][].
+## Version 0.0.x
 
-[Semantic Versioning]: http://semver.org/spec/v2.0.0.html
-[releases on GitHub]: https://github.com/kalhauge/jvm-binary/releases
+- Fix problems with package.yaml file
+- Add ConstantValue and Exceptions
+
+## Version 0.0.1
+
+The initial version
+

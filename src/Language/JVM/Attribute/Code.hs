@@ -56,7 +56,6 @@ import           Language.JVM.Constant (ConstantRef (..))
 import           Language.JVM.Utils
 
 
-
 data Code a = Code
   { maxStack       :: Int16
   , maxLocals      :: Int16
