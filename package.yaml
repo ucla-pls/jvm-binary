@@ -1,14 +1,15 @@
 name: jvm-binary
 version: '0.0.1'
-maintainer: Christian Gram Kalhauge
+author: Christian Gram Kalhauge
+maintainer: Christian Gram Kalhauge <kalhauge@cs.ucla.edu>
 synopsis: A library for reading Java class-files
 
 license: MIT
 license-file: LICENSE.md
 category: Language
-github: kalhauge/jvm-binary
+github: ucla-pls/jvm-binary
 
-description: A library for reading Java class-files
+description: A library for reading Java class-files.
 
 ghc-options: -Wall
 
