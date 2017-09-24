@@ -3,9 +3,8 @@ module Language.JVM.ConstantTest where
 
 import SpecHelper
 
-import qualified Data.ByteString as BS
-
 import Language.JVM.Constant
+import Language.JVM.UtilsTest ()
 
 import qualified Data.IntMap as IM
 
@@ -21,13 +20,12 @@ instance Arbitrary ConstantPool where
     ConstantPool . IM.fromList . go 1 <$> arbitrary
     where
       go n (e : lst) =
-        (n, e) : go (n + poolSize e) lst
+        (n, e) : go (n + constantSize e) lst
       go _ [] = []
-
 
 instance Arbitrary Constant where
   arbitrary = oneof
-    [ String <$> binstr
+    [ String <$> arbitrary
     , Integer <$> arbitrary
     , Float <$> arbitrary
     , Long <$> arbitrary
@@ -42,8 +40,3 @@ instance Arbitrary Constant where
     , MethodType <$> arbitrary
     , InvokeDynamic <$> arbitrary <*> arbitrary
     ]
-
-binstr :: Gen BS.ByteString
-binstr = do
-  len <- choose (0, 50)
-  BS.pack <$> sequence (replicate len arbitrary)

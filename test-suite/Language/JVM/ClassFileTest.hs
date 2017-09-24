@@ -27,7 +27,7 @@ instance Arbitrary ClassFile where
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
-    <*> (pure $ SizedList16 [])
-    <*> (pure $ SizedList16 [])
-    <*> (pure $ SizedList16 [])
-    <*> (pure $ SizedList16 [])
+    <*> (pure $ SizedList [])
+    <*> (pure $ SizedList [])
+    <*> (pure $ SizedList [])
+    <*> (pure $ SizedList [])

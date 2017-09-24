@@ -6,10 +6,10 @@ import Control.Monad
 -- import Data.Text as Text
 import Data.Maybe
 import Data.Either
-import Debug.Trace
+-- import Debug.Trace
 
 import Language.JVM
-import Language.JVM.Attribute.Code
+import Language.JVM.Attribute.Code ()
 
 test_reading_classfile :: IO [TestTree]
 test_reading_classfile = testAllFiles $ do
@@ -22,8 +22,9 @@ test_reading_classfile = testAllFiles $ do
       cMagicNumber cls `shouldBe` 0xCAFEBABE
 
     it "has a class name" $ \cls ->
-      constantOf cls (cThisClass cls) `shouldSatisfy` isJust
+      cThisClass (cConstantPool cls) cls `shouldSatisfy` isJust
 
     it "can parse all method codes" $ \cls ->
-      forM_ (catMaybes . map (getCodeOfMethod cls) $ cMethods' cls) $ \code-> do
+      forM_ (catMaybes . map (mCode (cConstantPool cls)) $ cMethods cls) $
+      \code-> do
         code `shouldSatisfy` isRight

@@ -1,3 +1,12 @@
+{-|
+Module      : Language.JVM.AccessFlag
+Copyright   : (c) Christian Gram Kalhauge, 2017
+License     : MIT
+Maintainer  : kalhuage@cs.ucla.edu
+
+Contains the AccessFlags used in the different modules.
+-}
+
 module Language.JVM.AccessFlag
   ( MAccessFlag(..), mflags
   , FAccessFlag(..), fflags
@@ -6,6 +15,7 @@ module Language.JVM.AccessFlag
 
 import           Language.JVM.Utils
 
+-- | Access flags for the 'Language.JVM.Method.Method'
 data MAccessFlag
   = MPublic
   | MPrivate
@@ -21,6 +31,8 @@ data MAccessFlag
   | MSynthetic
   deriving (Ord, Show, Eq)
 
+
+-- | The 'Enumish' mapping of the 'MAccessFlag'
 mflags :: [(Int, MAccessFlag)]
 mflags =
   [ (0,  MPublic)
@@ -40,6 +52,7 @@ mflags =
 instance Enumish MAccessFlag where
   inOrder = mflags
 
+-- | Access flags for the 'Language.JVM.ClassFile.ClassFile'
 data CAccessFlag
   = CPublic
   | CFinal
@@ -50,6 +63,7 @@ data CAccessFlag
   | CEnum
   deriving (Ord, Show, Eq)
 
+-- | The 'Enumish' mapping of the 'CAccessFlag'
 cflags :: [(Int, CAccessFlag)]
 cflags =
   [ (0, CPublic)
@@ -64,6 +78,7 @@ cflags =
 instance Enumish CAccessFlag where
   inOrder = cflags
 
+-- | Access flags for the 'Language.JVM.Field.Field'
 data FAccessFlag
   = FPublic
   | FPrivate
@@ -78,6 +93,7 @@ data FAccessFlag
   | FEnum
   deriving (Ord, Show, Eq)
 
+-- | The 'Enumish' mapping of the 'FAccessFlag'
 fflags :: [(Int, FAccessFlag)]
 fflags =
   [ (0,  FPublic)

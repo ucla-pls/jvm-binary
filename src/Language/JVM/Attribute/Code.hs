@@ -1,3 +1,10 @@
+{-|
+Module      : Language.JVM.Attribute.Code
+Copyright   : (c) Christian Gram Kalhauge, 2017
+License     : MIT
+Maintainer  : kalhuage@cs.ucla.edu
+-}
+
 {-# LANGUAGE DeriveGeneric   #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Language.JVM.Attribute.Code
@@ -13,8 +20,13 @@ module Language.JVM.Attribute.Code
   , WordSize
   , OneOrTwo (..)
   , ArithmeticType (..)
+  , SmallArithmeticType (..)
+  , BinOpr (..)
   , LocalType (..)
   , ArrayType (..)
+  , CmpOpr (..)
+  , LongOffset
+  , Offset
   ) where
 
 import           GHC.Generics          (Generic)
