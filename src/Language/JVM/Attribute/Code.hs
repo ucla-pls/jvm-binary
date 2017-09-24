@@ -27,6 +27,11 @@ module Language.JVM.Attribute.Code
   , CmpOpr (..)
   , LongOffset
   , Offset
+
+  , LocalAddress
+  , BitOpr
+  , FieldAccess
+  , Invokation
   ) where
 
 import           GHC.Generics          (Generic)

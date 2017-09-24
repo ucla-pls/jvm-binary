@@ -23,6 +23,8 @@ module Language.JVM.Attribute
 --  , module Language.JVM.Attribute.Code
   , Code
 
+  , Const
+
   ) where
 
 import           GHC.Generics                (Generic)
