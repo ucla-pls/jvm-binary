@@ -26,7 +26,7 @@ import           Language.JVM.Constant
 import           Language.JVM.Field
 import           Language.JVM.Method
 
--- | Create a class file form a lazy byte string
+-- | Create a class file from a lazy 'BL.ByteString'
 decodeClassFile :: BL.ByteString -> Either String ClassFile
 decodeClassFile bs = do
   case decodeOrFail bs of
