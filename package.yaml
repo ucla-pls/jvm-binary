@@ -1,30 +1,24 @@
-# This YAML file describes your package. Stack will automatically generate a
-# Cabal file when you run `stack build`. See the hpack website for help with
-# this file: <https://github.com/sol/hpack>.
-benchmarks:
-  jvm-binary-benchmarks:
-    dependencies:
-    - base
-    - jvm-binary
-    - criterion
-    - bytestring
-    ghc-options:
-    - -rtsopts
-    - -threaded
-    - -funbox-strict-fields
-    - -with-rtsopts=-N
-    main: Main.hs
-    source-dirs: benchmark
-category: Other
+name: jvm-binary
+version: '0.0.1'
+maintainer: Christian Gram Kalhauge
+synopsis: A library for reading Java class-files
+
+license: MIT
+license-file: LICENSE.md
+category: Language
+github: kalhauge/jvm-binary
+
 description: A library for reading Java class-files
+
+ghc-options: -Wall
+
 extra-source-files:
 - CHANGELOG.md
 - LICENSE.md
 - package.yaml
 - README.md
 - stack.yaml
-ghc-options: -Wall
-github: kalhauge/jvm-binary
+
 library:
   dependencies:
   - base
@@ -34,11 +28,7 @@ library:
   - text
   - vector
   source-dirs: src
-license: MIT
-license-file: LICENSE.md
-maintainer: Christian Gram Kalhauge
-name: jvm-binary
-synopsis: A library for reading Java class-files
+
 tests:
   jvm-binary-test-suite:
     dependencies:
@@ -61,4 +51,18 @@ tests:
     - -fno-warn-orphans
     main: Test.hs
     source-dirs: test-suite
-version: '0.0.1'
+
+benchmarks:
+  jvm-binary-benchmarks:
+    dependencies:
+    - base
+    - jvm-binary
+    - criterion
+    - bytestring
+    ghc-options:
+    - -rtsopts
+    - -threaded
+    - -funbox-strict-fields
+    - -with-rtsopts=-N
+    main: Main.hs
+    source-dirs: benchmark
