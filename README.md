@@ -17,10 +17,11 @@ import qualified Language.JVM.Attribute.Code as Code
 [docs](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7).
 The most notable and required are:
 
-  - StackMapTable (for Java 6 support)
-  - BootstrapMethods (for Java 7 support)
-
   - LineNumberTable
+
+- Add lenses for better access of deep fields
+
+- Add documentation for Code
 
 ## Developing
 

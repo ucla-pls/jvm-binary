@@ -1,20 +1,16 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Language.JVM.Attribute.StackMapTableTest where
 
 import           SpecHelper
 
-import           Data.Word
-
-import           Language.JVM.Attribute     (Attribute)
-import           Language.JVM.AttributeTest ()
-import           Language.JVM.ConstantTest ()
-import           Language.JVM.UtilsTest ()
+import           Language.JVM.AttributeTest           ()
+import           Language.JVM.ConstantTest            ()
+import           Language.JVM.UtilsTest               ()
 
 import           Language.JVM.Attribute.StackMapTable
-import qualified Language.JVM.Constant      as Constant
-
 
 prop_encode_and_decode :: StackMapTable -> Property
 prop_encode_and_decode = isoBinary

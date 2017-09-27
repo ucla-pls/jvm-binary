@@ -8,14 +8,18 @@ Maintainer  : kalhuage@cs.ucla.edu
 {-# LANGUAGE DeriveGeneric #-}
 module Language.JVM.Field
   ( Field (..)
+
+  -- * Attributes
+  , fConstantValue
   ) where
 
 import           Data.Binary
+import           Data.Monoid
 import           GHC.Generics            (Generic)
 
 import           Language.JVM.AccessFlag
-import           Language.JVM.Attribute  (Attribute)
-import           Language.JVM.Constant   (ConstantRef)
+import           Language.JVM.Attribute  (Attribute, ConstantValue, fromAttribute')
+import           Language.JVM.Constant   (ConstantRef, ConstantPool)
 import           Language.JVM.Utils
 
 -- | A Field in the class-file, as described
@@ -28,3 +32,9 @@ data Field = Field
   } deriving (Show, Eq, Generic)
 
 instance Binary Field where
+
+-- | Fetch the 'ConstantValue' attribute.
+-- There can only one be one exceptions attribute on a field.
+fConstantValue :: ConstantPool -> Field -> Maybe (Either String ConstantValue)
+fConstantValue cp =
+  getFirst . foldMap (First . fromAttribute' cp) . fAttributes

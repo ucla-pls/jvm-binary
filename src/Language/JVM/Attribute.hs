@@ -21,34 +21,43 @@ module Language.JVM.Attribute
   , IsAttribute (..)
   -- * SubAttributes
   , Code
+  , codeStackMapTable
   , ConstantValue
+  , Exceptions
+  , StackMapTable
+  , BootstrapMethods
 
   -- * Helpers
   , Const
   ) where
 
-import           GHC.Generics                (Generic)
+import           GHC.Generics                            (Generic)
 
 import           Data.Bifunctor
 import           Data.Binary
-import qualified Data.ByteString             as BS
-import qualified Data.ByteString.Lazy        as BL
-import           Data.Text                   as Text
+import qualified Data.ByteString                         as BS
+import qualified Data.ByteString.Lazy                    as BL
+import           Data.Monoid
+import           Data.Text                               as Text
 
-import           Language.JVM.Constant       (ConstantPool, ConstantRef,
-                                              lookupText)
-import           Language.JVM.Utils          (SizedByteString32, trd,
-                                              unSizedByteString)
+import           Language.JVM.Constant                   (ConstantPool,
+                                                          ConstantRef,
+                                                          lookupText)
+import           Language.JVM.Utils                      (SizedByteString32,
+                                                          trd,
+                                                          unSizedByteString)
 
-import qualified Language.JVM.Attribute.Code
-import           Language.JVM.Attribute.ConstantValue (ConstantValue)
-import           Language.JVM.Attribute.Exceptions (Exceptions)
+import           Language.JVM.Attribute.BootstrapMethods (BootstrapMethods)
+import qualified Language.JVM.Attribute.Code             as Code
+import           Language.JVM.Attribute.ConstantValue    (ConstantValue)
+import           Language.JVM.Attribute.Exceptions       (Exceptions)
+import           Language.JVM.Attribute.StackMapTable    (StackMapTable)
 
 -- | An Attribute, simply contains of a reference to a name and
 -- contains info.
 data Attribute = Attribute
   { aNameIndex :: ! ConstantRef
-  , aInfo'      :: ! SizedByteString32
+  , aInfo'     :: ! SizedByteString32
   } deriving (Show, Eq, Generic)
 
 instance Binary Attribute where
@@ -93,21 +102,39 @@ readFromStrict =
 
 -- # Attributes
 
--- | Code is redefined with Attribute, as it is recursively containing
--- 'Attribute'. This is a small hack to fix it.
-type Code = Language.JVM.Attribute.Code.Code Attribute
 
--- | Code is an Attribute.
+-- | 'Code' is an Attribute.
 instance IsAttribute Code where
   attrName = Const "Code"
   fromAttribute = readFromStrict
 
--- | ConstantValue is an Attribute.
+-- | 'ConstantValue' is an Attribute.
 instance IsAttribute ConstantValue where
   attrName = Const "ConstantValue"
   fromAttribute = readFromStrict
 
--- | Exceptions is an Attribute.
+-- | 'Exceptions' is an Attribute.
 instance IsAttribute Exceptions where
   attrName = Const "Exceptions"
   fromAttribute = readFromStrict
+
+-- | 'StackMapTable' is an Attribute.
+instance IsAttribute StackMapTable where
+  attrName = Const "StackMapTable"
+  fromAttribute = readFromStrict
+
+-- | 'BootstrapMethods' is an Attribute.
+instance IsAttribute BootstrapMethods where
+  attrName = Const "BootstrapMethods"
+  fromAttribute = readFromStrict
+
+-- | Code is redefined with Attribute, as it is recursively containing
+-- 'Attribute'. This is a small hack to fix it.
+type Code = Code.Code Attribute
+
+-- | The a attribute of the code is the StackMapTable. There can be at most one.
+-- If the version number of the file is more than 50, and there is no StackMapTable.
+-- there is an implicit empty StackMapTable.
+codeStackMapTable :: ConstantPool -> Code -> Maybe (Either String BootstrapMethods)
+codeStackMapTable cp =
+  getFirst . foldMap (First . fromAttribute' cp) . Code.attributes

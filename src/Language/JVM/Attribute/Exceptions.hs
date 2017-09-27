@@ -11,6 +11,7 @@ exceptions that a method can make.
 
 module Language.JVM.Attribute.Exceptions
   ( Exceptions (..)
+  , exceptionIndexTable
   ) where
 
 import           GHC.Generics          (Generic)
@@ -23,7 +24,11 @@ import           Language.JVM.Utils
 -- | An Exceptions attribute is a list of references into the
 -- constant pool.
 data Exceptions = Exceptions
-  { exceptionIndexTable :: SizedList16 ConstantRef
+  { exceptionIndexTable' :: SizedList16 ConstantRef
   } deriving (Show, Eq, Generic)
+
+-- | Get the constant refs that points .
+exceptionIndexTable :: Exceptions -> [ConstantRef]
+exceptionIndexTable = unSizedList . exceptionIndexTable'
 
 instance Binary Exceptions where

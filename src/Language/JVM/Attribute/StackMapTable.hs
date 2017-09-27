@@ -36,13 +36,16 @@ data StackMapTable = StackMapTable
 
 instance Binary StackMapTable where
 
+-- | A delta offset
 type DeltaOffset = Word8
 
+-- | An stack map frame
 data StackMapFrame = StackMapFrame
   { deltaOffset :: DeltaOffset
   , frameType :: StackMapFrameType
   } deriving (Show, Eq)
 
+-- | An stack map frame type
 data StackMapFrameType
   = SameFrame
   | SameLocals1StackItemFrame VerificationTypeInfo
@@ -129,6 +132,7 @@ instance Binary StackMapFrame where
         put ls1
         put ls2
 
+-- | The types info of the stack map frame.
 data VerificationTypeInfo
   = VTop
   | VInteger

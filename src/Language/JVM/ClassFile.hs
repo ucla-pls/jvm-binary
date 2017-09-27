@@ -18,14 +18,18 @@ module Language.JVM.ClassFile
 
   , cThisClass
   , cSuperClass
+
+  -- * Attributes
+  , cBootstrapMethods
   ) where
 
 import           Data.Binary
+import           Data.Monoid
 import qualified Data.Text               as Text
 import           GHC.Generics            (Generic)
 
 import           Language.JVM.AccessFlag
-import           Language.JVM.Attribute  (Attribute)
+import           Language.JVM.Attribute  (Attribute, BootstrapMethods, fromAttribute')
 import           Language.JVM.Constant
 import           Language.JVM.Field      (Field)
 import           Language.JVM.Method     (Method)
@@ -67,10 +71,6 @@ cFields = unSizedList . cFields'
 cMethods :: ClassFile -> [Method]
 cMethods = unSizedList . cMethods'
 
--- | Get a list of 'Attribute's of a ClassFile.
-cAttributes :: ClassFile -> [Attribute]
-cAttributes = unSizedList . cAttributes'
-
 -- | Lookup the this class in a ConstantPool
 cThisClass :: ConstantPool -> ClassFile -> Maybe Text.Text
 cThisClass cp = flip lookupClassName cp . cThisClassIndex
@@ -79,12 +79,12 @@ cThisClass cp = flip lookupClassName cp . cThisClassIndex
 cSuperClass :: ConstantPool -> ClassFile -> Maybe Text.Text
 cSuperClass cp = flip lookupClassName cp . cSuperClassIndex
 
+-- | Get a list of 'Attribute's of a ClassFile.
+cAttributes :: ClassFile -> [Attribute]
+cAttributes = unSizedList . cAttributes'
 
--- -- $accesors
--- textOf :: ClassFile -> ConstantRef -> Maybe Text.Text
--- textOf cf cr =
---   lookupText cr (cConstantPool cf)
-
--- constantOf :: ClassFile -> ConstantRef -> Maybe Constant
--- constantOf cf cr =
---   lookupConstant cr (cConstantPool cf)
+-- | Fetch the 'BootstrapMethods' attribute.
+-- There can only one be one exceptions attribute on a class-file.
+cBootstrapMethods :: ConstantPool -> ClassFile -> Maybe (Either String BootstrapMethods)
+cBootstrapMethods cp =
+  getFirst . foldMap (First . fromAttribute' cp) . cAttributes

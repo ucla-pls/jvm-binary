@@ -1,9 +1,14 @@
 # Change log
 
-## Version 0.0.x
+## Version 0.0.X
+
+## Version 0.0.2
 
 - Fix problems with package.yaml file
-- Add ConstantValue and Exceptions
+- Add ConstantValue 
+- Add Exceptions
+- Add StackMapTable
+- Add BootstrapMethods
 
 ## Version 0.0.1
 

@@ -14,7 +14,11 @@ module Language.JVM.Method
 
   , mName
   , mDescriptor
+
+  -- * Attributes
   , mCode
+  , mExceptions
+
   ) where
 
 import           Data.Binary
@@ -25,7 +29,7 @@ import           GHC.Generics            (Generic)
 import           Data.Monoid
 
 import           Language.JVM.AccessFlag
-import           Language.JVM.Attribute  (Attribute, fromAttribute', Code)
+import           Language.JVM.Attribute  (Attribute, fromAttribute', Code, Exceptions)
 import           Language.JVM.Constant   (ConstantRef, ConstantPool, lookupText)
 import           Language.JVM.Utils
 
@@ -56,7 +60,14 @@ mName cp = flip lookupText cp . mNameIndex
 mDescriptor :: ConstantPool -> Method -> Maybe Text.Text
 mDescriptor cp = flip lookupText cp . mDescriptorIndex
 
--- | Fetch the first 'Code' Attribute.
+-- | Fetch the 'Code' attribute, if any.
+-- There can only one be one code attribute on a method.
 mCode :: ConstantPool -> Method -> Maybe (Either String Code)
 mCode cp =
+  getFirst . foldMap (First . fromAttribute' cp) . mAttributes
+
+-- | Fetch the 'Exceptions' attribute.
+-- There can only one be one exceptions attribute on a method.
+mExceptions :: ConstantPool -> Method -> Maybe (Either String Exceptions)
+mExceptions cp =
   getFirst . foldMap (First . fromAttribute' cp) . mAttributes
