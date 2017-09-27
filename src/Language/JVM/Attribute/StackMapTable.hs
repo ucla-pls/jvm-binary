@@ -88,6 +88,7 @@ instance Binary StackMapFrame where
         | otherwise
         = fail $ "Unknown frame type '0x" ++ showHex ft "'"
     framegetter
+
   put (StackMapFrame off frame) = do
     case frame of
 
@@ -117,11 +118,13 @@ instance Binary StackMapFrame where
       AppendFrame vs
         | length vs <= 3 && 0 < length vs -> do
           putWord8 (fromIntegral $ 251 + length vs)
+          putWord8 off
           mapM_ put vs
         | otherwise ->
           fail $ "The AppendFrame has to contain at least 1 and at most 3 elements: " ++ show vs
 
       FullFrame ls1 ls2 -> do
+        putWord8 255
         put off
         put ls1
         put ls2
