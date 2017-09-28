@@ -84,7 +84,8 @@ cAttributes :: ClassFile -> [Attribute]
 cAttributes = unSizedList . cAttributes'
 
 -- | Fetch the 'BootstrapMethods' attribute.
--- There can only one be one exceptions attribute on a class-file.
+-- There can only one bootstrap methods per class, but there might not be
+-- one.
 cBootstrapMethods :: ConstantPool -> ClassFile -> Maybe (Either String BootstrapMethods)
 cBootstrapMethods cp =
   getFirst . foldMap (First . fromAttribute' cp) . cAttributes
