@@ -6,7 +6,7 @@ synopsis: A library for reading Java class-files
 
 license: MIT
 license-file: LICENSE.md
-category: Language, Java
+category: Language, Java, JVM
 github: ucla-pls/jvm-binary
 
 description: A library for reading Java class-files.
