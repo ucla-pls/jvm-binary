@@ -1,8 +1,10 @@
 # Change log
 
-## Version 0.0.X
+## Version 0.1.0
 
 - Fix documentation
+- Remove ConstantRef
+
 
 ## Version 0.0.2
 

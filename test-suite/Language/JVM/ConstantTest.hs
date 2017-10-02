@@ -11,10 +11,6 @@ import qualified Data.IntMap as IM
 prop_encode_and_decode :: ConstantPool -> Property
 prop_encode_and_decode = isoBinary
 
-instance Arbitrary ConstantRef where
-  arbitrary =
-    ConstantRef <$> arbitrary
-
 instance (InConstantPool a) => Arbitrary (Index a) where
   arbitrary =
     Index <$> arbitrary

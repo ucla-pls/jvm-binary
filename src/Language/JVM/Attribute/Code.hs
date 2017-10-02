@@ -52,8 +52,8 @@ import qualified Data.ByteString.Lazy  as BL
 import           Data.Int
 import qualified Data.Vector           as V
 
-import           Language.JVM.Constant (ClassName, Constant, ConstantRef (..),
-                                        FieldId, InClass, Index (..), MethodId)
+import           Language.JVM.Constant (ClassName, Constant, Index(..), indexAsWord,
+                                        FieldId, InClass, MethodId)
 import           Language.JVM.Utils
 
 
@@ -330,7 +330,7 @@ instance Binary ByteCodeOpr where
       0x10 -> Push . CByte <$> get
       0x11 -> Push . CShort <$> get
 
-      0x12 -> Push . CHalfRef . Index . ConstantRef . fromIntegral <$> getWord8
+      0x12 -> Push . CHalfRef . Index . fromIntegral <$> getWord8
       0x13 -> Push . CRef One <$> get
       0x14 -> Push . CRef Two <$> get
 
@@ -659,7 +659,7 @@ instance Binary ByteCodeOpr where
       Push (CByte x) -> putInt8 0x10 >> put x
       Push (CShort x) -> putInt8 0x11 >> put x
 
-      Push (CHalfRef (Index (ConstantRef r))) -> putInt8 0x12 >> putWord8 (fromIntegral r)
+      Push (CHalfRef x) -> putInt8 0x12 >> putWord8 (fromIntegral (indexAsWord x))
       Push (CRef One r) -> putInt8 0x13 >> put r
       Push (CRef Two r) -> putInt8 0x14 >> put r
       _ -> P.fail $ "Is not able to print '" ++ show bc ++ "' yet."

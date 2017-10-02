@@ -16,11 +16,11 @@ import           GHC.Generics          (Generic)
 
 import           Data.Binary
 
-import           Language.JVM.Constant (ConstantRef (..))
+import           Language.JVM.Constant (Index, Constant)
 
 -- | A constant value is just a index into the constant pool.
 data ConstantValue = ConstantValue
-  { constantValueIndex :: !ConstantRef
+  { constantValueIndex :: Index Constant
   } deriving (Show, Eq, Generic)
 
 instance Binary ConstantValue where

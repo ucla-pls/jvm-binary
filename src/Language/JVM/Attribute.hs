@@ -40,7 +40,7 @@ import qualified Data.ByteString.Lazy                    as BL
 import           Data.Monoid
 import           Data.Text                               as Text
 
-import           Language.JVM.Constant                   (ConstantPool, Index(..), deref)
+import           Language.JVM.Constant                   (ConstantPool, Index, deref)
 import           Language.JVM.Utils                      (SizedByteString32,
                                                           trd,
                                                           unSizedByteString)

@@ -10,7 +10,6 @@ are essential for accessing data in the class-file.
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RankNTypes    #-}
 {-# LANGUAGE GADTs    #-}
 module Language.JVM.Constant
@@ -32,15 +31,11 @@ module Language.JVM.Constant
     -- $ConstantPool
   , ConstantPool (..)
 
-  , ConstantRef (..)
-  , Index (..)
+  , Index(..)
+  , indexAsWord
   , InConstantPool (..)
 
-  , toListOfConstants
-
   ) where
-
-import           GHC.Generics       (Generic)
 
 import           Prelude            hiding (fail, lookup)
 
@@ -58,14 +53,6 @@ import           Language.JVM.Utils
 import qualified Data.Text          as Text
 import qualified Data.Text.Encoding as TE
 
--- | A constant is referenced by the ConstantRef data type. It is
--- just a 16 bit word, but wrapped for type safety.
-newtype ConstantRef =
-  ConstantRef Word16
-  deriving (Eq, Show, Generic)
-
-instance Binary ConstantRef where
-
 -- | A constant is a multi word item in the 'ConstantPool'. Each of
 -- the constructors are pretty much self expiatory from the types.
 data Constant
@@ -80,9 +67,9 @@ data Constant
   | MethodRef (Index ClassName) (Index MethodId)
   | InterfaceMethodRef (Index ClassName) (Index MethodId)
   | NameAndType (Index Text.Text) (Index Text.Text)
-  | MethodHandle !Word8 !ConstantRef
+  | MethodHandle !Word8 (Index Constant)
   | MethodType (Index MethodDescriptor)
-  | InvokeDynamic !Word16 !ConstantRef
+  | InvokeDynamic !Word16 (Index Constant)
   deriving (Show, Eq)
 
 instance Binary Constant where
@@ -120,6 +107,7 @@ instance Binary Constant where
       NameAndType i j        -> do putWord8 12; put i; put j
       MethodHandle i j       -> do putWord8 15; put i; put j
       MethodType i           -> do putWord8 16; put i;
+
       InvokeDynamic i j      -> do putWord8 18; put i; put j
 
 -- | Some of the 'Constant's take up more space in the constant pool than other.
@@ -175,10 +163,10 @@ newtype ConstantPool = ConstantPool
   { unConstantPool :: IM.IntMap Constant
   } deriving (Show, Eq)
 
--- | Return a list of reference-constant pairs.
-toListOfConstants :: ConstantPool -> [(ConstantRef, Constant)]
-toListOfConstants =
-  map (\(a,b) -> (ConstantRef . fromIntegral $ a, b)) . IM.toList . unConstantPool
+-- -- | Return a list of reference-constant pairs.
+-- toListOfConstants :: ConstantPool -> [(, Constant)]
+-- toListOfConstants =
+--   map (\(a,b) -> (ConstantRef . fromIntegral $ a, b)) . IM.toList . unConstantPool
 
 instance Binary ConstantPool where
   get = do
@@ -200,8 +188,8 @@ instance Binary ConstantPool where
         putInt16be 0
 
 -- | Lookup a 'Constant' in the 'ConstantPool'.
-derefConstant :: ConstantPool -> ConstantRef -> Maybe Constant
-derefConstant (ConstantPool cp) (ConstantRef ref) =
+derefConstant :: ConstantPool -> Word16 -> Maybe Constant
+derefConstant (ConstantPool cp) ref =
   IM.lookup (fromIntegral ref) cp
 
 -- This part contains helpers to describe some of the semantics of the
@@ -209,7 +197,11 @@ derefConstant (ConstantPool cp) (ConstantRef ref) =
 
 -- | Describes an index into the constant pool
 data Index x where
-  Index :: (InConstantPool x) => ConstantRef -> Index x
+  Index :: (InConstantPool x) => Word16 -> Index x
+
+-- | Get the internal word of the index
+indexAsWord :: Index x -> Word16
+indexAsWord (Index x) = x
 
 deriving instance (Show (Index x))
 deriving instance (Eq (Index x))
