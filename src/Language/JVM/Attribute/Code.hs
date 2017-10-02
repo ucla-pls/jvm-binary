@@ -16,7 +16,7 @@ module Language.JVM.Attribute.Code
   , ByteCodeInst (..)
   , ByteCodeOpr (..)
 
-  , Constant (..)
+  , CConstant (..)
   , WordSize
   , OneOrTwo (..)
   , ArithmeticType (..)
@@ -52,7 +52,8 @@ import qualified Data.ByteString.Lazy  as BL
 import           Data.Int
 import qualified Data.Vector           as V
 
-import           Language.JVM.Constant (ConstantRef (..))
+import           Language.JVM.Constant (ClassName, Constant, ConstantRef (..),
+                                        FieldId, InClass, Index (..), MethodId)
 import           Language.JVM.Utils
 
 
@@ -100,7 +101,7 @@ data ExceptionTable = ExceptionTable
   -- ^ Exclusive program counter into 'code'
   , handler   :: ! Word16
   -- ^ A program counter into 'code' indicating the handler.
-  , catchType :: ! ConstantRef
+  , catchType :: Index ClassName
   }
   deriving (Show, Eq, Generic)
 
@@ -150,7 +151,7 @@ data OneOrTwo = One | Two
 
 type WordSize = OneOrTwo
 
-data Constant
+data CConstant
   = CNull
 
   | CIntM1
@@ -174,8 +175,8 @@ data Constant
   | CByte Int8
   | CShort Int16
 
-  | CHalfRef ConstantRef
-  | CRef WordSize ConstantRef
+  | CHalfRef (Index Constant)
+  | CRef WordSize (Index Constant)
   deriving (Show, Eq)
 
 data BinOpr
@@ -218,7 +219,7 @@ data ByteCodeOpr
   | ArrayStore (ArrayType ())
   -- ^ aastore bastore ...
 
-  | Push Constant
+  | Push CConstant
 
   | Load LocalType LocalAddress
   -- ^ aload_0, bload_2, iload 5 ...
@@ -266,25 +267,25 @@ data ByteCodeOpr
   | LookupSwitch Int32 (V.Vector (Int32, Int32))
   -- ^ a lookup switch has a `default` value and a list of pairs.
 
-  | Get FieldAccess ConstantRef
-  | Put FieldAccess ConstantRef
+  | Get FieldAccess (Index (InClass FieldId))
+  | Put FieldAccess (Index (InClass FieldId))
 
-  | Invoke Invokation ConstantRef
+  | Invoke Invokation (Index (InClass MethodId))
 
-  | New ConstantRef
-  | NewArray (ArrayType ConstantRef)
+  | New (Index ClassName)
+  | NewArray (ArrayType (Index ClassName))
 
   | ArrayLength
 
   | Throw
 
-  | CheckCast ConstantRef
-  | InstanceOf ConstantRef
+  | CheckCast (Index ClassName)
+  | InstanceOf (Index ClassName)
 
   | Monitor Bool
   -- ^ True => Enter, False => Exit
 
-  | MultiNewArray ConstantRef Word8
+  | MultiNewArray (Index ClassName) Word8
   -- ^ Create a new multi array of #1 and with #2 dimensions
 
   | Return (Maybe LocalType)
@@ -329,7 +330,7 @@ instance Binary ByteCodeOpr where
       0x10 -> Push . CByte <$> get
       0x11 -> Push . CShort <$> get
 
-      0x12 -> Push . CHalfRef . ConstantRef . fromIntegral <$> getWord8
+      0x12 -> Push . CHalfRef . Index . ConstantRef . fromIntegral <$> getWord8
       0x13 -> Push . CRef One <$> get
       0x14 -> Push . CRef Two <$> get
 
@@ -658,7 +659,7 @@ instance Binary ByteCodeOpr where
       Push (CByte x) -> putInt8 0x10 >> put x
       Push (CShort x) -> putInt8 0x11 >> put x
 
-      Push (CHalfRef (ConstantRef r)) -> putInt8 0x12 >> putWord8 (fromIntegral r)
-      Push (CRef One (ConstantRef r)) -> putInt8 0x13 >> put r
-      Push (CRef Two (ConstantRef r)) -> putInt8 0x14 >> put r
+      Push (CHalfRef (Index (ConstantRef r))) -> putInt8 0x12 >> putWord8 (fromIntegral r)
+      Push (CRef One r) -> putInt8 0x13 >> put r
+      Push (CRef Two r) -> putInt8 0x14 >> put r
       _ -> P.fail $ "Is not able to print '" ++ show bc ++ "' yet."

@@ -30,15 +30,15 @@ import           Data.Monoid
 
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute  (Attribute, fromAttribute', Code, Exceptions)
-import           Language.JVM.Constant   (ConstantRef, ConstantPool, lookupText)
+import           Language.JVM.Constant   (ConstantPool, Index, deref)
 import           Language.JVM.Utils
 
 -- | A Method in the class-file, as described
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.6).
 data Method = Method
   { mAccessFlags'    :: BitSet16 MAccessFlag
-  , mNameIndex       :: ! ConstantRef
-  , mDescriptorIndex :: ! ConstantRef
+  , mNameIndex       :: Index Text.Text
+  , mDescriptorIndex :: Index Text.Text
   , mAttributes'     :: SizedList16 Attribute
   } deriving (Show, Eq, Generic)
 
@@ -54,11 +54,11 @@ mAttributes = unSizedList . mAttributes'
 
 -- | Lookup the name of the method in the 'ConstantPool'.
 mName :: ConstantPool -> Method -> Maybe Text.Text
-mName cp = flip lookupText cp . mNameIndex
+mName cp = deref cp . mNameIndex
 
 -- | Lookup the descriptor of the method in the 'ConstantPool'.
 mDescriptor :: ConstantPool -> Method -> Maybe Text.Text
-mDescriptor cp = flip lookupText cp . mDescriptorIndex
+mDescriptor cp = deref cp . mDescriptorIndex
 
 -- | Fetch the 'Code' attribute, if any.
 -- There can only one be one code attribute on a method.

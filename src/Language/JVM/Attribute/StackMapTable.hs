@@ -25,7 +25,7 @@ import           Data.Binary
 import           Numeric
 import           Control.Monad (replicateM)
 
-import           Language.JVM.Constant (ConstantRef (..))
+import           Language.JVM.Constant (Index, ClassName)
 import           Language.JVM.Utils
 
 -- | An Exceptions attribute is a list of references into the
@@ -141,7 +141,7 @@ data VerificationTypeInfo
   | VDouble
   | VNull
   | VUninitializedThis
-  | VObject !ConstantRef
+  | VObject (Index ClassName)
   | VUninitialized !Word16
   deriving (Show, Eq)
 

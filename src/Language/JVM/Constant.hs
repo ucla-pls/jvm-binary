@@ -8,24 +8,36 @@ This module contains the 'Constant' type and the 'ConstantPool'. These
 are essential for accessing data in the class-file.
 -}
 
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RankNTypes    #-}
+{-# LANGUAGE GADTs    #-}
 module Language.JVM.Constant
   (
     -- * Constant
     Constant (..)
   , constantSize
-  , ConstantRef (..)
+
+    -- ** Special constants
+  , InClass (..)
+  , MethodId (..)
+  , FieldId (..)
+  , ClassName (..)
+
+  , MethodDescriptor
+  , FieldDescriptor
 
     -- * Constant Pool
     -- $ConstantPool
   , ConstantPool (..)
 
-  , lookupConstant
-  , lookupText
-  , lookupClassName
+  , ConstantRef (..)
+  , Index (..)
+  , InConstantPool (..)
 
   , toListOfConstants
+
   ) where
 
 import           GHC.Generics       (Generic)
@@ -62,15 +74,15 @@ data Constant
   | Float !Word32
   | Long !Word64
   | Double !Word64
-  | ClassRef !ConstantRef
-  | StringRef !ConstantRef
-  | FieldRef !ConstantRef !ConstantRef
-  | MethodRef !ConstantRef !ConstantRef
-  | InterfaceMethodRef !ConstantRef !ConstantRef
-  | NameAndType !ConstantRef !ConstantRef
+  | ClassRef (Index Text.Text)
+  | StringRef (Index Text.Text)
+  | FieldRef (Index ClassName) (Index FieldId)
+  | MethodRef (Index ClassName) (Index MethodId)
+  | InterfaceMethodRef (Index ClassName) (Index MethodId)
+  | NameAndType (Index Text.Text) (Index Text.Text)
   | MethodHandle !Word8 !ConstantRef
-  | MethodType !ConstantRef
-  | InvokeDynamic !ConstantRef !ConstantRef
+  | MethodType (Index MethodDescriptor)
+  | InvokeDynamic !Word16 !ConstantRef
   deriving (Show, Eq)
 
 instance Binary Constant where
@@ -122,6 +134,36 @@ constantSize x =
     Long _   -> 2
     _        -> 1
 
+-- | A class name
+newtype ClassName = ClassName
+  { classNameAsText :: Text.Text
+  } deriving (Show, Eq, Ord)
+
+-- | Any thing pointing inside a class
+data InClass a = InClass
+  { inClassName :: ClassName
+  , inClassId :: a
+  } deriving (Show, Eq, Ord)
+
+-- | A method identifier
+data MethodId = MethodId
+  { methodIdName :: Text.Text
+  , methodIdDescription :: MethodDescriptor
+  } deriving (Show, Eq, Ord)
+
+-- | A field identifier
+data FieldId = FieldId
+  { fieldIdName :: Text.Text
+  , fieldIdDescription :: FieldDescriptor
+  } deriving (Show, Eq, Ord)
+
+-- | Method Descriptor
+type MethodDescriptor = Text.Text
+
+-- | Field Descriptor
+type FieldDescriptor = Text.Text
+
+
 -- $ConstantPool
 --
 -- The 'ConstantPool' contains all the constants, and is accessible using the
@@ -158,23 +200,64 @@ instance Binary ConstantPool where
         putInt16be 0
 
 -- | Lookup a 'Constant' in the 'ConstantPool'.
-lookupConstant :: ConstantRef -> ConstantPool -> Maybe Constant
-lookupConstant (ConstantRef ref) (ConstantPool cp) =
+derefConstant :: ConstantPool -> ConstantRef -> Maybe Constant
+derefConstant (ConstantPool cp) (ConstantRef ref) =
   IM.lookup (fromIntegral ref) cp
+
+-- This part contains helpers to describe some of the semantics of the
+-- class file.
+
+-- | Describes an index into the constant pool
+data Index x where
+  Index :: (InConstantPool x) => ConstantRef -> Index x
+
+deriving instance (Show (Index x))
+deriving instance (Eq (Index x))
+
+instance (InConstantPool x) => Binary (Index x) where
+  get = Index <$> get
+  put (Index ref) = put ref
+
+-- | Describes if a type is in the constant pool
+class InConstantPool a where
+  deref :: ConstantPool -> Index a -> Maybe a
+
+instance InConstantPool Constant where
+  deref cp (Index ref) =
+    derefConstant cp ref
 
 -- | Lookup a 'Text.Text' in the 'ConstantPool', returns 'Nothing' if the
 -- reference does not point to something in the ConstantPool, if it points to
 -- something not a 'Language.JVM.Constant.String' Constant, or if it is
 -- impossible to decode the 'ByteString' as Utf8.
-lookupText :: ConstantRef -> ConstantPool -> Maybe Text.Text
-lookupText ref cp = do
-  String str <- lookupConstant ref cp
-  case TE.decodeUtf8' . unSizedByteString $ str of
-    Left _    -> Nothing
-    Right txt -> Just txt
+instance InConstantPool Text.Text where
+  deref cp (Index ref) = do
+    String str <- derefConstant cp ref
+    case TE.decodeUtf8' . unSizedByteString $ str of
+      Left _    -> Nothing
+      Right txt -> Just txt
 
--- | Lookup a class name in the 'ConstantPool', returns 'Nothing' otherwise.
-lookupClassName :: ConstantRef -> ConstantPool -> Maybe Text.Text
-lookupClassName ref cp = do
-  ClassRef r <- lookupConstant ref cp
-  lookupText r cp
+instance InConstantPool ClassName where
+  deref cp (Index ref) = do
+    ClassRef r <- derefConstant cp ref
+    ClassName <$> deref cp r
+
+instance InConstantPool (InClass MethodId) where
+  deref cp (Index ref) = do
+    MethodRef cn rt <- derefConstant cp ref
+    InClass <$> deref cp cn <*> deref cp rt
+
+instance InConstantPool (InClass FieldId) where
+  deref cp (Index ref) = do
+    FieldRef cn rt <- derefConstant cp ref
+    InClass <$> deref cp cn <*> deref cp rt
+
+instance InConstantPool MethodId where
+  deref cp (Index ref) = do
+    NameAndType n t <- derefConstant cp ref
+    MethodId <$> deref cp n <*> deref cp t
+
+instance InConstantPool FieldId where
+  deref cp (Index ref) = do
+    NameAndType n t <- derefConstant cp ref
+    FieldId <$> deref cp n <*> deref cp t

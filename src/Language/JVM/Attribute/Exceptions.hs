@@ -18,17 +18,17 @@ import           GHC.Generics          (Generic)
 
 import           Data.Binary
 
-import           Language.JVM.Constant (ConstantRef (..))
+import           Language.JVM.Constant (Index, ClassName)
 import           Language.JVM.Utils
 
 -- | An Exceptions attribute is a list of references into the
 -- constant pool.
 data Exceptions = Exceptions
-  { exceptionIndexTable' :: SizedList16 ConstantRef
+  { exceptionIndexTable' :: SizedList16 (Index ClassName)
   } deriving (Show, Eq, Generic)
 
 -- | Get the constant refs that points .
-exceptionIndexTable :: Exceptions -> [ConstantRef]
+exceptionIndexTable :: Exceptions -> [(Index ClassName)]
 exceptionIndexTable = unSizedList . exceptionIndexTable'
 
 instance Binary Exceptions where

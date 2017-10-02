@@ -15,6 +15,10 @@ instance Arbitrary ConstantRef where
   arbitrary =
     ConstantRef <$> arbitrary
 
+instance (InConstantPool a) => Arbitrary (Index a) where
+  arbitrary =
+    Index <$> arbitrary
+
 instance Arbitrary ConstantPool where
   arbitrary =
     ConstantPool . IM.fromList . go 1 <$> arbitrary

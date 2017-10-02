@@ -40,9 +40,7 @@ import qualified Data.ByteString.Lazy                    as BL
 import           Data.Monoid
 import           Data.Text                               as Text
 
-import           Language.JVM.Constant                   (ConstantPool,
-                                                          ConstantRef,
-                                                          lookupText)
+import           Language.JVM.Constant                   (ConstantPool, Index(..), deref)
 import           Language.JVM.Utils                      (SizedByteString32,
                                                           trd,
                                                           unSizedByteString)
@@ -56,7 +54,7 @@ import           Language.JVM.Attribute.StackMapTable    (StackMapTable)
 -- | An Attribute, simply contains of a reference to a name and
 -- contains info.
 data Attribute = Attribute
-  { aNameIndex :: ! ConstantRef
+  { aNameIndex :: Index Text.Text
   , aInfo'     :: ! SizedByteString32
   } deriving (Show, Eq, Generic)
 
@@ -70,7 +68,7 @@ aInfo = unSizedByteString . aInfo'
 -- | Extracts the name from the attribute, if it exists in the
 -- ConstantPool.
 aName :: ConstantPool -> Attribute -> Maybe Text.Text
-aName cp as = lookupText (aNameIndex as) cp
+aName cp = deref cp . aNameIndex
 
 -- | Create a type dependent on another type 'b',
 -- used for accessing the correct 'attrName' in 'IsAttribute'.

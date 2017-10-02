@@ -20,7 +20,7 @@ import           GHC.Generics          (Generic)
 
 import           Data.Binary
 
-import           Language.JVM.Constant (ConstantRef (..))
+import           Language.JVM.Constant (InClass, MethodId, Index, Constant)
 import           Language.JVM.Utils
 
 -- | Is a list of bootstrapped methods.
@@ -36,12 +36,12 @@ methods = unSizedList . methods'
 
 -- | A bootstraped methods.
 data BootstrapMethod = BootstrapMethod
-  { methodIndex :: ConstantRef
-  , arguments' :: SizedList16 ConstantRef
+  { methodIndex :: Index (InClass MethodId)
+  , arguments' :: SizedList16 (Index Constant)
   } deriving (Show, Eq, Generic)
 
--- | The arguments is a cool
-arguments :: BootstrapMethod -> [ ConstantRef ]
+-- | The arguments as a list
+arguments :: BootstrapMethod -> [ Index Constant ]
 arguments = unSizedList . arguments'
 
 instance Binary BootstrapMethod where

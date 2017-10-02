@@ -25,11 +25,11 @@ module Language.JVM.ClassFile
 
 import           Data.Binary
 import           Data.Monoid
-import qualified Data.Text               as Text
 import           GHC.Generics            (Generic)
 
 import           Language.JVM.AccessFlag
-import           Language.JVM.Attribute  (Attribute, BootstrapMethods, fromAttribute')
+import           Language.JVM.Attribute  (Attribute, BootstrapMethods,
+                                          fromAttribute')
 import           Language.JVM.Constant
 import           Language.JVM.Field      (Field)
 import           Language.JVM.Method     (Method)
@@ -48,10 +48,10 @@ data ClassFile = ClassFile
 
   , cAccessFlags     :: BitSet16 CAccessFlag
 
-  , cThisClassIndex  :: !ConstantRef
-  , cSuperClassIndex :: !ConstantRef
+  , cThisClassIndex  :: Index ClassName
+  , cSuperClassIndex :: Index ClassName
 
-  , cInterfaces'     :: SizedList16 ConstantRef
+  , cInterfaces'     :: SizedList16 (Index ClassName)
   , cFields'         :: SizedList16 Field
   , cMethods'        :: SizedList16 Method
   , cAttributes'     :: SizedList16 Attribute
@@ -60,7 +60,7 @@ data ClassFile = ClassFile
 instance Binary ClassFile where
 
 -- | Get a list of 'ConstantRef's to interfaces.
-cInterfaces :: ClassFile -> [ConstantRef]
+cInterfaces :: ClassFile -> [ Index ClassName ]
 cInterfaces = unSizedList . cInterfaces'
 
 -- | Get a list of 'Field's of a ClassFile.
@@ -72,12 +72,12 @@ cMethods :: ClassFile -> [Method]
 cMethods = unSizedList . cMethods'
 
 -- | Lookup the this class in a ConstantPool
-cThisClass :: ConstantPool -> ClassFile -> Maybe Text.Text
-cThisClass cp = flip lookupClassName cp . cThisClassIndex
+cThisClass :: ConstantPool -> ClassFile -> Maybe ClassName
+cThisClass cp = deref cp . cThisClassIndex
 
 -- | Lookup the super class in the ConstantPool
-cSuperClass :: ConstantPool -> ClassFile -> Maybe Text.Text
-cSuperClass cp = flip lookupClassName cp . cSuperClassIndex
+cSuperClass :: ConstantPool -> ClassFile -> Maybe ClassName
+cSuperClass cp = deref cp . cSuperClassIndex
 
 -- | Get a list of 'Attribute's of a ClassFile.
 cAttributes :: ClassFile -> [Attribute]
