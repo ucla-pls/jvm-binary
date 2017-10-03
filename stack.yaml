@@ -1,6 +1,8 @@
 resolver: lts-9.3
 packages:
 - .
-extra-deps: []
+extra-deps: 
+  - megaparsec-6.2.0  
+  - hspec-megaparsec-1.0.0
 flags: {}
 extra-package-dbs: []

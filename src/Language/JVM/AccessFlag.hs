@@ -106,7 +106,7 @@ fflags =
   , (7,  FVolatile)
   , (8,  FTransient)
   , (13, FSynthetic)
-  , (15, FEnum)
+  , (14, FEnum)
   ]
 
 instance Enumish FAccessFlag where

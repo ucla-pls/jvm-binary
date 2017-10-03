@@ -4,7 +4,7 @@
 
 - Fix documentation
 - Remove ConstantRef
-
+- Add better method and field descriptions 
 
 ## Version 0.0.2
 

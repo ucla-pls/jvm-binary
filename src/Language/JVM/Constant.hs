@@ -48,7 +48,7 @@ import           Data.Binary.Put
 import qualified Data.IntMap.Strict as IM
 
 import           Language.JVM.Utils
-
+import           Language.JVM.Type
 
 import qualified Data.Text          as Text
 import qualified Data.Text.Encoding as TE
@@ -122,11 +122,6 @@ constantSize x =
     Long _   -> 2
     _        -> 1
 
--- | A class name
-newtype ClassName = ClassName
-  { classNameAsText :: Text.Text
-  } deriving (Show, Eq, Ord)
-
 -- | Any thing pointing inside a class
 data InClass a = InClass
   { inClassName :: ClassName
@@ -145,15 +140,8 @@ data FieldId = FieldId
   , fieldIdDescription :: FieldDescriptor
   } deriving (Show, Eq, Ord)
 
--- | Method Descriptor
-type MethodDescriptor = Text.Text
-
--- | Field Descriptor
-type FieldDescriptor = Text.Text
-
 
 -- $ConstantPool
---
 -- The 'ConstantPool' contains all the constants, and is accessible using the
 -- Lookup methods.
 
@@ -246,10 +234,18 @@ instance InConstantPool (InClass FieldId) where
 
 instance InConstantPool MethodId where
   deref cp (Index ref) = do
-    NameAndType n t <- derefConstant cp ref
-    MethodId <$> deref cp n <*> deref cp t
+    NameAndType n (Index t) <- derefConstant cp ref
+    MethodId <$> deref cp n <*> deref cp (Index t)
 
 instance InConstantPool FieldId where
   deref cp (Index ref) = do
-    NameAndType n t <- derefConstant cp ref
-    FieldId <$> deref cp n <*> deref cp t
+    NameAndType n (Index t) <- derefConstant cp ref
+    FieldId <$> deref cp n <*> deref cp (Index t)
+
+instance InConstantPool MethodDescriptor where
+  deref cp (Index ref) = do
+    methodDescriptorFromText =<< deref cp (Index ref)
+
+instance InConstantPool FieldDescriptor where
+  deref cp (Index ref) = do
+    fieldDescriptorFromText =<< deref cp (Index ref)

@@ -28,6 +28,7 @@ library:
   - containers
   - text
   - vector
+  - megaparsec >= 6.0.0
   source-dirs: src
 
 tests:
@@ -45,6 +46,8 @@ tests:
     - filepath
     - directory
     - text
+    - megaparsec >= 6.0.0
+    - hspec-megaparsec
     ghc-options:
     - -rtsopts
     - -threaded
