@@ -11,6 +11,7 @@ The class file is described in this module.
 module Language.JVM.ClassFile
   ( ClassFile (..)
 
+  , cAccessFlags
   , cInterfaces
   , cFields
   , cMethods
@@ -25,6 +26,7 @@ module Language.JVM.ClassFile
 
 import           Data.Binary
 import           Data.Monoid
+import           Data.Set (Set)
 import           GHC.Generics            (Generic)
 
 import           Language.JVM.AccessFlag
@@ -46,7 +48,7 @@ data ClassFile = ClassFile
 
   , cConstantPool    :: !ConstantPool
 
-  , cAccessFlags     :: BitSet16 CAccessFlag
+  , cAccessFlags'     :: BitSet16 CAccessFlag
 
   , cThisClassIndex  :: Index ClassName
   , cSuperClassIndex :: Index ClassName
@@ -58,6 +60,10 @@ data ClassFile = ClassFile
   } deriving (Show, Eq, Generic)
 
 instance Binary ClassFile where
+
+-- | Get the set of access flags
+cAccessFlags :: ClassFile -> Set CAccessFlag
+cAccessFlags = toSet . cAccessFlags'
 
 -- | Get a list of 'ConstantRef's to interfaces.
 cInterfaces :: ClassFile -> [ Index ClassName ]

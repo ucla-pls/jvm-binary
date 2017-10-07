@@ -10,6 +10,7 @@ module Language.JVM.Field
   ( Field (..)
   , fName
   , fDescriptor
+  , fAccessFlags
   -- * Attributes
   , fConstantValue
   ) where
@@ -23,12 +24,14 @@ import           Language.JVM.Attribute  (Attribute, ConstantValue, fromAttribut
 import           Language.JVM.Constant   (ConstantPool, Index, FieldDescriptor, deref)
 import           Language.JVM.Utils
 
+import qualified Data.Set as Set
+
 import qualified Data.Text as Text
 
 -- | A Field in the class-file, as described
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.5).
 data Field = Field
-  { fAccessFlags     :: BitSet16 FAccessFlag
+  { fAccessFlags'    :: BitSet16 FAccessFlag
   , fNameIndex       :: Index Text.Text
   , fDescriptorIndex :: Index FieldDescriptor
   , fAttributes      :: SizedList16 Attribute
@@ -39,6 +42,10 @@ instance Binary Field where
 -- | Get the name of the field
 fName :: ConstantPool -> Field -> Maybe Text.Text
 fName cp = deref cp . fNameIndex
+
+-- | Get the set of access flags
+fAccessFlags :: Field -> Set.Set FAccessFlag
+fAccessFlags = toSet . fAccessFlags'
 
 -- | Get the descriptor of the field
 fDescriptor :: ConstantPool -> Field -> Maybe FieldDescriptor
