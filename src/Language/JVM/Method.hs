@@ -26,11 +26,9 @@ import           Data.Set (Set)
 import qualified Data.Text as Text
 import           GHC.Generics            (Generic)
 
-import           Data.Monoid
-
 import           Language.JVM.AccessFlag
-import           Language.JVM.Attribute  (Attribute, fromAttribute', Code, Exceptions)
-import           Language.JVM.Constant   (ConstantPool, Index, deref)
+import           Language.JVM.Attribute
+import           Language.JVM.Constant
 import           Language.JVM.Utils
 
 -- | A Method in the class-file, as described
@@ -53,21 +51,19 @@ mAttributes :: Method -> [Attribute]
 mAttributes = unSizedList . mAttributes'
 
 -- | Lookup the name of the method in the 'ConstantPool'.
-mName :: ConstantPool -> Method -> Maybe Text.Text
-mName cp = deref cp . mNameIndex
+mName :: Method -> PoolAccess Text.Text
+mName = derefF  mNameIndex
 
 -- | Lookup the descriptor of the method in the 'ConstantPool'.
-mDescriptor :: ConstantPool -> Method -> Maybe Text.Text
-mDescriptor cp = deref cp . mDescriptorIndex
+mDescriptor :: Method -> PoolAccess Text.Text
+mDescriptor = derefF mDescriptorIndex
 
 -- | Fetch the 'Code' attribute, if any.
--- There can only one be one code attribute on a method.
-mCode :: ConstantPool -> Method -> Maybe (Either String Code)
-mCode cp =
-  getFirst . foldMap (First . fromAttribute' cp) . mAttributes
+-- There can only be one code attribute in a method.
+mCode :: Method -> PoolAccess (Maybe (Either String Code))
+mCode = fmap firstOne . matching mAttributes
 
 -- | Fetch the 'Exceptions' attribute.
--- There can only one be one exceptions attribute on a method.
-mExceptions :: ConstantPool -> Method -> Maybe (Either String Exceptions)
-mExceptions cp =
-  getFirst . foldMap (First . fromAttribute' cp) . mAttributes
+-- There can only be one exceptions attribute in a method.
+mExceptions :: Method -> PoolAccess (Maybe (Either String Exceptions))
+mExceptions = fmap firstOne . matching mAttributes

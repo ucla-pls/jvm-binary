@@ -20,8 +20,10 @@ The most notable and required are:
   - LineNumberTable
 
 - Add lenses for better access of deep fields
-
 - Add documentation for Code
+- Add Code writing
+- Change Megaparsec to Attoparsec of improved performance.
+- Setup regular benchmarks
 
 ## Developing
 

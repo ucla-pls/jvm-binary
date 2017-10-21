@@ -12,7 +12,7 @@ import Language.JVM
 import Language.JVM.Attribute.Code ()
 
 test_reading_classfile :: IO [TestTree]
-test_reading_classfile = testAllFiles $ do
+test_reading_classfile = testSomeFiles $ do
   it "can parse the bytestring" $ \bs -> do
     decodeClassFile bs `shouldSatisfy` isRight
 
@@ -22,9 +22,11 @@ test_reading_classfile = testAllFiles $ do
       cMagicNumber cls `shouldBe` 0xCAFEBABE
 
     it "has a class name" $ \cls ->
-      cThisClass (cConstantPool cls) cls `shouldSatisfy` isJust
+      runWithPool (cThisClass cls) (cConstantPool cls) `shouldSatisfy` isRight
 
     it "can parse all method codes" $ \cls ->
-      forM_ (catMaybes . map (mCode (cConstantPool cls)) $ cMethods cls) $
-      \code-> do
-        code `shouldSatisfy` isRight
+      case runWithPool (mapM mCode $ cMethods cls) (cConstantPool cls) of
+        Left a -> expectationFailure (show a)
+        Right rs ->
+          forM_ (catMaybes rs) $ \code ->
+            code `shouldSatisfy` isRight

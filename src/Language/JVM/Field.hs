@@ -16,12 +16,11 @@ module Language.JVM.Field
   ) where
 
 import           Data.Binary
-import           Data.Monoid
 import           GHC.Generics            (Generic)
 
 import           Language.JVM.AccessFlag
-import           Language.JVM.Attribute  (Attribute, ConstantValue, fromAttribute')
-import           Language.JVM.Constant   (ConstantPool, Index, FieldDescriptor, deref)
+import           Language.JVM.Attribute
+import           Language.JVM.Constant
 import           Language.JVM.Utils
 
 import qualified Data.Set as Set
@@ -40,19 +39,19 @@ data Field = Field
 instance Binary Field where
 
 -- | Get the name of the field
-fName :: ConstantPool -> Field -> Maybe Text.Text
-fName cp = deref cp . fNameIndex
+fName :: Field -> PoolAccess Text.Text
+fName = derefF fNameIndex
 
 -- | Get the set of access flags
 fAccessFlags :: Field -> Set.Set FAccessFlag
 fAccessFlags = toSet . fAccessFlags'
 
 -- | Get the descriptor of the field
-fDescriptor :: ConstantPool -> Field -> Maybe FieldDescriptor
-fDescriptor cp = deref cp . fDescriptorIndex
+fDescriptor :: Field -> PoolAccess FieldDescriptor
+fDescriptor = derefF fDescriptorIndex
 
 -- | Fetch the 'ConstantValue' attribute.
 -- There can only one be one exceptions attribute on a field.
-fConstantValue :: ConstantPool -> Field -> Maybe (Either String ConstantValue)
-fConstantValue cp =
-  getFirst . foldMap (First . fromAttribute' cp) . fAttributes
+fConstantValue :: Field -> PoolAccess (Maybe (Either String ConstantValue))
+fConstantValue =
+  fmap firstOne . matching fAttributes

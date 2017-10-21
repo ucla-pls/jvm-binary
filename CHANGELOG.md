@@ -5,6 +5,7 @@
 - Fix documentation
 - Remove ConstantRef
 - Add better method and field descriptions 
+- Add PoolAccess Monad
 
 ## Version 0.0.2
 

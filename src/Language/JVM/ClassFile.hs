@@ -12,6 +12,7 @@ module Language.JVM.ClassFile
   ( ClassFile (..)
 
   , cAccessFlags
+  , cInterfaceIndicies
   , cInterfaces
   , cFields
   , cMethods
@@ -25,13 +26,11 @@ module Language.JVM.ClassFile
   ) where
 
 import           Data.Binary
-import           Data.Monoid
-import           Data.Set (Set)
+import           Data.Set
 import           GHC.Generics            (Generic)
 
 import           Language.JVM.AccessFlag
-import           Language.JVM.Attribute  (Attribute, BootstrapMethods,
-                                          fromAttribute')
+import           Language.JVM.Attribute
 import           Language.JVM.Constant
 import           Language.JVM.Field      (Field)
 import           Language.JVM.Method     (Method)
@@ -41,22 +40,22 @@ import           Language.JVM.Utils
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html).
 
 data ClassFile = ClassFile
-  { cMagicNumber     :: !Word32
+  { cMagicNumber        :: !Word32
 
-  , cMinorVersion    :: !Word16
-  , cMajorVersion    :: !Word16
+  , cMinorVersion       :: !Word16
+  , cMajorVersion       :: !Word16
 
-  , cConstantPool    :: !ConstantPool
+  , cConstantPool       :: !ConstantPool
 
-  , cAccessFlags'     :: BitSet16 CAccessFlag
+  , cAccessFlags'       :: BitSet16 CAccessFlag
 
-  , cThisClassIndex  :: Index ClassName
-  , cSuperClassIndex :: Index ClassName
+  , cThisClassIndex     :: Index ClassName
+  , cSuperClassIndex    :: Index ClassName
 
-  , cInterfaces'     :: SizedList16 (Index ClassName)
-  , cFields'         :: SizedList16 Field
-  , cMethods'        :: SizedList16 Method
-  , cAttributes'     :: SizedList16 Attribute
+  , cInterfaceIndicies' :: SizedList16 (Index ClassName)
+  , cFields'            :: SizedList16 Field
+  , cMethods'           :: SizedList16 Method
+  , cAttributes'        :: SizedList16 Attribute
   } deriving (Show, Eq, Generic)
 
 instance Binary ClassFile where
@@ -66,8 +65,12 @@ cAccessFlags :: ClassFile -> Set CAccessFlag
 cAccessFlags = toSet . cAccessFlags'
 
 -- | Get a list of 'ConstantRef's to interfaces.
-cInterfaces :: ClassFile -> [ Index ClassName ]
-cInterfaces = unSizedList . cInterfaces'
+cInterfaceIndicies :: ClassFile -> [ Index ClassName ]
+cInterfaceIndicies = unSizedList . cInterfaceIndicies'
+
+-- | Get a list of 'ClassName'
+cInterfaces :: ClassFile -> PoolAccess [ ClassName ]
+cInterfaces = mapM deref . cInterfaceIndicies
 
 -- | Get a list of 'Field's of a ClassFile.
 cFields :: ClassFile -> [Field]
@@ -78,12 +81,12 @@ cMethods :: ClassFile -> [Method]
 cMethods = unSizedList . cMethods'
 
 -- | Lookup the this class in a ConstantPool
-cThisClass :: ConstantPool -> ClassFile -> Maybe ClassName
-cThisClass cp = deref cp . cThisClassIndex
+cThisClass :: ClassFile -> PoolAccess ClassName
+cThisClass = derefF cThisClassIndex
 
 -- | Lookup the super class in the ConstantPool
-cSuperClass :: ConstantPool -> ClassFile -> Maybe ClassName
-cSuperClass cp = deref cp . cSuperClassIndex
+cSuperClass :: ClassFile -> PoolAccess ClassName
+cSuperClass = derefF cSuperClassIndex
 
 -- | Get a list of 'Attribute's of a ClassFile.
 cAttributes :: ClassFile -> [Attribute]
@@ -92,6 +95,6 @@ cAttributes = unSizedList . cAttributes'
 -- | Fetch the 'BootstrapMethods' attribute.
 -- There can only one bootstrap methods per class, but there might not be
 -- one.
-cBootstrapMethods :: ConstantPool -> ClassFile -> Maybe (Either String BootstrapMethods)
-cBootstrapMethods cp =
-  getFirst . foldMap (First . fromAttribute' cp) . cAttributes
+cBootstrapMethods :: ClassFile -> PoolAccess (Maybe (Either String BootstrapMethods))
+cBootstrapMethods =
+  fmap firstOne . matching cAttributes'
