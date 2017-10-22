@@ -7,7 +7,7 @@ Maintainer  : kalhuage@cs.ucla.edu
 The class file is described in this module.
 -}
 
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 module Language.JVM.ClassFile
   ( ClassFile (..)
 
@@ -27,6 +27,8 @@ module Language.JVM.ClassFile
 
 import           Data.Binary
 import           Data.Set
+
+import           Control.DeepSeq (NFData)
 import           GHC.Generics            (Generic)
 
 import           Language.JVM.AccessFlag
@@ -56,7 +58,7 @@ data ClassFile = ClassFile
   , cFields'            :: SizedList16 Field
   , cMethods'           :: SizedList16 Method
   , cAttributes'        :: SizedList16 Attribute
-  } deriving (Show, Eq, Generic)
+  } deriving (Show, Eq, Generic, NFData)
 
 instance Binary ClassFile where
 

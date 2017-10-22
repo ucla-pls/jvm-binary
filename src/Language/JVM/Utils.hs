@@ -9,6 +9,7 @@ This module contains utilities missing not in other libraries.
 
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Language.JVM.Utils
   ( -- * Sized Data Structures
@@ -46,6 +47,7 @@ import           Data.Bits
 import           Data.List       as List
 import           Data.Set        as Set
 
+import           Control.DeepSeq (NFData)
 import           Control.Monad
 
 import qualified Data.ByteString as BS
@@ -60,7 +62,7 @@ import qualified Data.ByteString as BS
 -- length N of type 'w' and then N items of type 'a'.
 newtype SizedList w a = SizedList
   { unSizedList :: [ a ]
-  } deriving (Show, Eq, Functor)
+  } deriving (Show, Eq, Functor, NFData)
 
 -- | Get the size of the sized list.
 listSize :: Num w => SizedList w a -> w
@@ -87,7 +89,7 @@ instance (Binary w, Integral w, Binary a) => Binary (SizedList w a) where
 -- | A byte string with a size w.
 newtype SizedByteString w = SizedByteString
   { unSizedByteString :: BS.ByteString
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, NFData)
 
 -- | Get the size of a SizedByteString
 byteStringSize :: (Num w) => SizedByteString w -> w
@@ -123,7 +125,7 @@ class (Eq a, Ord a) => Enumish a where
 -- | A bit set of size w
 newtype BitSet w a = BitSet
   { toSet :: Set.Set a
-  } deriving (Ord, Show, Eq)
+  } deriving (Ord, Show, Eq, NFData)
 
 instance (Bits w, Binary w, Enumish a) => Binary (BitSet w a) where
   get = do

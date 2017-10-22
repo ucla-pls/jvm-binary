@@ -5,7 +5,7 @@ License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
 -}
 
-{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass#-}
 module Language.JVM.Method
   ( Method (..)
 
@@ -26,6 +26,8 @@ import           Data.Set (Set)
 import qualified Data.Text as Text
 import           GHC.Generics            (Generic)
 
+import           Control.DeepSeq (NFData)
+
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
 import           Language.JVM.Constant
@@ -38,7 +40,7 @@ data Method = Method
   , mNameIndex       :: Index Text.Text
   , mDescriptorIndex :: Index Text.Text
   , mAttributes'     :: SizedList16 Attribute
-  } deriving (Show, Eq, Generic)
+  } deriving (Show, Eq, Generic, NFData)
 
 instance Binary Method where
 

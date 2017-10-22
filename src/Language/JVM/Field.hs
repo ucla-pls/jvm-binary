@@ -5,7 +5,7 @@ License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
 -}
 
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 module Language.JVM.Field
   ( Field (..)
   , fName
@@ -16,6 +16,7 @@ module Language.JVM.Field
   ) where
 
 import           Data.Binary
+import           Control.DeepSeq (NFData)
 import           GHC.Generics            (Generic)
 
 import           Language.JVM.AccessFlag
@@ -34,7 +35,7 @@ data Field = Field
   , fNameIndex       :: Index Text.Text
   , fDescriptorIndex :: Index FieldDescriptor
   , fAttributes      :: SizedList16 Attribute
-  } deriving (Show, Eq, Generic)
+  } deriving (Show, Eq, Generic, NFData)
 
 instance Binary Field where
 

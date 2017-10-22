@@ -28,6 +28,7 @@ library:
   - containers
   - text
   - vector
+  - deepseq
   - megaparsec >= 6.2.0
   source-dirs: src
 

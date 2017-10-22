@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE EmptyCase #-}
 {-|
 Module      : Language.JVM.Constant
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -14,7 +11,12 @@ are essential for accessing data in the class-file.
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RankNTypes    #-}
+{-# LANGUAGE DeriveAnyClass  #-}
 {-# LANGUAGE GADTs    #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE EmptyCase #-}
 module Language.JVM.Constant
   (
     -- * Constant
@@ -48,6 +50,9 @@ import           Prelude            hiding (fail, lookup)
 
 import           Control.Monad      (forM_)
 import           Control.Monad.Fail (fail)
+import           Control.DeepSeq (NFData)
+
+import           GHC.Generics (Generic)
 
 import           Data.Binary
 import           Data.Binary.Get
@@ -79,7 +84,7 @@ data Constant
   | MethodHandle !Word8 (Index Constant)
   | MethodType (Index MethodDescriptor)
   | InvokeDynamic !Word16 (Index Constant)
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 typeToStr :: Constant -> String
 typeToStr = head . words . show
@@ -138,19 +143,19 @@ constantSize x =
 data InClass a = InClass
   { inClassName :: ClassName
   , inClassId :: a
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 -- | A method identifier
 data MethodId = MethodId
   { methodIdName :: Text.Text
   , methodIdDescription :: MethodDescriptor
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 -- | A field identifier
 data FieldId = FieldId
   { fieldIdName :: Text.Text
   , fieldIdDescription :: FieldDescriptor
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 
 -- $ConstantPool
@@ -161,7 +166,7 @@ data FieldId = FieldId
 -- accessed after their byte-offset. 'constantSize'
 newtype ConstantPool = ConstantPool
   { unConstantPool :: IM.IntMap Constant
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Generic, NFData)
 
 -- -- | Return a list of reference-constant pairs.
 -- toListOfConstants :: ConstantPool -> [(, Constant)]
@@ -220,7 +225,7 @@ instance Monad (PoolAccess) where
 -- | Describes an index into the constant pool
 newtype Index x = Index
   { indexAsWord :: Word16
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Generic, NFData)
 
 instance (InConstantPool x) => Binary (Index x) where
   get = Index <$> get

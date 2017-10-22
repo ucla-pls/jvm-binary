@@ -12,6 +12,7 @@ This is the main module for accessing all kinds of Attributes.
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module Language.JVM.Attribute
   ( Attribute (..)
   , aInfo
@@ -33,6 +34,7 @@ module Language.JVM.Attribute
   ) where
 
 import           GHC.Generics                            (Generic)
+import           Control.DeepSeq  (NFData)
 
 import           Data.Foldable
 import           Data.List as List
@@ -59,7 +61,7 @@ import           Language.JVM.Attribute.StackMapTable    (StackMapTable)
 data Attribute = Attribute
   { aNameIndex :: Index Text.Text
   , aInfo'     :: ! SizedByteString32
-  } deriving (Show, Eq, Generic)
+  } deriving (Show, Eq, Generic, NFData)
 
 instance Binary Attribute where
 

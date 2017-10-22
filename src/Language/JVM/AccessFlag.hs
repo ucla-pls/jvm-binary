@@ -6,7 +6,8 @@ Maintainer  : kalhuage@cs.ucla.edu
 
 Contains the AccessFlags used in the different modules.
 -}
-
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module Language.JVM.AccessFlag
   ( MAccessFlag(..), mflags
   , FAccessFlag(..), fflags
@@ -14,6 +15,9 @@ module Language.JVM.AccessFlag
   ) where
 
 import           Language.JVM.Utils
+
+import           GHC.Generics (Generic)
+import           Control.DeepSeq (NFData)
 
 -- | Access flags for the 'Language.JVM.Method.Method'
 data MAccessFlag
@@ -29,7 +33,7 @@ data MAccessFlag
   | MAbstract
   | MStrictFP
   | MSynthetic
-  deriving (Ord, Show, Eq)
+  deriving (Ord, Show, Eq, NFData, Generic)
 
 
 -- | The 'Enumish' mapping of the 'MAccessFlag'
@@ -61,7 +65,7 @@ data CAccessFlag
   | CSynthetic
   | CAnnotation
   | CEnum
-  deriving (Ord, Show, Eq)
+  deriving (Ord, Show, Eq, NFData, Generic)
 
 -- | The 'Enumish' mapping of the 'CAccessFlag'
 cflags :: [(Int, CAccessFlag)]
@@ -91,7 +95,7 @@ data FAccessFlag
   | FTransient
   | FSynthetic
   | FEnum
-  deriving (Ord, Show, Eq)
+  deriving (Ord, Show, Eq, NFData, Generic)
 
 -- | The 'Enumish' mapping of the 'FAccessFlag'
 fflags :: [(Int, FAccessFlag)]

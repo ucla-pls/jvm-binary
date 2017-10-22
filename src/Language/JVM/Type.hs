@@ -6,7 +6,8 @@ Maintainer  : kalhuage@cs.ucla.edu
 
 This module contains the 'JType'.
 -}
-
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Language.JVM.Type
   ( ClassName (..)
   , JType (..)
@@ -24,6 +25,8 @@ module Language.JVM.Type
   ) where
 
 import Data.Void
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Data.Text as Text
@@ -31,7 +34,7 @@ import qualified Data.Text as Text
 -- | A class name
 newtype ClassName = ClassName
   { classNameAsText :: Text.Text
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 -- | A Jvm primitive type
 data JType
@@ -45,18 +48,18 @@ data JType
   | JTShort
   | JTBoolean
   | JTArray JType
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 -- | Method Descriptor
 data MethodDescriptor = MethodDescriptor
   { methodArguments :: [JType]
   , methodReturnType :: Maybe JType
-  } deriving (Show, Ord, Eq)
+  } deriving (Show, Ord, Eq, Generic, NFData)
 
 -- | Field Descriptor
 newtype FieldDescriptor = FieldDescriptor
   { fieldType :: JType
-  } deriving (Show, Ord, Eq)
+  } deriving (Show, Ord, Eq, Generic, NFData)
 
 type Parser = Parsec Void Text.Text
 
