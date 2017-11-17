@@ -7,7 +7,7 @@ Maintainer  : kalhuage@cs.ucla.edu
 Based on the Exceptions Attribute, as documented [here](http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.5). It describes the checked
 exceptions that a method can make.
 -}
-{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 
 module Language.JVM.Attribute.Exceptions
   ( Exceptions (..)
@@ -15,6 +15,7 @@ module Language.JVM.Attribute.Exceptions
   ) where
 
 import           GHC.Generics          (Generic)
+import           Control.DeepSeq       (NFData)
 
 import           Data.Binary
 
@@ -25,7 +26,7 @@ import           Language.JVM.Utils
 -- constant pool.
 data Exceptions = Exceptions
   { exceptionIndexTable' :: SizedList16 (Index ClassName)
-  } deriving (Show, Eq, Generic)
+  } deriving (Show, Eq, Generic, NFData)
 
 -- | Get the constant refs that points .
 exceptionIndexTable :: Exceptions -> [(Index ClassName)]

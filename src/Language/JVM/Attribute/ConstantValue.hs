@@ -6,13 +6,14 @@ Maintainer  : kalhuage@cs.ucla.edu
 
 Based on the ConstantValue, as documented [here](http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.5).
 -}
-{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 
 module Language.JVM.Attribute.ConstantValue
   ( ConstantValue (..)
   ) where
 
 import           GHC.Generics          (Generic)
+import           Control.DeepSeq       (NFData)
 
 import           Data.Binary
 
@@ -21,6 +22,6 @@ import           Language.JVM.Constant (Index, Constant)
 -- | A constant value is just a index into the constant pool.
 data ConstantValue = ConstantValue
   { constantValueIndex :: Index Constant
-  } deriving (Show, Eq, Generic)
+  } deriving (Show, Eq, Generic, NFData)
 
 instance Binary ConstantValue where

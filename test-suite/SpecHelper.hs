@@ -46,7 +46,7 @@ testSomeFiles spec =
   where
     files =
       [ "test-suite/data/java/util/zip/ZipOutputStream.class"
-      -- , "test-suite/data/project/Main.class"
+      , "test-suite/data/project/Main.class"
       ]
 
 isoBinary :: (Binary a, Eq a, Show a) => a -> Property

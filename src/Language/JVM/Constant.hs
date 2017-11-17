@@ -70,11 +70,11 @@ import qualified Data.Text.Encoding.Error as TE
 -- | A constant is a multi word item in the 'ConstantPool'. Each of
 -- the constructors are pretty much self expiatory from the types.
 data Constant
-  = String !SizedByteString16
-  | Integer !Word32
-  | Float !Word32
-  | Long !Word64
-  | Double !Word64
+  = String {-#  UNPACK #-} !SizedByteString16
+  | Integer {-# UNPACK #-} !Word32
+  | Float {-# UNPACK #-} !Word32
+  | Long {-# UNPACK #-} !Word64
+  | Double {-# UNPACK #-} !Word64
   | ClassRef (Index Text.Text)
   | StringRef (Index Text.Text)
   | FieldRef (Index ClassName) (Index FieldId)
@@ -83,7 +83,7 @@ data Constant
   | NameAndType (Index Text.Text) (Index Text.Text)
   | MethodHandle !Word8 (Index Constant)
   | MethodType (Index MethodDescriptor)
-  | InvokeDynamic !Word16 (Index Constant)
+  | InvokeDynamic {-# UNPACK #-} !Word16 (Index Constant)
   deriving (Show, Eq, Generic, NFData)
 
 typeToStr :: Constant -> String
@@ -141,20 +141,20 @@ constantSize x =
 
 -- | Any thing pointing inside a class
 data InClass a = InClass
-  { inClassName :: ClassName
+  { inClassName :: !ClassName
   , inClassId :: a
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 -- | A method identifier
 data MethodId = MethodId
-  { methodIdName :: Text.Text
-  , methodIdDescription :: MethodDescriptor
+  { methodIdName :: !Text.Text
+  , methodIdDescription :: !MethodDescriptor
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 -- | A field identifier
 data FieldId = FieldId
-  { fieldIdName :: Text.Text
-  , fieldIdDescription :: FieldDescriptor
+  { fieldIdName :: !Text.Text
+  , fieldIdDescription :: !FieldDescriptor
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 
@@ -200,7 +200,7 @@ derefConstant (ConstantPool cp) ref =
 -- | A pool access error
 data PoolAccessError
   = PoolAccessError Word16 String
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 -- | The pool access monad.
 newtype PoolAccess a = PoolAccess

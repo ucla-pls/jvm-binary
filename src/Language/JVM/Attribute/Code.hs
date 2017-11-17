@@ -6,6 +6,7 @@ Maintainer  : kalhuage@cs.ucla.edu
 -}
 
 {-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE DeriveAnyClass   #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Language.JVM.Attribute.Code
   ( Code (..)
@@ -44,6 +45,7 @@ import           Numeric               (showHex)
 
 import           Control.Monad         hiding (fail)
 import           Control.Monad.Fail    (fail)
+import           Control.DeepSeq       (NFData)
 
 import           Data.Binary
 import           Data.Binary.Get       hiding (Get)
@@ -63,14 +65,14 @@ data Code a = Code
   , bytecode       :: ByteCode
   , exceptionTable :: SizedList16 ExceptionTable
   , attributes     :: SizedList16 a
-  } deriving (Show, Eq, Generic)
+  } deriving (Show, Eq, Generic, NFData)
 
 instance (Binary a) => Binary (Code a) where
   -- Auto implemented by generic
 
 newtype ByteCode = ByteCode
   { unByteCode :: [ByteCodeInst]
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Generic, NFData)
 
 instance Binary ByteCode where
   get = do
@@ -103,7 +105,7 @@ data ExceptionTable = ExceptionTable
   -- ^ A program counter into 'code' indicating the handler.
   , catchType :: Index ClassName
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, NFData)
 
 instance Binary ExceptionTable where
 
@@ -111,7 +113,7 @@ data ByteCodeInst = ByteCodeInst
   { offset :: LongOffset
   , opcode :: ByteCodeOpr
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, NFData)
 
 instance Binary ByteCodeInst where
   get =
@@ -120,18 +122,18 @@ instance Binary ByteCodeInst where
     put $ opcode x
 
 data ArithmeticType = MInt | MLong | MFloat | MDouble
-  deriving (Show, Eq, Enum, Bounded)
+  deriving (Show, Eq, Enum, Bounded, Generic, NFData)
 
 data SmallArithmeticType = MByte | MChar | MShort
-  deriving (Show, Eq, Enum, Bounded)
+  deriving (Show, Eq, Enum, Bounded, Generic, NFData)
 
 data LocalType = LInt | LLong | LFloat | LDouble | LRef
-  deriving (Show, Eq, Enum, Bounded)
+  deriving (Show, Eq, Enum, Bounded, Generic, NFData)
 
 data ArrayType a
   = ABoolean | AByte | AChar | AShort | AInt | ALong
   | AFloat | ADouble | ARef a
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 data Invokation
   = InvkSpecial
@@ -139,15 +141,15 @@ data Invokation
   | InvkStatic
   | InvkInterface Word8
   | InvkDynamic
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 data FieldAccess
   = FldStatic
   | FldField
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 data OneOrTwo = One | Two
-  deriving (Show, Ord, Bounded, Eq, Enum)
+  deriving (Show, Ord, Bounded, Eq, Enum, Generic, NFData)
 
 type WordSize = OneOrTwo
 
@@ -177,7 +179,7 @@ data CConstant
 
   | CHalfRef (Index Constant)
   | CRef WordSize (Index Constant)
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 data BinOpr
   = Add
@@ -185,7 +187,7 @@ data BinOpr
   | Mul
   | Div
   | Rem
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 data BitOpr
   = ShL
@@ -194,7 +196,7 @@ data BitOpr
   | And
   | Or
   | XOr
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 type Offset = Int16
 type LongOffset = Int32
@@ -202,16 +204,16 @@ type LongOffset = Int32
 data LocalAddress
   = LWide Word16
   | LSingle Word8
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 data IncrementAmount
   = IWide Int16
   | ISingle Int8
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 data CmpOpr
   = CEq | CNe | CLt | CGe | CGt | CLe
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 data ByteCodeOpr
   = ArrayLoad (ArrayType ())
@@ -300,7 +302,7 @@ data ByteCodeOpr
 
   | Swap
 
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 instance Binary ByteCodeOpr where
   get = do
