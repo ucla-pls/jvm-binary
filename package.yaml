@@ -22,7 +22,7 @@ extra-source-files:
 
 library:
   dependencies:
-  - base >= 4.9 && < 4.10
+  - base >= 4.10 && < 4.11
   - binary
   - bytestring
   - containers
@@ -35,7 +35,7 @@ library:
 tests:
   jvm-binary-test-suite:
     dependencies:
-    - base >= 4.9 && < 4.10
+    - base >= 4.10 && < 4.11
     - jvm-binary
     - tasty
     - tasty-hspec
@@ -60,7 +60,7 @@ tests:
 benchmarks:
   jvm-binary-benchmarks:
     dependencies:
-    - base >= 4.9 && < 4.10
+    - base >= 4.10 && < 4.11
     - jvm-binary
     - criterion
     - bytestring

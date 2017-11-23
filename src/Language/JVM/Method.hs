@@ -17,6 +17,7 @@ module Language.JVM.Method
 
   -- * Attributes
   , mCode
+  , mExceptions'
   , mExceptions
 
   ) where
@@ -30,6 +31,7 @@ import           Control.DeepSeq (NFData)
 
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
+import           Language.JVM.Attribute.Exceptions (exceptionIndexTable)
 import           Language.JVM.Constant
 import           Language.JVM.Utils
 
@@ -38,7 +40,7 @@ import           Language.JVM.Utils
 data Method = Method
   { mAccessFlags'    :: BitSet16 MAccessFlag
   , mNameIndex       :: Index Text.Text
-  , mDescriptorIndex :: Index Text.Text
+  , mDescriptorIndex :: Index MethodDescriptor
   , mAttributes'     :: SizedList16 Attribute
   } deriving (Show, Eq, Generic, NFData)
 
@@ -57,7 +59,7 @@ mName :: Method -> PoolAccess Text.Text
 mName = derefF  mNameIndex
 
 -- | Lookup the descriptor of the method in the 'ConstantPool'.
-mDescriptor :: Method -> PoolAccess Text.Text
+mDescriptor :: Method -> PoolAccess MethodDescriptor
 mDescriptor = derefF mDescriptorIndex
 
 -- | Fetch the 'Code' attribute, if any.
@@ -67,5 +69,18 @@ mCode = fmap firstOne . matching mAttributes
 
 -- | Fetch the 'Exceptions' attribute.
 -- There can only be one exceptions attribute in a method.
-mExceptions :: Method -> PoolAccess (Maybe (Either String Exceptions))
-mExceptions = fmap firstOne . matching mAttributes
+mExceptions' :: Method -> PoolAccess (Maybe (Either String Exceptions))
+mExceptions' = fmap firstOne . matching mAttributes
+
+-- | Fetches the 'Exceptions' attribute, but turns it into an list of exceptions.
+-- If no exceptions field where found the empty list is returned
+mExceptions :: Method -> PoolAccess (Either String [ClassName])
+mExceptions m = do
+  exs <- mExceptions' m
+  case exs of
+    Just (Right a) ->
+      Right <$> mapM deref (exceptionIndexTable a)
+    Just (Left msg) ->
+      return $ Left msg
+    Nothing ->
+      return $ Right []

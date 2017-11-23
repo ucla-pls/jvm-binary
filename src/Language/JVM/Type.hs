@@ -10,6 +10,7 @@ This module contains the 'JType'.
 {-# LANGUAGE DeriveGeneric #-}
 module Language.JVM.Type
   ( ClassName (..)
+  , strCls
   , JType (..)
 
   , MethodDescriptor (..)
@@ -36,6 +37,10 @@ newtype ClassName = ClassName
   { classNameAsText :: Text.Text
   } deriving (Show, Eq, Ord, Generic, NFData)
 
+-- | Class cls
+strCls :: String -> ClassName
+strCls = ClassName . Text.pack
+
 -- | A Jvm primitive type
 data JType
   = JTByte
@@ -52,13 +57,13 @@ data JType
 
 -- | Method Descriptor
 data MethodDescriptor = MethodDescriptor
-  { methodArguments :: [JType]
-  , methodReturnType :: Maybe JType
+  { methodDescriptorArguments :: [JType]
+  , methodDescriptorReturnType :: Maybe JType
   } deriving (Show, Ord, Eq, Generic, NFData)
 
 -- | Field Descriptor
 newtype FieldDescriptor = FieldDescriptor
-  { fieldType :: JType
+  { fieldDescriptorType :: JType
   } deriving (Show, Ord, Eq, Generic, NFData)
 
 type Parser = Parsec Void Text.Text
