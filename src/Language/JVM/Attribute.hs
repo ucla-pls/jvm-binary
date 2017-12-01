@@ -14,9 +14,8 @@ This is the main module for accessing all kinds of Attributes.
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE DeriveAnyClass #-}
 module Language.JVM.Attribute
-  ( Attribute (..)
-  , aInfo
-  , aName
+  (
+   module Language.JVM.Attribute.Base
 
   -- * SubAttributes
   , IsAttribute (..)
@@ -33,47 +32,26 @@ module Language.JVM.Attribute
   , firstOne
   ) where
 
-import           GHC.Generics                            (Generic)
-import           Control.DeepSeq  (NFData)
 
 import           Data.Foldable
 import           Data.List as List
 import           Data.Bifunctor
 import           Data.Maybe
-import           Data.Binary
-import qualified Data.ByteString                         as BS
 import qualified Data.ByteString.Lazy                    as BL
-import           Data.Text                               as Text
+import           Data.Binary
+
+import qualified Data.Text as Text
 
 import           Language.JVM.Constant
-import           Language.JVM.Utils                      (SizedByteString32,
-                                                          trd,
-                                                          unSizedByteString)
+import           Language.JVM.Utils                      (trd)
 
 import           Language.JVM.Attribute.BootstrapMethods (BootstrapMethods)
 import qualified Language.JVM.Attribute.Code             as Code
 import           Language.JVM.Attribute.ConstantValue    (ConstantValue)
 import           Language.JVM.Attribute.Exceptions       (Exceptions)
 import           Language.JVM.Attribute.StackMapTable    (StackMapTable)
+import           Language.JVM.Attribute.Base
 
--- | An Attribute, simply contains of a reference to a name and
--- contains info.
-data Attribute = Attribute
-  { aNameIndex :: Index Text.Text
-  , aInfo'     :: ! SizedByteString32
-  } deriving (Show, Eq, Generic, NFData)
-
-instance Binary Attribute where
-
--- | A small helper function to extract the info as a
--- lazy 'Data.ByteString.Lazy.ByteString'.
-aInfo :: Attribute -> BS.ByteString
-aInfo = unSizedByteString . aInfo'
-
--- | Extracts the name from the attribute, if it exists in the
--- ConstantPool.
-aName :: Attribute -> PoolAccess Text.Text
-aName = derefF aNameIndex
 
 -- | Create a type dependent on another type 'b',
 -- used for accessing the correct 'attrName' in 'IsAttribute'.
@@ -142,7 +120,7 @@ instance IsAttribute BootstrapMethods where
 
 -- | Code is redefined with Attribute, as it is recursively containing
 -- 'Attribute'. This is a small hack to fix it.
-type Code = Code.Code Attribute
+type Code = Code.Code Index
 
 -- | Maybe return the first element of a list
 firstOne :: [a] -> Maybe a
@@ -153,4 +131,4 @@ firstOne as = fst <$> List.uncons as
 -- there is an implicit empty StackMapTable.
 codeStackMapTable :: Code -> PoolAccess (Maybe (Either String BootstrapMethods))
 codeStackMapTable c = do
-  firstOne <$> matching Code.attributes c
+  firstOne <$> matching Code.codeAttributes c

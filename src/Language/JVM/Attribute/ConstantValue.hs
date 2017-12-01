@@ -17,11 +17,16 @@ import           Control.DeepSeq       (NFData)
 
 import           Data.Binary
 
-import           Language.JVM.Constant (Index, Constant)
+import           Language.JVM.Constant (Index, Ref, Reference,  Constant)
 
 -- | A constant value is just a index into the constant pool.
-data ConstantValue = ConstantValue
-  { constantValueIndex :: Index Constant
-  } deriving (Show, Eq, Generic, NFData)
+data ConstantValue r = ConstantValue
+  { constantValueIndex :: Ref r Constant
+  }
 
-instance Binary ConstantValue where
+deriving instance Reference r => Show (ConstantValue r)
+deriving instance Reference r => Eq (ConstantValue r)
+deriving instance Reference r => Generic (ConstantValue r)
+deriving instance Reference r => NFData (ConstantValue r)
+
+instance Binary (ConstantValue Index) where

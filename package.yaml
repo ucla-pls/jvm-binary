@@ -29,6 +29,7 @@ library:
   - text
   - vector
   - deepseq
+  - deriving-compat
   - megaparsec >= 6.2.0
   source-dirs: src
 
@@ -45,6 +46,7 @@ tests:
     - bytestring
     - containers
     - filepath
+    - deriving-compat
     - directory
     - text
     - megaparsec >= 6.0.0
@@ -64,6 +66,7 @@ benchmarks:
     - jvm-binary
     - criterion
     - bytestring
+    - deriving-compat
     ghc-options:
     - -rtsopts
     - -threaded

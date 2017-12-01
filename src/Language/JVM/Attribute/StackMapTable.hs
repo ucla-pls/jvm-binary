@@ -25,38 +25,53 @@ import           Data.Binary
 import           Numeric
 import           Control.Monad (replicateM)
 
-import           Language.JVM.Constant (Index, ClassName)
+import           Language.JVM.Constant (Index, Ref, Reference, ClassName)
 import           Language.JVM.Utils
 
 -- | An Exceptions attribute is a list of references into the
 -- constant pool.
-data StackMapTable = StackMapTable
-  { stackMapTable :: SizedList16 StackMapFrame
-  } deriving (Show, Eq, Generic)
+data StackMapTable r = StackMapTable
+  { stackMapTable :: SizedList16 (StackMapFrame r)
+  }
 
-instance Binary StackMapTable where
+deriving instance Reference r => Show (StackMapTable r)
+deriving instance Reference r => Eq (StackMapTable r)
+deriving instance Reference r => Generic (StackMapTable r)
+deriving instance Reference r => NFData (StackMapTable r)
+
+
+instance Binary (StackMapTable Index) where
 
 -- | A delta offset
 type DeltaOffset = Word8
 
 -- | An stack map frame
-data StackMapFrame = StackMapFrame
+data StackMapFrame r = StackMapFrame
   { deltaOffset :: DeltaOffset
-  , frameType :: StackMapFrameType
-  } deriving (Show, Eq)
+  , frameType :: StackMapFrameType r
+  }
+
+deriving instance Reference r => Show (StackMapFrame r)
+deriving instance Reference r => Eq (StackMapFrame r)
+deriving instance Reference r => Generic (StackMapFrame r)
+deriving instance Reference r => NFData (StackMapFrame r)
 
 -- | An stack map frame type
-data StackMapFrameType
+data StackMapFrameType r
   = SameFrame
-  | SameLocals1StackItemFrame VerificationTypeInfo
+  | SameLocals1StackItemFrame (VerificationTypeInfo r)
   | ChopFrame Word8
-  | AppendFrame [VerificationTypeInfo]
+  | AppendFrame [VerificationTypeInfo r]
   | FullFrame
-      (SizedList16 VerificationTypeInfo)
-      (SizedList16 VerificationTypeInfo)
-  deriving (Show, Eq)
+      (SizedList16 (VerificationTypeInfo r))
+      (SizedList16 (VerificationTypeInfo r))
 
-instance Binary StackMapFrame where
+deriving instance Reference r => Show (StackMapFrameType r)
+deriving instance Reference r => Eq (StackMapFrameType r)
+deriving instance Reference r => Generic (StackMapFrameType r)
+deriving instance Reference r => NFData (StackMapFrameType r)
+
+instance Binary (StackMapFrame Index) where
   get = do
     ft <- getWord8
     let
@@ -133,7 +148,7 @@ instance Binary StackMapFrame where
         put ls2
 
 -- | The types info of the stack map frame.
-data VerificationTypeInfo
+data VerificationTypeInfo r
   = VTop
   | VInteger
   | VFloat
@@ -141,11 +156,16 @@ data VerificationTypeInfo
   | VDouble
   | VNull
   | VUninitializedThis
-  | VObject (Index ClassName)
+  | VObject (Ref r ClassName)
   | VUninitialized !Word16
   deriving (Show, Eq)
 
-instance Binary VerificationTypeInfo where
+deriving instance Reference r => Show (VerificationTypeInfo r)
+deriving instance Reference r => Eq (VerificationTypeInfo r)
+deriving instance Reference r => Generic (VerificationTypeInfo r)
+deriving instance Reference r => NFData (VerificationTypeInfo r)
+
+instance Binary (VerificationTypeInfo Index) where
   get = do
     tag <- getWord8
     case tag of

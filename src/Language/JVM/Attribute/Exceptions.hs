@@ -19,17 +19,27 @@ import           Control.DeepSeq       (NFData)
 
 import           Data.Binary
 
-import           Language.JVM.Constant (Index, ClassName)
+import           Language.JVM.Constant (Index, Ref, Reference, ClassName)
 import           Language.JVM.Utils
 
 -- | An Exceptions attribute is a list of references into the
 -- constant pool.
-data Exceptions = Exceptions
-  { exceptionIndexTable' :: SizedList16 (Index ClassName)
-  } deriving (Show, Eq, Generic, NFData)
+data Exceptions r = Exceptions
+  { exceptionIndexTable' :: SizedList16 (Ref r ClassName)
+  }
+
+deriving instance Reference r => Show (Exceptions r)
+deriving instance Reference r => Eq (Exceptions r)
+deriving instance Reference r => Generic (Exceptions r)
+deriving instance Reference r => NFData (Exceptions r)
 
 -- | Get the constant refs that points .
-exceptionIndexTable :: Exceptions -> [(Index ClassName)]
+exceptionIndexTable :: Reference r => Exceptions -> [(Ref r ClassName)]
 exceptionIndexTable = unSizedList . exceptionIndexTable'
 
-instance Binary Exceptions where
+instance Binary (Exceptions Index) where
+
+deriving instance Reference r => Show (Exception r)
+deriving instance Reference r => Eq (Exception r)
+deriving instance Reference r => Generic (Exception r)
+deriving instance Reference r => NFData (Exception r)

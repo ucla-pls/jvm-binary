@@ -8,6 +8,8 @@ Maintainer  : kalhuage@cs.ucla.edu
 {-# LANGUAGE DeriveGeneric   #-}
 {-# LANGUAGE DeriveAnyClass   #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE StandaloneDeriving  #-}
 module Language.JVM.Attribute.Code
   ( Code (..)
 
@@ -57,24 +59,48 @@ import qualified Data.Vector           as V
 import           Language.JVM.Constant (ClassName, Constant, Index(..), indexAsWord,
                                         FieldId, InClass, MethodId)
 import           Language.JVM.Utils
+import           Language.JVM.Attribute.Base
+
+-- | Code contains the actual byte-code. The 'i' type parameter is added to allow
+-- indicate the two stages of the code file, before and after access to the 'ConstantPool'.
+-- i should be either 'Ref' or 'Deref'.
+data Code i = Code
+  { codeMaxStack       :: Int16
+  , codeMaxLocals      :: Int16
+  , codeByteCode       :: (ByteCode i)
+  , codeExceptionTable :: SizedList16 (ExceptionTable i)
+  , codeAttributes     :: SizedList16 Attribute
+  }
+
+deriving instance Show (Code Index)
+deriving instance Eq (Code Index)
+deriving instance Generic (Code Index)
+deriving instance NFData (Code Index)
+deriving instance Binary (Code Index)
+
+-- data Ref i = Ref i
+-- data Deref i = Deref i
+
+-- class Indexable f where
+--   deref :: f Ref -> f Deref
+
+-- instance Indexable Code where
+--   deref code = do
+--     bc <- deref $ codeByteCode code
+--     et <- sequence $ codeExceptionTable code
+--     code { codeByteCode = bc, codeExceptionTable = et}
 
 
-data Code a = Code
-  { maxStack       :: Int16
-  , maxLocals      :: Int16
-  , bytecode       :: ByteCode
-  , exceptionTable :: SizedList16 ExceptionTable
-  , attributes     :: SizedList16 a
-  } deriving (Show, Eq, Generic, NFData)
+newtype ByteCode i = ByteCode
+  { unByteCode :: [ByteCodeInst i]
+  }
 
-instance (Binary a) => Binary (Code a) where
-  -- Auto implemented by generic
+deriving instance Show (ByteCode Index)
+deriving instance Eq (ByteCode Index)
+deriving instance Generic (ByteCode Index)
+deriving instance NFData (ByteCode Index)
 
-newtype ByteCode = ByteCode
-  { unByteCode :: [ByteCodeInst]
-  } deriving (Show, Eq, Generic, NFData)
-
-instance Binary ByteCode where
+instance Binary (ByteCode Index) where
   get = do
     x <- getWord32be
     bs <- getLazyByteString (fromIntegral x)
@@ -89,33 +115,39 @@ instance Binary ByteCode where
             x <- get
             (x:) <$> go
 
-
   put (ByteCode lst)= do
     let bs = runPut (mapM_ put lst)
     putWord32be (fromIntegral $ BL.length bs)
     putLazyByteString bs
 
 
-data ExceptionTable = ExceptionTable
+data ExceptionTable i = ExceptionTable
   { start     :: ! Word16
   -- ^ Inclusive program counter into 'code'
   , end       :: ! Word16
   -- ^ Exclusive program counter into 'code'
   , handler   :: ! Word16
   -- ^ A program counter into 'code' indicating the handler.
-  , catchType :: Index ClassName
+  , catchType :: i ClassName
   }
-  deriving (Show, Eq, Generic, NFData)
 
-instance Binary ExceptionTable where
+deriving instance Show (ExceptionTable Index)
+deriving instance Eq (ExceptionTable Index)
+deriving instance Generic (ExceptionTable Index)
+deriving instance NFData (ExceptionTable Index)
+deriving instance Binary (ExceptionTable Index)
 
-data ByteCodeInst = ByteCodeInst
+data ByteCodeInst i = ByteCodeInst
   { offset :: LongOffset
-  , opcode :: ByteCodeOpr
+  , opcode :: ByteCodeOpr i
   }
-  deriving (Show, Eq, Generic, NFData)
 
-instance Binary ByteCodeInst where
+deriving instance Show (ByteCodeInst Index)
+deriving instance Eq (ByteCodeInst Index)
+deriving instance Generic (ByteCodeInst Index)
+deriving instance NFData (ByteCodeInst Index)
+
+instance Binary (ByteCodeInst Index) where
   get =
     ByteCodeInst <$> (fromIntegral <$> bytesRead) <*> get
   put x =
@@ -153,7 +185,7 @@ data OneOrTwo = One | Two
 
 type WordSize = OneOrTwo
 
-data CConstant
+data CConstant i
   = CNull
 
   | CIntM1
@@ -177,9 +209,13 @@ data CConstant
   | CByte Int8
   | CShort Int16
 
-  | CHalfRef (Index Constant)
-  | CRef WordSize (Index Constant)
-  deriving (Show, Eq, Generic, NFData)
+  | CHalfRef (i Constant)
+  | CRef WordSize (i Constant)
+
+deriving instance Show (CConstant Index)
+deriving instance Eq (CConstant Index)
+deriving instance Generic (CConstant Index)
+deriving instance NFData (CConstant Index)
 
 data BinOpr
   = Add
@@ -215,13 +251,13 @@ data CmpOpr
   = CEq | CNe | CLt | CGe | CGt | CLe
   deriving (Show, Eq, Generic, NFData)
 
-data ByteCodeOpr
+data ByteCodeOpr i
   = ArrayLoad (ArrayType ())
   -- ^ aaload baload ...
   | ArrayStore (ArrayType ())
   -- ^ aastore bastore ...
 
-  | Push CConstant
+  | Push (CConstant i)
 
   | Load LocalType LocalAddress
   -- ^ aload_0, bload_2, iload 5 ...
@@ -269,25 +305,25 @@ data ByteCodeOpr
   | LookupSwitch Int32 (V.Vector (Int32, Int32))
   -- ^ a lookup switch has a `default` value and a list of pairs.
 
-  | Get FieldAccess (Index (InClass FieldId))
-  | Put FieldAccess (Index (InClass FieldId))
+  | Get FieldAccess (i (InClass FieldId))
+  | Put FieldAccess (i (InClass FieldId))
 
-  | Invoke Invokation (Index (InClass MethodId))
+  | Invoke Invokation (i (InClass MethodId))
 
-  | New (Index ClassName)
-  | NewArray (ArrayType (Index ClassName))
+  | New (i ClassName)
+  | NewArray (ArrayType (i ClassName))
 
   | ArrayLength
 
   | Throw
 
-  | CheckCast (Index ClassName)
-  | InstanceOf (Index ClassName)
+  | CheckCast (i ClassName)
+  | InstanceOf (i ClassName)
 
   | Monitor Bool
   -- ^ True => Enter, False => Exit
 
-  | MultiNewArray (Index ClassName) Word8
+  | MultiNewArray (i ClassName) Word8
   -- ^ Create a new multi array of #1 and with #2 dimensions
 
   | Return (Maybe LocalType)
@@ -302,9 +338,14 @@ data ByteCodeOpr
 
   | Swap
 
-  deriving (Show, Eq, Generic, NFData)
+-- deriving (Eq, Generic, NFData)
 
-instance Binary ByteCodeOpr where
+deriving instance Show (ByteCodeOpr Index)
+deriving instance Eq (ByteCodeOpr Index)
+deriving instance Generic (ByteCodeOpr Index)
+deriving instance NFData (ByteCodeOpr Index)
+
+instance Binary (ByteCodeOpr Index) where
   get = do
     cmd <- getWord8
     case cmd of

@@ -20,28 +20,38 @@ import           GHC.Generics          (Generic)
 
 import           Data.Binary
 
-import           Language.JVM.Constant (InClass, MethodId, Index, Constant)
+import           Language.JVM.Constant (AbsMethodId, Reference, Ref, Index, Constant)
 import           Language.JVM.Utils
 
 -- | Is a list of bootstrapped methods.
-data BootstrapMethods = BootstrapMethods
-  { methods' :: SizedList16 BootstrapMethod
+data BootstrapMethods r = BootstrapMethods
+  { methods' :: SizedList16 (BootstrapMethod r)
   } deriving (Show, Eq, Generic)
 
 instance Binary BootstrapMethods where
 
+deriving instance Reference r => Show (BootstrapMethods r)
+deriving instance Reference r => Eq (BootstrapMethods r)
+deriving instance Reference r => Generic (BootstrapMethods r)
+deriving instance Reference r => NFData (BootstrapMethods r)
+
 -- | The methods as list
-methods :: BootstrapMethods -> [ BootstrapMethod ]
+methods :: BootstrapMethods r -> [ BootstrapMethod r ]
 methods = unSizedList . methods'
 
 -- | A bootstraped methods.
 data BootstrapMethod = BootstrapMethod
-  { methodIndex :: Index (InClass MethodId)
-  , arguments' :: SizedList16 (Index Constant)
-  } deriving (Show, Eq, Generic)
+  { methodIndex :: Ref r (AbsMethodId r)
+  , arguments' :: SizedList16 (Ref r (Constant r))
+  }
 
 -- | The arguments as a list
-arguments :: BootstrapMethod -> [ Index Constant ]
+arguments :: Reference r => BootstrapMethod r -> [ Ref r Constant ]
 arguments = unSizedList . arguments'
 
 instance Binary BootstrapMethod where
+
+deriving instance Reference r => Show (BootstrapMethod r)
+deriving instance Reference r => Eq (BootstrapMethod r)
+deriving instance Reference r => Generic (BootstrapMethod r)
+deriving instance Reference r => NFData (BootstrapMethod r)

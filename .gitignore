@@ -4,3 +4,4 @@
 /*.cabal
 
 test-suite/data/java
+.DS_Store

@@ -1,5 +1,4 @@
 {-|
-Module      : Language.JVM.Constant
 Copyright   : (c) Christian Gram Kalhauge, 2017
 License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
@@ -9,6 +8,7 @@ are essential for accessing data in the class-file.
 -}
 
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RankNTypes    #-}
 {-# LANGUAGE DeriveAnyClass  #-}
@@ -17,42 +17,62 @@ are essential for accessing data in the class-file.
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Language.JVM.Constant
   (
-    -- * Constant
-    Constant (..)
+    -- * Constant Pool
+    -- $ConstantPool
+    ConstantPool (..)
+
+    -- ** Reference
+  , Reference (..)
+  , Ref (..)
+  , Index (..)
+  , Deref (..)
+
+  -- ** Dereferencing
+  , PoolAccessError(..)
+  , derefConstant
+
+  , Referenceable (..)
+
+    -- * Constants
+  , Constant (..)
   , constantSize
+  , typeToStr
 
     -- ** Special constants
-  , InClass (..)
+  , ClassName (..)
+
   , MethodId (..)
   , FieldId (..)
-  , ClassName (..)
+  , InterfaceId (..)
 
   , MethodDescriptor
   , FieldDescriptor
 
-    -- * Constant Pool
-    -- $ConstantPool
-  , ConstantPool (..)
+  , InClass (..)
+  , AbsFieldId
+  , AbsMethodId
 
-  , Index(..)
-  , InConstantPool (..)
+  , MethodHandle (..)
+  , MethodHandleField (..)
+  , MethodHandleMethod (..)
+  , MethodHandleInterface (..)
 
-  , PoolAccess(..)
-  , PoolAccessError(..)
-
-  , derefF
+  , InvokeDynamic (..)
 
   ) where
 
 import           Prelude            hiding (fail, lookup)
 
+import Numeric (showHex)
+
 import           Control.Monad      (forM_)
 import           Control.Monad.Fail (fail)
-import           Control.DeepSeq (NFData)
+import           Control.DeepSeq (NFData, NFData1, rnf, rnf1)
 
-import           GHC.Generics (Generic)
+import           GHC.Generics (Generic, Generic1)
 
 import           Data.Binary
 import           Data.Binary.Get
@@ -62,118 +82,23 @@ import qualified Data.IntMap.Strict as IM
 import           Language.JVM.Utils
 import           Language.JVM.Type
 
+import           Text.Show.Deriving
+import           Data.Eq.Deriving
+
 import qualified Data.Text          as Text
-import qualified Data.ByteString    as BS
-import qualified Data.Text.Encoding as TE
-import qualified Data.Text.Encoding.Error as TE
+-- import qualified Data.ByteString    as BS
+-- import qualified Data.Text.Encoding as TE
+-- import qualified Data.Text.Encoding.Error as TE
 
--- | A constant is a multi word item in the 'ConstantPool'. Each of
--- the constructors are pretty much self expiatory from the types.
-data Constant
-  = String {-#  UNPACK #-} !SizedByteString16
-  | Integer {-# UNPACK #-} !Word32
-  | Float {-# UNPACK #-} !Word32
-  | Long {-# UNPACK #-} !Word64
-  | Double {-# UNPACK #-} !Word64
-  | ClassRef (Index Text.Text)
-  | StringRef (Index Text.Text)
-  | FieldRef (Index ClassName) (Index FieldId)
-  | MethodRef (Index ClassName) (Index MethodId)
-  | InterfaceMethodRef (Index ClassName) (Index MethodId)
-  | NameAndType (Index Text.Text) (Index Text.Text)
-  | MethodHandle !Word8 (Index Constant)
-  | MethodType (Index MethodDescriptor)
-  | InvokeDynamic {-# UNPACK #-} !Word16 (Index Constant)
-  deriving (Show, Eq, Generic, NFData)
-
-typeToStr :: Constant -> String
-typeToStr = head . words . show
-
-instance Binary Constant where
-  get = do
-    ident <- getWord8
-    case ident of
-      1  -> String <$> get
-      3  -> Integer <$> get
-      4  -> Float <$> get
-      5  -> Long <$> get
-      6  -> Double <$> get
-      7  -> ClassRef <$> get
-      8  -> StringRef <$> get
-      9  -> FieldRef <$> get <*> get
-      10 -> MethodRef <$> get <*> get
-      11 -> InterfaceMethodRef <$> get <*> get
-      12 -> NameAndType <$> get <*> get
-      15 -> MethodHandle <$> get <*> get
-      16 -> MethodType <$> get
-      18 -> InvokeDynamic <$> get <*> get
-      _  -> fail $ "Unkown identifier " ++ show ident
-
-  put x =
-    case x of
-      String bs              -> do putWord8 1; put bs
-      Integer i              -> do putWord8 3; put i
-      Float i                -> do putWord8 4; put i
-      Long i                 -> do putWord8 5; put i
-      Double i               -> do putWord8 6; put i
-      ClassRef i             -> do putWord8 7; put i
-      StringRef i            -> do putWord8 8; put i
-      FieldRef i j           -> do putWord8 9; put i; put j
-      MethodRef i j          -> do putWord8 10; put i; put j
-      InterfaceMethodRef i j -> do putWord8 11; put i; put j
-      NameAndType i j        -> do putWord8 12; put i; put j
-      MethodHandle i j       -> do putWord8 15; put i; put j
-      MethodType i           -> do putWord8 16; put i;
-
-      InvokeDynamic i j      -> do putWord8 18; put i; put j
-
--- | Some of the 'Constant's take up more space in the constant pool than other.
--- Notice that 'Language.JVM.Constant.String' and 'MethodType' is not of size
--- 32, but is still awarded value 1. This is due to an
--- [inconsistency](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4.5)
--- in JVM.
-constantSize :: Constant -> Int
-constantSize x =
-  case x of
-    Double _ -> 2
-    Long _   -> 2
-    _        -> 1
-
--- | Any thing pointing inside a class
-data InClass a = InClass
-  { inClassName :: !ClassName
-  , inClassId :: a
-  } deriving (Show, Eq, Ord, Generic, NFData)
-
--- | A method identifier
-data MethodId = MethodId
-  { methodIdName :: !Text.Text
-  , methodIdDescription :: !MethodDescriptor
-  } deriving (Show, Eq, Ord, Generic, NFData)
-
--- | A field identifier
-data FieldId = FieldId
-  { fieldIdName :: !Text.Text
-  , fieldIdDescription :: !FieldDescriptor
-  } deriving (Show, Eq, Ord, Generic, NFData)
-
-
--- $ConstantPool
--- The 'ConstantPool' contains all the constants, and is accessible using the
--- Lookup methods.
+import Data.Functor.Classes (Eq1, Show1, eq1, showsPrec1)
 
 -- | A ConstantPool is just an 'IntMap'. A 'IntMap' is used, because constants are
 -- accessed after their byte-offset. 'constantSize'
-newtype ConstantPool = ConstantPool
-  { unConstantPool :: IM.IntMap Constant
-  } deriving (Show, Eq, Generic, NFData)
+newtype ConstantPool r = ConstantPool
+  { unConstantPool :: IM.IntMap (Constant r)
+  }
 
--- -- | Return a list of reference-constant pairs.
--- toListOfConstants :: ConstantPool -> [(, Constant)]
--- toListOfConstants =
---   map (\(a,b) -> (ConstantRef . fromIntegral $ a, b)) . IM.toList . unConstantPool
-
-instance Binary ConstantPool where
+instance Binary (ConstantPool Index) where
   get = do
     len <- fromIntegral <$> getInt16be
     list <- go len 1
@@ -192,150 +117,463 @@ instance Binary ConstantPool where
       Nothing -> do
         putInt16be 0
 
+-- | A reference into the 'ConstantPool', has a single function that
+-- returns the index value as a 'Word16'. There are two implementations
+-- of this class 'Index' which only saves the index into the ConstantPool
+-- and 'Deref' that also stores the value.
+class (Generic1 r, Eq1 r, Show1 r, NFData1 r) => Reference r where
+  asWord :: r a -> Word16
+
+-- | This wraps a 'Reference' 'r' and an 'Referenceable' 'a', and
+-- make them an instance of 'Generic', 'Show', 'Eq', and 'NFData'
+newtype Ref r a = Ref { unref :: (r a) }
+
+instance (Reference r, Show a) => Show (Ref r a) where
+  showsPrec i = showsPrec1 i . unref
+
+instance (Reference r, Eq a) => Eq (Ref r a) where
+  (==) a b = eq1 (unref a) (unref b)
+
+instance (Reference r, NFData a) => NFData (Ref r a) where
+  rnf = rnf1 . unref
+
+deriving instance (Reference r, Generic a) => Generic (Ref r a)
+
+
+-- | An access into the constant pool
+data Index i = Index
+  { indexAsWord :: {-# UNPACK #-} !Word16
+  } -- deriving (Show, Eq, Generic, NFData, Binary)
+
+instance Binary (Ref Index a) where
+  get = get
+  put a =
+    put . indexAsWord . unref $ a
+
+deriving instance NFData1 Index
+deriving instance Generic1 Index
+
+instance Reference Index where
+  asWord = indexAsWord
+
+-- | An access into the constant pool, de-referenced.
+data Deref i = Deref
+  { derefIndex :: {-# UNPACK #-} !Word16
+  , derefValue :: i
+  } -- deriving (Show, Eq, Generic, NFData)
+
+deriving instance (NFData1 Deref)
+deriving instance (Generic1 Deref)
+
+instance Reference Deref where
+  asWord = derefIndex
+
+class Referenceable a where
+  fromConst :: Constant Deref -> a
+
+-- | A constant is a multi word item in the 'ConstantPool'. Each of
+-- the constructors are pretty much self-explanatory from the types.
+data Constant r
+  = CString !SizedByteString16
+  | CInteger !Word32
+  | CFloat !Word32
+  | CLong !Word64
+  | CDouble !Word64
+  | CClassRef !(Ref r Text.Text)
+  | CStringRef !(Ref r Text.Text)
+  | CFieldRef !(AbsFieldId r)
+  | CMethodRef !(AbsMethodId r)
+  | CInterfaceMethodRef !(AbsMethodId r)
+  | CNameAndType !(Ref r Text.Text) !(Ref r Text.Text)
+
+  -- All part of MethodHandle
+  | CMethodHandle !(MethodHandle r)
+
+  | CMethodType !(Ref r MethodDescriptor)
+  | CInvokeDynamic !(InvokeDynamic r)
+
+deriving instance Reference r => Show (Constant r)
+deriving instance Reference r => Eq (Constant r)
+deriving instance Reference r => Generic (Constant r)
+deriving instance Reference r => NFData (Constant r)
+
+--deriving (Show, Eq, Generic, NFData)
+
+-- | Anything pointing inside a class
+data InClass a r = InClass
+  { inClassName :: !(Ref r ClassName)
+  , inClassId :: !(Ref r (a r))
+  }
+
+-- | A method identifier
+data MethodId r = MethodId
+  { methodIdName :: !(Ref r Text.Text)
+  , methodIdDescription :: !(Ref r MethodDescriptor)
+  }
+
+deriving instance Reference r => Show (MethodId r)
+deriving instance Reference r => Eq (MethodId r)
+deriving instance Reference r => Generic (MethodId r)
+deriving instance Reference r => NFData (MethodId r)
+deriving instance Binary (MethodId Index)
+
+-- | An absolute reference to a method
+type AbsMethodId = InClass MethodId
+
+deriving instance Reference r => Show (AbsMethodId r)
+deriving instance Reference r => Eq (AbsMethodId r)
+deriving instance Reference r => Generic (AbsMethodId r)
+deriving instance Reference r => NFData (AbsMethodId r)
+deriving instance Binary (AbsMethodId Index)
+
+-- | A field identifier
+data FieldId r = FieldId
+  { fieldIdName :: !(Ref r Text.Text)
+  , fieldIdDescription :: !(Ref r FieldDescriptor)
+  } -- deriving (Show, Eq, Ord, Generic, NFData)
+
+deriving instance Reference r => Show (FieldId r)
+deriving instance Reference r => Eq (FieldId r)
+deriving instance Reference r => Generic (FieldId r)
+deriving instance Reference r => NFData (FieldId r)
+deriving instance Binary (FieldId Index)
+
+-- | An absolute reference to a field
+type AbsFieldId = InClass FieldId
+
+deriving instance Reference r => Show (AbsFieldId r)
+deriving instance Reference r => Eq (AbsFieldId r)
+deriving instance Reference r => Generic (AbsFieldId r)
+deriving instance Reference r => NFData (AbsFieldId r)
+deriving instance Binary (AbsFieldId Index)
+
+
+-- | An interface identifier, essentially a method id
+data InterfaceId r = InterfaceId
+  { interfaceMethodId :: !(AbsMethodId r)
+  }
+
+deriving instance Reference r => Show (InterfaceId r)
+deriving instance Reference r => Eq (InterfaceId r)
+deriving instance Reference r => Generic (InterfaceId r)
+deriving instance Reference r => NFData (InterfaceId r)
+
+-- | The union type over the different method handles.
+data MethodHandle r
+  = MHField !(MethodHandleField r)
+  | MHMethod !(MethodHandleMethod r)
+  | MHInterface !(MethodHandleInterface r)
+
+deriving instance Reference r => Show (MethodHandle r)
+deriving instance Reference r => Eq (MethodHandle r)
+deriving instance Reference r => Generic (MethodHandle r)
+deriving instance Reference r => NFData (MethodHandle r)
+
+instance Binary (MethodHandle Index) where
+  get = do
+    w <- getWord8
+    case w of
+      1 -> MHField . MethodHandleField MHGetField <$> get
+      2 -> MHField . MethodHandleField MHGetStatic <$> get
+      3 -> MHField . MethodHandleField MHPutField <$> get
+      4 -> MHField . MethodHandleField MHPutStatic <$> get
+
+      5 -> MHMethod . MethodHandleMethod MHInvokeVirtual <$> get
+      6 -> MHMethod . MethodHandleMethod MHInvokeStatic <$> get
+      7 -> MHMethod . MethodHandleMethod MHInvokeSpecial<$> get
+      8 -> MHMethod . MethodHandleMethod MHNewInvokeSpecial <$> get
+
+      9 -> MHInterface . MethodHandleInterface <$> get
+
+      _ -> fail $ "Unknown method handle kind 'x" ++ showHex w "'"
+
+  put x = case x of
+    MHField h -> do
+      putWord8 $ case methodHandleFieldKind h of
+        MHGetField -> 1
+        MHGetStatic -> 2
+        MHPutField -> 3
+        MHPutStatic -> 4
+      put $ methodHandleFieldRef h
+
+    MHMethod h   -> do
+      putWord8 $ case methodHandleMethodKind h of
+        MHInvokeVirtual-> 5
+        MHInvokeStatic -> 6
+        MHInvokeSpecial -> 7
+        MHNewInvokeSpecial -> 7
+      put $ methodHandleMethodRef h
+
+    MHInterface h -> do
+      putWord8  9
+      put $ methodHandleInterfaceRef h
+
+
+data MethodHandleField r = MethodHandleField
+  { methodHandleFieldKind :: !MethodHandleFieldKind
+  , methodHandleFieldRef :: !(Ref r (AbsFieldId r))
+  }
+
+deriving instance Reference r => Show (MethodHandleField r)
+deriving instance Reference r => Eq (MethodHandleField r)
+deriving instance Reference r => Generic (MethodHandleField r)
+deriving instance Reference r => NFData (MethodHandleField r)
+
+data MethodHandleFieldKind
+  = MHGetField
+  | MHGetStatic
+  | MHPutField
+  | MHPutStatic
+  deriving (Eq, Show, NFData, Generic)
+
+data MethodHandleMethod r = MethodHandleMethod
+  { methodHandleMethodKind :: !MethodHandleMethodKind
+  , methodHandleMethodRef :: !(Ref r (AbsMethodId r))
+  }
+
+deriving instance Reference r => Show (MethodHandleMethod r)
+deriving instance Reference r => Eq (MethodHandleMethod r)
+deriving instance Reference r => Generic (MethodHandleMethod r)
+deriving instance Reference r => NFData (MethodHandleMethod r)
+
+
+data MethodHandleMethodKind
+  = MHInvokeVirtual
+  | MHInvokeStatic
+  | MHInvokeSpecial
+  | MHNewInvokeSpecial
+  deriving (Eq, Show, NFData, Generic)
+
+data MethodHandleInterface r = MethodHandleInterface
+  {  methodHandleInterfaceRef :: !(Ref r (AbsMethodId r))
+  }
+deriving instance Reference r => Show (MethodHandleInterface r)
+deriving instance Reference r => Eq (MethodHandleInterface r)
+deriving instance Reference r => Generic (MethodHandleInterface r)
+deriving instance Reference r => NFData (MethodHandleInterface r)
+
+data InvokeDynamic r = InvokeDynamic
+  { invokeDynamicAttrIndex :: !Word16
+  , invokeDynamicMethod :: !(Ref r (MethodId r))
+  }
+
+deriving instance Reference r => Show (InvokeDynamic r)
+deriving instance Reference r => Eq (InvokeDynamic r)
+deriving instance Reference r => Generic (InvokeDynamic r)
+deriving instance Reference r => NFData (InvokeDynamic r)
+deriving instance Binary (InvokeDynamic Index)
+
+
+-- toFieldId :: NameAndType r -> FieldId
+
+typeToStr :: Reference r => Constant r -> String
+typeToStr = head . words . show
+
+instance Binary (Constant Index) where
+  get = do
+    ident <- getWord8
+    case ident of
+      1  -> CString <$> get
+      3  -> CInteger <$> get
+      4  -> CFloat <$> get
+      5  -> CLong <$> get
+      6  -> CDouble <$> get
+      7  -> CClassRef <$> get
+      8  -> CStringRef <$> get
+      9  -> CFieldRef <$> get
+      10 -> CMethodRef <$> get
+      11 -> CInterfaceMethodRef <$> get
+      12 -> CNameAndType <$> get <*> get
+      15 -> CMethodHandle <$> get
+      16 -> CMethodType <$> get
+      18 -> CInvokeDynamic <$> get
+      _  -> fail $ "Unkown identifier " ++ show ident
+
+  put x =
+    case x of
+      CString bs              -> do putWord8 1; put bs
+      CInteger i              -> do putWord8 3; put i
+      CFloat i                -> do putWord8 4; put i
+      CLong i                 -> do putWord8 5; put i
+      CDouble i               -> do putWord8 6; put i
+      CClassRef i             -> do putWord8 7; put i
+      CStringRef i            -> do putWord8 8; put i
+      CFieldRef i             -> do putWord8 9; put i
+      CMethodRef i            -> do putWord8 10; put i
+      CInterfaceMethodRef i   -> do putWord8 11; put i
+      CNameAndType i j        -> do putWord8 12; put i; put j
+      CMethodHandle h         -> do putWord8 15; put h
+      CMethodType i           -> do putWord8 16; put i;
+      CInvokeDynamic i        -> do putWord8 18; put i
+
+-- | Some of the 'Constant's take up more space in the constant pool than other.
+-- Notice that 'Language.JVM.Constant.String' and 'MethodType' is not of size
+-- 32, but is still awarded value 1. This is due to an
+-- [inconsistency](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4.5)
+-- in JVM.
+constantSize :: Reference r => Constant r -> Int
+constantSize x =
+  case x of
+    CDouble _ -> 2
+    CLong _   -> 2
+    _        -> 1
+
+-- $ConstantPool
+-- The 'ConstantPool' contains all the constants, and is accessible using the
+-- Lookup methods.
+
 -- | Lookup a 'Constant' in the 'ConstantPool'.
-derefConstant :: ConstantPool -> Word16 -> Maybe Constant
-derefConstant (ConstantPool cp) ref =
-  IM.lookup (fromIntegral ref) cp
+derefConstant :: ConstantPool Deref -> Ref Index i -> Either PoolAccessError (Deref (Constant Deref))
+derefConstant (ConstantPool cp) (Ref (Index ref)) =
+  case IM.lookup (fromIntegral ref) cp of
+    Just x -> Right (Deref ref x)
+    Nothing -> Left $ PoolAccessError ref "No such element."
 
 -- | A pool access error
-data PoolAccessError
-  = PoolAccessError Word16 String
-  deriving (Show, Eq, Generic, NFData)
+data PoolAccessError = PoolAccessError
+  { paErrorRef :: !Word16
+  , paErrorMsg :: String
+  } -- deriving (Show, Eq, Generic, NFData)
 
--- | The pool access monad.
-newtype PoolAccess a = PoolAccess
-  { runWithPool :: ConstantPool -> Either PoolAccessError a
-  } deriving (Functor)
+-- -- | The pool access monad.
+-- newtype PoolAccess a = PoolAccess
+--   { runWithPool :: (ConstantPool Ref) -> Either PoolAccessError a
+--   } deriving (Functor)
 
-instance Applicative (PoolAccess) where
-  pure x = PoolAccess . const $ Right x
-  mf <*> ma = PoolAccess $ \c ->
-     runWithPool mf c <*> runWithPool ma c
+-- instance Applicative (PoolAccess) where
+--   pure x = PoolAccess . const $ Right x
+--   mf <*> ma = PoolAccess $ \c ->
+--      runWithPool mf c <*> runWithPool ma c
 
-instance Monad (PoolAccess) where
-  return = pure
-  ma >>= fm = PoolAccess $ \c ->
-    case runWithPool ma c of
-      Left p -> Left p
-      Right b -> runWithPool (fm b) c
+-- instance Monad (PoolAccess) where
+--   return = pure
+--   ma >>= fm = PoolAccess $ \c ->
+--     case runWithPool ma c of
+--       Left p -> Left p
+--       Right b -> runWithPool (fm b) c
 
--- This part contains helpers to describe some of the semantics of the
--- class file.
+-- -- This part contains helpers to describe some of the semantics of the
+-- -- class file.
 
--- | Describes an index into the constant pool
-newtype Index x = Index
-  { indexAsWord :: Word16
-  } deriving (Show, Eq, Generic, NFData)
+-- -- | Describes an index into the constant pool
+-- newtype Index x = Index
+--   { indexAsWord :: Word16
+--   } deriving (Show, Eq, Generic, NFData)
 
-instance (InConstantPool x) => Binary (Index x) where
-  get = Index <$> get
-  put (Index ref) = put ref
+-- instance (InConstantPool x) => Binary (Index x) where
+--   get = Index <$> get
+--   put (Index ref) = put ref
 
--- | Describes if a type is in the constant pool
-class InConstantPool a where
-  deref :: Index a -> PoolAccess a
+-- -- | Describes if a type is in the constant pool
+-- class InConstantPool a where
+--   deref :: Index a -> PoolAccess a
 
-instance InConstantPool Constant where
-  deref (Index ref) = PoolAccess $ \cp ->
-    case derefConstant cp ref of
-      Just c -> Right c
-      Nothing -> runWithPool (outofbounds ref) cp
+-- instance InConstantPool Constant where
+--   deref (Index ref) = PoolAccess $ \cp ->
+--     case derefConstant cp ref of
+--       Just c -> Right c
+--       Nothing -> runWithPool (outofbounds ref) cp
 
--- | Lookup a 'Text.Text' in the 'ConstantPool', returns 'Nothing' if the
--- reference does not point to something in the ConstantPool, if it points to
--- something not a 'Language.JVM.Constant.String' Constant, or if it is
--- impossible to decode the 'ByteString' as Utf8.
-instance InConstantPool Text.Text where
-  deref (Index ref) = do
-    cons <- derefW ref
-    case cons of
-      String str ->
-        case TE.decodeUtf8' . unSizedByteString $ str of
-          Left (TE.DecodeError msg _) -> badEncoding ref msg (unSizedByteString str)
-          Left _ -> error "This is deprecated in the api"
-          Right txt -> return txt
-      a -> wrongType ref "String" a
+-- -- | Lookup a 'Text.Text' in the 'ConstantPool', returns 'Nothing' if the
+-- -- reference does not point to something in the ConstantPool, if it points to
+-- -- something not a 'Language.JVM.Constant.String' Constant, or if it is
+-- -- impossible to decode the 'ByteString' as Utf8.
+-- instance InConstantPool Text.Text where
+--   deref (Index ref) = do
+--     cons <- derefW ref
+--     case cons of
+--       String str ->
+--         case TE.decodeUtf8' . unSizedByteString $ str of
+--           Left (TE.DecodeError msg _) -> badEncoding ref msg (unSizedByteString str)
+--           Left _ -> error "This is deprecated in the api"
+--           Right txt -> return txt
+--       a -> wrongType ref "String" a
 
-instance InConstantPool ClassName where
-  deref (Index ref) = do
-    cons <- derefW ref
-    case cons of
-      ClassRef r ->
-        ClassName <$> deref r
-      a -> wrongType ref "ClassRef" a
+-- instance InConstantPool ClassName where
+--   deref (Index ref) = do
+--     cons <- derefW ref
+--     case cons of
+--       ClassRef r ->
+--         ClassName <$> deref r
+--       a -> wrongType ref "ClassRef" a
 
-instance InConstantPool (InClass MethodId) where
-  deref (Index ref) = do
-    cons <- derefW ref
-    case cons of
-      MethodRef cn rt ->
-        InClass <$> deref cn <*> deref rt
-      a -> wrongType ref "MethodRef" a
+-- instance InConstantPool (InClass MethodId) where
+--   deref (Index ref) = do
+--     cons <- derefW ref
+--     case cons of
+--       MethodRef cn rt ->
+--         InClass <$> deref cn <*> deref rt
+--       a -> wrongType ref "MethodRef" a
 
-instance InConstantPool (InClass FieldId) where
-  deref (Index ref) = do
-    cons <- derefW ref
-    case cons of
-      FieldRef cn rt ->
-        InClass <$> deref cn <*> deref rt
-      a -> wrongType ref "FieldRef" a
+-- instance InConstantPool (InClass FieldId) where
+--   deref (Index ref) = do
+--     cons <- derefW ref
+--     case cons of
+--       FieldRef cn rt ->
+--         InClass <$> deref cn <*> deref rt
+--       a -> wrongType ref "FieldRef" a
 
-instance InConstantPool MethodId where
-  deref (Index ref) = do
-    cons <- derefW ref
-    case cons of
-      NameAndType n (Index i) ->
-        MethodId <$> deref n <*> derefW i
-      a -> wrongType ref "NameAndType" a
+-- instance InConstantPool MethodId where
+--   deref (Index ref) = do
+--     cons <- derefW ref
+--     case cons of
+--       NameAndType n (Index i) ->
+--         MethodId <$> deref n <*> derefW i
+--       a -> wrongType ref "NameAndType" a
 
-instance InConstantPool FieldId where
-  deref (Index ref) = do
-    cons <- derefW ref
-    case cons of
-      NameAndType n (Index i) ->
-        FieldId <$> deref n <*> derefW i
-      a -> wrongType ref "NameAndType" a
+-- instance InConstantPool FieldId where
+--   deref (Index ref) = do
+--     cons <- derefW ref
+--     case cons of
+--       NameAndType n (Index i) ->
+--         FieldId <$> deref n <*> derefW i
+--       a -> wrongType ref "NameAndType" a
 
-instance InConstantPool MethodDescriptor where
-  deref (Index ref) = do
-    txt <- derefW ref
-    case methodDescriptorFromText txt of
-      Just x -> return x
-      Nothing -> parseError ref txt
+-- instance InConstantPool MethodDescriptor where
+--   deref (Index ref) = do
+--     txt <- derefW ref
+--     case methodDescriptorFromText txt of
+--       Just x -> return x
+--       Nothing -> parseError ref txt
 
-instance InConstantPool FieldDescriptor where
-  deref (Index ref) = do
-    txt <- derefW ref
-    case fieldDescriptorFromText txt of
-      Just x -> return x
-      Nothing -> parseError ref txt
+-- instance InConstantPool FieldDescriptor where
+--   deref (Index ref) = do
+--     txt <- derefW ref
+--     case fieldDescriptorFromText txt of
+--       Just x -> return x
+--       Nothing -> parseError ref txt
 
--- Helper functions
+-- -- Helper functions
 
--- | Given a function from an object b to an 'Index a' create a function from b
--- to 'PoolAccess a'. Very useful for defining functions.
-derefF :: InConstantPool a => (b -> Index a) -> b -> PoolAccess a
-derefF fn b = deref (fn b)
+-- -- | Given a function from an object b to an 'Index a' create a function from b
+-- -- to 'PoolAccess a'. Very useful for defining functions.
+-- derefF :: InConstantPool a => (b -> Index a) -> b -> PoolAccess a
+-- derefF fn b = deref (fn b)
 
--- Hidden access method.
+-- -- Hidden access method.
 
-derefW :: InConstantPool a => Word16 -> PoolAccess a
-derefW w = deref (Index w)
+-- derefW :: InConstantPool a => Word16 -> PoolAccess a
+-- derefW w = deref (Index w)
 
--- Hidden exception methods
+-- -- Hidden exception methods
 
-wrongType :: Word16 -> String -> Constant -> PoolAccess a
-wrongType w expected got = PoolAccess $ \_ ->
-  Left (PoolAccessError w ("Expected '" ++ expected ++ "' but got '" ++ typeToStr got ++ "'"))
+-- wrongType :: Word16 -> String -> Constant -> PoolAccess a
+-- wrongType w expected got = PoolAccess $ \_ ->
+--   Left (PoolAccessError w ("Expected '" ++ expected ++ "' but got '" ++ typeToStr got ++ "'"))
 
-outofbounds :: Word16 -> PoolAccess a
-outofbounds w = PoolAccess $ \_ ->
-  Left (PoolAccessError w "Out of bounds")
+-- outofbounds :: Word16 -> PoolAccess a
+-- outofbounds w = PoolAccess $ \_ ->
+--   Left (PoolAccessError w "Out of bounds")
 
-parseError :: Word16 -> Text.Text -> PoolAccess a
-parseError w t = PoolAccess $ \_ ->
-  Left (PoolAccessError w $ "Could not parse '" ++ Text.unpack t ++ "'")
+-- parseError :: Word16 -> Text.Text -> PoolAccess a
+-- parseError w t = PoolAccess $ \_ ->
+--   Left (PoolAccessError w $ "Could not parse '" ++ Text.unpack t ++ "'")
 
-badEncoding :: Word16 -> String -> BS.ByteString -> PoolAccess a
-badEncoding w str bs = PoolAccess $ \_ ->
-  Left (PoolAccessError w $ "Could not encode '" ++ str ++ "': " ++ show bs)
+-- badEncoding :: Word16 -> String -> BS.ByteString -> PoolAccess a
+-- badEncoding w str bs = PoolAccess $ \_ ->
+--   Left (PoolAccessError w $ "Could not encode '" ++ str ++ "': " ++ show bs)
+
+$(deriveShow1 ''Index)
+$(deriveShow1 ''Deref)
+$(deriveEq1 ''Index)
+$(deriveEq1 ''Deref)
