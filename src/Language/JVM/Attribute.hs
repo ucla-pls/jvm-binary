@@ -20,7 +20,7 @@ module Language.JVM.Attribute
   -- * SubAttributes
   , IsAttribute (..)
   , Code
-  , codeStackMapTable
+  --, codeStackMapTable
   , ConstantValue
   , Exceptions
   , StackMapTable
@@ -28,15 +28,15 @@ module Language.JVM.Attribute
 
   -- * Helpers
   , Const
-  , matching
+  -- , matching
   , firstOne
   ) where
 
 
-import           Data.Foldable
+-- import           Data.Foldable
 import           Data.List as List
 import           Data.Bifunctor
-import           Data.Maybe
+-- import           Data.Maybe
 import qualified Data.ByteString.Lazy                    as BL
 import           Data.Binary
 
@@ -46,7 +46,7 @@ import           Language.JVM.Constant
 import           Language.JVM.Utils                      (trd)
 
 import           Language.JVM.Attribute.BootstrapMethods (BootstrapMethods)
-import qualified Language.JVM.Attribute.Code             as Code
+import Language.JVM.Attribute.Code (Code)
 import           Language.JVM.Attribute.ConstantValue    (ConstantValue)
 import           Language.JVM.Attribute.Exceptions       (Exceptions)
 import           Language.JVM.Attribute.StackMapTable    (StackMapTable)
@@ -64,71 +64,67 @@ class IsAttribute a where
   attrName :: Const Text.Text a
   -- ^ The name of the attribute.
 
-  fromAttribute :: Attribute -> Either String a
+  fromAttribute :: Attribute r -> Either String a
   -- ^ Generate a 'a' from an Attribute.
 
-  fromAttribute'
-    :: Attribute
-    -> PoolAccess (Maybe (Either String a))
-  fromAttribute' as = do
-    name <- aName as
-    return $ if name == unConst (attrName :: Const Text.Text a)
-      then Just $ fromAttribute as
-      else Nothing
+  -- fromAttribute'
+  --   :: Attribute
+  --   -> PoolAccess (Maybe (Either String a))
+  -- fromAttribute' as = do
+  --   name <- aName as
+  --   return $ if name == unConst (attrName :: Const Text.Text a)
+  --     then Just $ fromAttribute as
+  --     else Nothing
 
--- | Return a list of either parsed attributes or error messages from an object
--- given a function that object to a collection of attributes. The list only
--- contains matching attributes.
-matching
-  :: (IsAttribute a, Traversable t)
-  => (b -> t Attribute)
-  -> b
-  -> PoolAccess [Either String a]
-matching fn b = do
-  catMaybes . toList <$> sequence (fromAttribute' <$> fn b)
+-- -- | Return a list of either parsed attributes or error messages from an object
+-- -- given a function that object to a collection of attributes. The list only
+-- -- contains matching attributes.
+-- matching
+--   :: (IsAttribute a, Traversable t)
+--   => (b -> t Attribute)
+--   -> b
+--   -> PoolAccess [Either String a]
+-- matching fn b = do
+--   catMaybes . toList <$> sequence (fromAttribute' <$> fn b)
 
-readFromStrict :: Binary a => Attribute -> Either String a
+readFromStrict :: Binary a => Attribute r -> Either String a
 readFromStrict =
     bimap trd trd . decodeOrFail . BL.fromStrict . aInfo
 
 -- # Attributes
 
 -- | 'Code' is an Attribute.
-instance IsAttribute Code where
+instance IsAttribute (Code Index) where
   attrName = Const "Code"
   fromAttribute = readFromStrict
 
 -- | 'ConstantValue' is an Attribute.
-instance IsAttribute ConstantValue where
+instance IsAttribute (ConstantValue Index) where
   attrName = Const "ConstantValue"
   fromAttribute = readFromStrict
 
 -- | 'Exceptions' is an Attribute.
-instance IsAttribute Exceptions where
+instance IsAttribute (Exceptions Index) where
   attrName = Const "Exceptions"
   fromAttribute = readFromStrict
 
 -- | 'StackMapTable' is an Attribute.
-instance IsAttribute StackMapTable where
+instance IsAttribute (StackMapTable Index) where
   attrName = Const "StackMapTable"
   fromAttribute = readFromStrict
 
 -- | 'BootstrapMethods' is an Attribute.
-instance IsAttribute BootstrapMethods where
+instance IsAttribute (BootstrapMethods Index) where
   attrName = Const "BootstrapMethods"
   fromAttribute = readFromStrict
-
--- | Code is redefined with Attribute, as it is recursively containing
--- 'Attribute'. This is a small hack to fix it.
-type Code = Code.Code Index
 
 -- | Maybe return the first element of a list
 firstOne :: [a] -> Maybe a
 firstOne as = fst <$> List.uncons as
 
--- | The a attribute of the code is the StackMapTable. There can be at most one.
--- If the version number of the file is more than 50, and there is no StackMapTable.
--- there is an implicit empty StackMapTable.
-codeStackMapTable :: Code -> PoolAccess (Maybe (Either String BootstrapMethods))
-codeStackMapTable c = do
-  firstOne <$> matching Code.codeAttributes c
+-- -- | The a attribute of the code is the StackMapTable. There can be at most one.
+-- -- If the version number of the file is more than 50, and there is no StackMapTable.
+-- -- there is an implicit empty StackMapTable.
+-- codeStackMapTable :: Code -> PoolAccess (Maybe (Either String BootstrapMethods))
+-- codeStackMapTable c = do
+--   firstOne <$> matching Code.codeAttributes c

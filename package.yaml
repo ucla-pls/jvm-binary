@@ -20,36 +20,31 @@ extra-source-files:
 - README.md
 - stack.yaml
 
+dependencies:
+- base >= 4.9 && < 4.11
+- binary
+- bytestring
+- containers
+- text
+- vector
+- deepseq >= 1.4.3.0
+- deriving-compat
+- attoparsec 
+
 library:
-  dependencies:
-  - base >= 4.10 && < 4.11
-  - binary
-  - bytestring
-  - containers
-  - text
-  - vector
-  - deepseq
-  - deriving-compat
-  - megaparsec >= 6.2.0
   source-dirs: src
 
 tests:
   jvm-binary-test-suite:
     dependencies:
-    - base >= 4.10 && < 4.11
     - jvm-binary
     - tasty
     - tasty-hspec
     - tasty-discover
     - tasty-quickcheck
-    - binary
-    - bytestring
-    - containers
     - filepath
-    - deriving-compat
     - directory
     - text
-    - megaparsec >= 6.0.0
     - hspec-megaparsec
     ghc-options:
     - -rtsopts
@@ -62,11 +57,8 @@ tests:
 benchmarks:
   jvm-binary-benchmarks:
     dependencies:
-    - base >= 4.10 && < 4.11
     - jvm-binary
     - criterion
-    - bytestring
-    - deriving-compat
     ghc-options:
     - -rtsopts
     - -threaded

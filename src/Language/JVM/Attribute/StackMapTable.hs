@@ -1,3 +1,7 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE DeriveAnyClass   #-}
 {-|
 Module      : Language.JVM.Attribute.StackMapTable
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -8,7 +12,6 @@ Based on the StackMapTable Attribute,
 as documented [here](http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.4).
 
 -}
-{-# LANGUAGE DeriveGeneric   #-}
 
 module Language.JVM.Attribute.StackMapTable
   ( StackMapTable (..)
@@ -22,6 +25,7 @@ module Language.JVM.Attribute.StackMapTable
 import           GHC.Generics          (Generic)
 
 import           Data.Binary
+import           Control.DeepSeq
 import           Numeric
 import           Control.Monad (replicateM)
 
@@ -158,7 +162,6 @@ data VerificationTypeInfo r
   | VUninitializedThis
   | VObject (Ref r ClassName)
   | VUninitialized !Word16
-  deriving (Show, Eq)
 
 deriving instance Reference r => Show (VerificationTypeInfo r)
 deriving instance Reference r => Eq (VerificationTypeInfo r)

@@ -5,11 +5,11 @@ License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
 -}
 
-{-# LANGUAGE DeriveGeneric   #-}
-{-# LANGUAGE DeriveAnyClass   #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE StandaloneDeriving  #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell    #-}
 module Language.JVM.Attribute.Code
   ( Code (..)
 
@@ -38,44 +38,46 @@ module Language.JVM.Attribute.Code
   , Invokation (..)
   ) where
 
-import           GHC.Generics          (Generic)
+import           GHC.Generics                (Generic)
 
-import           Prelude               hiding (fail)
-import qualified Prelude               as P
+import           Prelude                     hiding (fail)
+import qualified Prelude                     as P
 
-import           Numeric               (showHex)
+import           Numeric                     (showHex)
 
-import           Control.Monad         hiding (fail)
-import           Control.Monad.Fail    (fail)
-import           Control.DeepSeq       (NFData)
+import           Control.DeepSeq             (NFData)
+import           Control.Monad               hiding (fail)
+import           Control.Monad.Fail          (fail)
 
 import           Data.Binary
-import           Data.Binary.Get       hiding (Get)
-import           Data.Binary.Put       hiding (Put)
-import qualified Data.ByteString.Lazy  as BL
+import           Data.Binary.Get             hiding (Get)
+import           Data.Binary.Put             hiding (Put)
+import qualified Data.ByteString.Lazy        as BL
 import           Data.Int
-import qualified Data.Vector           as V
+import qualified Data.Vector                 as V
 
-import           Language.JVM.Constant (ClassName, Constant, Index(..), indexAsWord,
-                                        FieldId, InClass, MethodId)
-import           Language.JVM.Utils
 import           Language.JVM.Attribute.Base
+import           Language.JVM.Constant       (ClassName, Constant, FieldId,
+                                              InClass, Index (), MethodId,
+                                              Reference,
+                                              Ref)
+import           Language.JVM.Utils
 
 -- | Code contains the actual byte-code. The 'i' type parameter is added to allow
 -- indicate the two stages of the code file, before and after access to the 'ConstantPool'.
 -- i should be either 'Ref' or 'Deref'.
-data Code i = Code
+data Code r = Code
   { codeMaxStack       :: Int16
   , codeMaxLocals      :: Int16
-  , codeByteCode       :: (ByteCode i)
-  , codeExceptionTable :: SizedList16 (ExceptionTable i)
-  , codeAttributes     :: SizedList16 Attribute
+  , codeByteCode       :: (ByteCode r)
+  , codeExceptionTable :: SizedList16 (ExceptionTable r)
+  , codeAttributes     :: SizedList16 (Attribute r)
   }
 
-deriving instance Show (Code Index)
-deriving instance Eq (Code Index)
-deriving instance Generic (Code Index)
-deriving instance NFData (Code Index)
+deriving instance Reference r => Show (Code r)
+deriving instance Reference r => Eq (Code r)
+deriving instance Reference r => Generic (Code r)
+deriving instance Reference r => NFData (Code r)
 deriving instance Binary (Code Index)
 
 -- data Ref i = Ref i
@@ -95,10 +97,10 @@ newtype ByteCode i = ByteCode
   { unByteCode :: [ByteCodeInst i]
   }
 
-deriving instance Show (ByteCode Index)
-deriving instance Eq (ByteCode Index)
-deriving instance Generic (ByteCode Index)
-deriving instance NFData (ByteCode Index)
+deriving instance Reference r => Show (ByteCode r)
+deriving instance Reference r => Eq (ByteCode r)
+deriving instance Reference r => Generic (ByteCode r)
+deriving instance Reference r => NFData (ByteCode r)
 
 instance Binary (ByteCode Index) where
   get = do
@@ -128,13 +130,14 @@ data ExceptionTable i = ExceptionTable
   -- ^ Exclusive program counter into 'code'
   , handler   :: ! Word16
   -- ^ A program counter into 'code' indicating the handler.
-  , catchType :: i ClassName
+  , catchType :: ! (Ref i ClassName)
   }
 
-deriving instance Show (ExceptionTable Index)
-deriving instance Eq (ExceptionTable Index)
-deriving instance Generic (ExceptionTable Index)
-deriving instance NFData (ExceptionTable Index)
+deriving instance Reference r => Show (ExceptionTable r)
+deriving instance Reference r => Eq (ExceptionTable r)
+deriving instance Reference r => Generic (ExceptionTable r)
+deriving instance Reference r => NFData (ExceptionTable r)
+
 deriving instance Binary (ExceptionTable Index)
 
 data ByteCodeInst i = ByteCodeInst
@@ -142,10 +145,10 @@ data ByteCodeInst i = ByteCodeInst
   , opcode :: ByteCodeOpr i
   }
 
-deriving instance Show (ByteCodeInst Index)
-deriving instance Eq (ByteCodeInst Index)
-deriving instance Generic (ByteCodeInst Index)
-deriving instance NFData (ByteCodeInst Index)
+deriving instance Reference r => Show (ByteCodeInst r)
+deriving instance Reference r => Eq (ByteCodeInst r)
+deriving instance Reference r => Generic (ByteCodeInst r)
+deriving instance Reference r => NFData (ByteCodeInst r)
 
 instance Binary (ByteCodeInst Index) where
   get =
@@ -185,7 +188,7 @@ data OneOrTwo = One | Two
 
 type WordSize = OneOrTwo
 
-data CConstant i
+data CConstant r
   = CNull
 
   | CIntM1
@@ -209,13 +212,13 @@ data CConstant i
   | CByte Int8
   | CShort Int16
 
-  | CHalfRef (i Constant)
-  | CRef WordSize (i Constant)
+  | CHalfRef (Ref r (Constant r))
+  | CRef WordSize (Ref r (Constant r))
 
-deriving instance Show (CConstant Index)
-deriving instance Eq (CConstant Index)
-deriving instance Generic (CConstant Index)
-deriving instance NFData (CConstant Index)
+deriving instance Reference r => Show (CConstant r)
+deriving instance Reference r => Eq (CConstant r)
+deriving instance Reference r => Generic (CConstant r)
+deriving instance Reference r => NFData (CConstant r)
 
 data BinOpr
   = Add
@@ -251,13 +254,13 @@ data CmpOpr
   = CEq | CNe | CLt | CGe | CGt | CLe
   deriving (Show, Eq, Generic, NFData)
 
-data ByteCodeOpr i
+data ByteCodeOpr r
   = ArrayLoad (ArrayType ())
   -- ^ aaload baload ...
   | ArrayStore (ArrayType ())
   -- ^ aastore bastore ...
 
-  | Push (CConstant i)
+  | Push (CConstant r)
 
   | Load LocalType LocalAddress
   -- ^ aload_0, bload_2, iload 5 ...
@@ -305,25 +308,25 @@ data ByteCodeOpr i
   | LookupSwitch Int32 (V.Vector (Int32, Int32))
   -- ^ a lookup switch has a `default` value and a list of pairs.
 
-  | Get FieldAccess (i (InClass FieldId))
-  | Put FieldAccess (i (InClass FieldId))
+  | Get FieldAccess (Ref r (InClass FieldId r))
+  | Put FieldAccess (Ref r (InClass FieldId r))
 
-  | Invoke Invokation (i (InClass MethodId))
+  | Invoke Invokation (Ref r (InClass MethodId r))
 
-  | New (i ClassName)
-  | NewArray (ArrayType (i ClassName))
+  | New (Ref r ClassName)
+  | NewArray (ArrayType (Ref r ClassName))
 
   | ArrayLength
 
   | Throw
 
-  | CheckCast (i ClassName)
-  | InstanceOf (i ClassName)
+  | CheckCast (Ref r ClassName)
+  | InstanceOf (Ref r ClassName)
 
   | Monitor Bool
   -- ^ True => Enter, False => Exit
 
-  | MultiNewArray (i ClassName) Word8
+  | MultiNewArray (Ref r ClassName) Word8
   -- ^ Create a new multi array of #1 and with #2 dimensions
 
   | Return (Maybe LocalType)
@@ -340,10 +343,10 @@ data ByteCodeOpr i
 
 -- deriving (Eq, Generic, NFData)
 
-deriving instance Show (ByteCodeOpr Index)
-deriving instance Eq (ByteCodeOpr Index)
-deriving instance Generic (ByteCodeOpr Index)
-deriving instance NFData (ByteCodeOpr Index)
+deriving instance Reference r => Show (ByteCodeOpr r)
+deriving instance Reference r => Eq (ByteCodeOpr r)
+deriving instance Reference r => Generic (ByteCodeOpr r)
+deriving instance Reference r => NFData (ByteCodeOpr r)
 
 instance Binary (ByteCodeOpr Index) where
   get = do
@@ -373,7 +376,7 @@ instance Binary (ByteCodeOpr Index) where
       0x10 -> Push . CByte <$> get
       0x11 -> Push . CShort <$> get
 
-      0x12 -> Push . CHalfRef . Index . fromIntegral <$> getWord8
+      0x12 -> Push . CHalfRef <$> get
       0x13 -> Push . CRef One <$> get
       0x14 -> Push . CRef Two <$> get
 
@@ -702,7 +705,7 @@ instance Binary (ByteCodeOpr Index) where
       Push (CByte x) -> putInt8 0x10 >> put x
       Push (CShort x) -> putInt8 0x11 >> put x
 
-      Push (CHalfRef x) -> putInt8 0x12 >> putWord8 (fromIntegral (indexAsWord x))
+      Push (CHalfRef x) -> putInt8 0x12 >> put x
       Push (CRef One r) -> putInt8 0x13 >> put r
       Push (CRef Two r) -> putInt8 0x14 >> put r
       _ -> P.fail $ "Is not able to print '" ++ show bc ++ "' yet."

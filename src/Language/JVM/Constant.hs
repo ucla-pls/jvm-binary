@@ -75,6 +75,7 @@ import           Control.DeepSeq (NFData, NFData1, rnf, rnf1)
 import           GHC.Generics (Generic, Generic1)
 
 import           Data.Binary
+import           Data.Monoid
 import           Data.Binary.Get
 import           Data.Binary.Put
 import qualified Data.IntMap.Strict as IM
@@ -97,6 +98,11 @@ import Data.Functor.Classes (Eq1, Show1, eq1, showsPrec1)
 newtype ConstantPool r = ConstantPool
   { unConstantPool :: IM.IntMap (Constant r)
   }
+
+deriving instance Reference r => Show (ConstantPool r)
+deriving instance Reference r => Eq (ConstantPool r)
+deriving instance Reference r => Generic (ConstantPool r)
+deriving instance Reference r => NFData (ConstantPool r)
 
 instance Binary (ConstantPool Index) where
   get = do
@@ -168,8 +174,6 @@ deriving instance (Generic1 Deref)
 instance Reference Deref where
   asWord = derefIndex
 
-class Referenceable a where
-  fromConst :: Constant Deref -> a
 
 -- | A constant is a multi word item in the 'ConstantPool'. Each of
 -- the constructors are pretty much self-explanatory from the types.
@@ -185,10 +189,7 @@ data Constant r
   | CMethodRef !(AbsMethodId r)
   | CInterfaceMethodRef !(AbsMethodId r)
   | CNameAndType !(Ref r Text.Text) !(Ref r Text.Text)
-
-  -- All part of MethodHandle
   | CMethodHandle !(MethodHandle r)
-
   | CMethodType !(Ref r MethodDescriptor)
   | CInvokeDynamic !(InvokeDynamic r)
 
@@ -336,7 +337,6 @@ deriving instance Reference r => Eq (MethodHandleMethod r)
 deriving instance Reference r => Generic (MethodHandleMethod r)
 deriving instance Reference r => NFData (MethodHandleMethod r)
 
-
 data MethodHandleMethodKind
   = MHInvokeVirtual
   | MHInvokeStatic
@@ -422,18 +422,99 @@ constantSize x =
 -- The 'ConstantPool' contains all the constants, and is accessible using the
 -- Lookup methods.
 
--- | Lookup a 'Constant' in the 'ConstantPool'.
-derefConstant :: ConstantPool Deref -> Ref Index i -> Either PoolAccessError (Deref (Constant Deref))
-derefConstant (ConstantPool cp) (Ref (Index ref)) =
-  case IM.lookup (fromIntegral ref) cp of
-    Just x -> Right (Deref ref x)
-    Nothing -> Left $ PoolAccessError ref "No such element."
-
 -- | A pool access error
 data PoolAccessError = PoolAccessError
   { paErrorRef :: !Word16
   , paErrorMsg :: String
-  } -- deriving (Show, Eq, Generic, NFData)
+  } deriving (Show, Eq, Generic, NFData)
+
+-- | Lookup a 'Constant' in the 'ConstantPool'.
+derefConstant :: Ref Index i -> ConstantPool Deref -> Either PoolAccessError (Constant Deref)
+derefConstant (Ref (Index ref)) (ConstantPool cp) =
+  case IM.lookup (fromIntegral ref) cp of
+    Just x -> Right x
+    Nothing -> Left $ PoolAccessError ref "No such element."
+
+class Referenceable a where
+  fromConst :: Constant Deref -> Either String a
+
+deref :: Referenceable a => Ref Index a -> ConstantPool Deref -> Either ClassFileError (Ref Deref a)
+deref r cp =
+  case derefConstant r cp of
+    Left msg -> Left $ CFEPoolAccessError msg
+    Right c -> do
+      case fromConst c of
+        Left str -> Left (CFEConversionError str)
+        Right a -> Right $ Ref (Deref (indexAsWord . unref $ r) a)
+
+data ClassFileError
+  = CFEPoolAccessError !PoolAccessError
+  | CFEInconsistentClassPool !String
+  | CFEConversionError !String
+  deriving (Show, Eq, Generic, NFData)
+
+class ClassFileReadable f where
+  untie :: f Index -> ConstantPool Deref -> Either ClassFileError (f Deref)
+
+-- | Untie the constant pool, this requires a special operation as the constant pool
+-- might reference itself.
+bootstrapUntie :: ConstantPool Index -> Either ClassFileError (ConstantPool Deref)
+bootstrapUntie reffed =
+  case stage (ConstantPool IM.empty, IM.toList $ unConstantPool reffed) of
+    (cp, []) ->
+      Right cp
+    (cp, _:_) ->
+      Left (CFEInconsistentClassPool "Could not load all constants in the constant pool")
+  where
+    stage (cp, mis) =
+      if IM.null cp'
+      then
+        (cp, mis)
+      else
+        stage (ConstantPool (unConstantPool cp `IM.union` cp'), appEndo mis' [])
+      where (cp', mis') = foldMap (grow cp) mis
+
+    grow cp (k,a) =
+      case untie a cp of
+        Right c -> (IM.singleton k c, Endo id)
+        Left e -> (IM.empty, Endo ((k,a):))
+
+instance ClassFileReadable ConstantPool where
+  untie cp = const $ bootstrapUntie cp
+
+instance ClassFileReadable Constant where
+  untie c cp =
+    case c of
+      -- CString st -> return $ CString st
+      -- CInteger i -> return $ CInteger i
+      -- CFloat f -> return $ CFloat f
+      -- CLong l -> return $ CLong l
+      -- CDouble l -> return $ CDouble l
+      -- CClassRef r ->
+      --   CClassRef <$> deref r cp
+      -- CStringRef r ->
+      --   CStringRef <$> deref r cp
+      -- CFieldRef a ->
+      --   CFieldRef <$> deref a cp
+      -- CMethodRef m ->
+      --   CMethodRef <$> deref m cp
+      -- CInterfaceMethodRef i ->
+      --   CInterfaceMethodRef <$> deref i cp
+      -- CNameAndType r1 r2-> do
+      --   t1 <- deref r1 cp
+      --   t2 <- deref r2 cp
+      --   return $ CNameAndType t1 t2
+      -- CMethodHandle r1 -> do
+      --   t <- deref r1 cp
+      --   t' <- untie t cp
+      --   return $ CMethodHandle t'
+      -- CMethodType m -> do
+      --   t <- deref m cp
+      --   t' <- untie t cp
+      --   return $ CMethodType t'
+      -- CInvokeDynamic t -> do
+      --   t' <- untie t cp
+      --   return $ CInvokeDynamic t'
 
 -- -- | The pool access monad.
 -- newtype PoolAccess a = PoolAccess

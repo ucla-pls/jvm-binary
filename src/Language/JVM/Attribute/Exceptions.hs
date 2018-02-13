@@ -1,3 +1,7 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE DeriveAnyClass   #-}
 {-|
 Module      : Language.JVM.Attribute.Exceptions
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -7,8 +11,6 @@ Maintainer  : kalhuage@cs.ucla.edu
 Based on the Exceptions Attribute, as documented [here](http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.5). It describes the checked
 exceptions that a method can make.
 -}
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
-
 module Language.JVM.Attribute.Exceptions
   ( Exceptions (..)
   , exceptionIndexTable
@@ -34,12 +36,12 @@ deriving instance Reference r => Generic (Exceptions r)
 deriving instance Reference r => NFData (Exceptions r)
 
 -- | Get the constant refs that points .
-exceptionIndexTable :: Reference r => Exceptions -> [(Ref r ClassName)]
+exceptionIndexTable :: Reference r => Exceptions r -> [(Ref r ClassName)]
 exceptionIndexTable = unSizedList . exceptionIndexTable'
 
 instance Binary (Exceptions Index) where
 
-deriving instance Reference r => Show (Exception r)
-deriving instance Reference r => Eq (Exception r)
-deriving instance Reference r => Generic (Exception r)
-deriving instance Reference r => NFData (Exception r)
+-- deriving instance Reference r => Show (Exception r)
+-- deriving instance Reference r => Eq (Exception r)
+-- deriving instance Reference r => Generic (Exception r)
+-- deriving instance Reference r => NFData (Exception r)

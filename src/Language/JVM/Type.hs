@@ -7,7 +7,7 @@ Maintainer  : kalhuage@cs.ucla.edu
 This module contains the 'JType'.
 -}
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric  #-}
 module Language.JVM.Type
   ( ClassName (..)
   , strCls
@@ -25,12 +25,11 @@ module Language.JVM.Type
   , fieldDescriptorFromText
   ) where
 
-import Data.Void
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
-import Text.Megaparsec
-import Text.Megaparsec.Char
-import qualified Data.Text as Text
+import           Control.DeepSeq      (NFData)
+import           Data.Attoparsec.Text
+import qualified Data.Text            as Text
+import           GHC.Generics         (Generic)
+import           Prelude              hiding (takeWhile)
 
 -- | A class name
 newtype ClassName = ClassName
@@ -57,7 +56,7 @@ data JType
 
 -- | Method Descriptor
 data MethodDescriptor = MethodDescriptor
-  { methodDescriptorArguments :: [JType]
+  { methodDescriptorArguments  :: [JType]
   , methodDescriptorReturnType :: Maybe JType
   } deriving (Show, Ord, Eq, Generic, NFData)
 
@@ -66,7 +65,7 @@ newtype FieldDescriptor = FieldDescriptor
   { fieldDescriptorType :: JType
   } deriving (Show, Ord, Eq, Generic, NFData)
 
-type Parser = Parsec Void Text.Text
+-- type Parser = Parsec Void Text.Text
 
 -- | Parse a JType
 parseJType :: Parser JType
@@ -80,7 +79,7 @@ parseJType = try $ do
     'I' -> return JTInt
     'J' -> return JTLong
     'L' -> do
-      txt <- takeWhileP (Just "ClassName") (/= ';')
+      txt <- takeWhile (/= ';')
       _ <- char ';'
       return $ JTClass (ClassName txt)
     'S' -> return JTShort
@@ -92,7 +91,7 @@ parseJType = try $ do
 parseMethodDescriptor :: Parser MethodDescriptor
 parseMethodDescriptor = do
   _ <- char '('
-  args <- (many $ parseJType) <?> "method arguments"
+  args <- (many' $ parseJType) <?> "method arguments"
   _ <- char ')'
   returnType <- choice
     [ char 'V' >> return Nothing
@@ -101,13 +100,13 @@ parseMethodDescriptor = do
   return $ MethodDescriptor args returnType
 
 -- | Read a method descriptor from `Text.Text`
-methodDescriptorFromText :: Text.Text -> Maybe MethodDescriptor
-methodDescriptorFromText = parseMaybe (parseMethodDescriptor <* eof)
+methodDescriptorFromText :: Text.Text -> Either String MethodDescriptor
+methodDescriptorFromText = parseOnly parseMethodDescriptor
 
 -- | Parse a field descriptor
 parseFieldDescriptor :: Parser FieldDescriptor
 parseFieldDescriptor = FieldDescriptor <$> parseJType
 
 -- | Read a field descriptor from `Text.Text`.
-fieldDescriptorFromText :: Text.Text -> Maybe FieldDescriptor
-fieldDescriptorFromText = parseMaybe (parseFieldDescriptor <* eof)
+fieldDescriptorFromText :: Text.Text -> Either String FieldDescriptor
+fieldDescriptorFromText = parseOnly parseFieldDescriptor

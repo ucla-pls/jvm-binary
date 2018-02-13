@@ -1,3 +1,7 @@
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-|
 Module      : Language.JVM.Attribute.BootstrapMethods
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -7,7 +11,6 @@ Maintainer  : kalhuage@cs.ucla.edu
 Based on the BootstrapMethods Attribute, as documented
 [here](http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.23).
 -}
-{-# LANGUAGE DeriveGeneric   #-}
 
 module Language.JVM.Attribute.BootstrapMethods
   ( BootstrapMethods (..)
@@ -19,6 +22,7 @@ module Language.JVM.Attribute.BootstrapMethods
 import           GHC.Generics          (Generic)
 
 import           Data.Binary
+import           Control.DeepSeq
 
 import           Language.JVM.Constant (AbsMethodId, Reference, Ref, Index, Constant)
 import           Language.JVM.Utils
@@ -26,9 +30,9 @@ import           Language.JVM.Utils
 -- | Is a list of bootstrapped methods.
 data BootstrapMethods r = BootstrapMethods
   { methods' :: SizedList16 (BootstrapMethod r)
-  } deriving (Show, Eq, Generic)
+  }
 
-instance Binary BootstrapMethods where
+instance Binary (BootstrapMethods Index) where
 
 deriving instance Reference r => Show (BootstrapMethods r)
 deriving instance Reference r => Eq (BootstrapMethods r)
@@ -40,16 +44,16 @@ methods :: BootstrapMethods r -> [ BootstrapMethod r ]
 methods = unSizedList . methods'
 
 -- | A bootstraped methods.
-data BootstrapMethod = BootstrapMethod
+data BootstrapMethod r = BootstrapMethod
   { methodIndex :: Ref r (AbsMethodId r)
   , arguments' :: SizedList16 (Ref r (Constant r))
   }
 
 -- | The arguments as a list
-arguments :: Reference r => BootstrapMethod r -> [ Ref r Constant ]
+arguments :: Reference r => BootstrapMethod r -> [ Ref r (Constant r) ]
 arguments = unSizedList . arguments'
 
-instance Binary BootstrapMethod where
+instance Binary (BootstrapMethod Index) where
 
 deriving instance Reference r => Show (BootstrapMethod r)
 deriving instance Reference r => Eq (BootstrapMethod r)

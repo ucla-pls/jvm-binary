@@ -31,7 +31,7 @@ import           Language.JVM.Method
 import           Language.JVM.Utils
 
 -- | Create a class file from a lazy 'BL.ByteString'
-decodeClassFile :: BL.ByteString -> Either String ClassFile
+decodeClassFile :: BL.ByteString -> Either String (ClassFile Index)
 decodeClassFile bs = do
   case decodeOrFail bs of
     Right (_, _, cf) -> Right cf

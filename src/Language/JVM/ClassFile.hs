@@ -6,23 +6,25 @@ Maintainer  : kalhuage@cs.ucla.edu
 
 The class file is described in this module.
 -}
-
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Language.JVM.ClassFile
   ( ClassFile (..)
 
   , cAccessFlags
   , cInterfaceIndicies
-  , cInterfaces
+  --, cInterfaces
   , cFields
   , cMethods
   , cAttributes
 
-  , cThisClass
-  , cSuperClass
+  -- , cThisClass
+  -- , cSuperClass
 
   -- * Attributes
-  , cBootstrapMethods
+  -- , cBootstrapMethods
   ) where
 
 import           Data.Binary
@@ -41,62 +43,67 @@ import           Language.JVM.Utils
 -- | A 'ClassFile' as described
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html).
 
-data ClassFile = ClassFile
+data ClassFile r = ClassFile
   { cMagicNumber        :: !Word32
 
   , cMinorVersion       :: !Word16
   , cMajorVersion       :: !Word16
 
-  , cConstantPool       :: !ConstantPool
+  , cConstantPool       :: !(ConstantPool r)
 
   , cAccessFlags'       :: BitSet16 CAccessFlag
 
-  , cThisClassIndex     :: Index ClassName
-  , cSuperClassIndex    :: Index ClassName
+  , cThisClassIndex     :: Ref r ClassName
+  , cSuperClassIndex    :: Ref r ClassName
 
-  , cInterfaceIndicies' :: SizedList16 (Index ClassName)
-  , cFields'            :: SizedList16 Field
-  , cMethods'           :: SizedList16 Method
-  , cAttributes'        :: SizedList16 Attribute
-  } deriving (Show, Eq, Generic, NFData)
+  , cInterfaceIndicies' :: SizedList16 (Ref r ClassName)
+  , cFields'            :: SizedList16 (Field r)
+  , cMethods'           :: SizedList16 (Method r)
+  , cAttributes'        :: SizedList16 (Attribute r)
+  }
 
-instance Binary ClassFile where
+deriving instance Reference r => Show (ClassFile r)
+deriving instance Reference r => Eq (ClassFile r)
+deriving instance Reference r => Generic (ClassFile r)
+deriving instance Reference r => NFData (ClassFile r)
+
+deriving instance Binary (ClassFile Index)
 
 -- | Get the set of access flags
-cAccessFlags :: ClassFile -> Set CAccessFlag
+cAccessFlags :: ClassFile r -> Set CAccessFlag
 cAccessFlags = toSet . cAccessFlags'
 
 -- | Get a list of 'ConstantRef's to interfaces.
-cInterfaceIndicies :: ClassFile -> [ Index ClassName ]
+cInterfaceIndicies :: ClassFile r -> [ Ref r ClassName ]
 cInterfaceIndicies = unSizedList . cInterfaceIndicies'
 
--- | Get a list of 'ClassName'
-cInterfaces :: ClassFile -> PoolAccess [ ClassName ]
-cInterfaces = mapM deref . cInterfaceIndicies
+-- -- | Get a list of 'ClassName'
+-- cInterfaces :: ClassFile -> PoolAccess [ ClassName ]
+-- cInterfaces = mapM deref . cInterfaceIndicies
 
 -- | Get a list of 'Field's of a ClassFile.
-cFields :: ClassFile -> [Field]
+cFields :: ClassFile r -> [Field r]
 cFields = unSizedList . cFields'
 
 -- | Get a list of 'Method's of a ClassFile.
-cMethods :: ClassFile -> [Method]
+cMethods :: ClassFile r -> [Method r]
 cMethods = unSizedList . cMethods'
 
 -- | Lookup the this class in a ConstantPool
-cThisClass :: ClassFile -> PoolAccess ClassName
-cThisClass = derefF cThisClassIndex
+-- cThisClass :: ClassFile -> PoolAccess ClassName
+-- cThisClass = derefF cThisClassIndex
 
 -- | Lookup the super class in the ConstantPool
-cSuperClass :: ClassFile -> PoolAccess ClassName
-cSuperClass = derefF cSuperClassIndex
+-- cSuperClass :: ClassFile -> PoolAccess ClassName
+-- cSuperClass = derefF cSuperClassIndex
 
 -- | Get a list of 'Attribute's of a ClassFile.
-cAttributes :: ClassFile -> [Attribute]
+cAttributes :: ClassFile r -> [Attribute r]
 cAttributes = unSizedList . cAttributes'
 
--- | Fetch the 'BootstrapMethods' attribute.
--- There can only one bootstrap methods per class, but there might not be
--- one.
-cBootstrapMethods :: ClassFile -> PoolAccess (Maybe (Either String BootstrapMethods))
-cBootstrapMethods =
-  fmap firstOne . matching cAttributes'
+-- -- | Fetch the 'BootstrapMethods' attribute.
+-- -- There can only one bootstrap methods per class, but there might not be
+-- -- one.
+-- cBootstrapMethods :: ClassFile -> PoolAccess (Maybe (Either String BootstrapMethods))
+-- cBootstrapMethods =
+--   fmap firstOne . matching cAttributes'

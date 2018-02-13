@@ -5,18 +5,21 @@ License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
 -}
 
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Language.JVM.Field
   ( Field (..)
-  , fName
-  , fDescriptor
+--  , fName
+--  , fDescriptor
   , fAccessFlags
   -- * Attributes
-  , fConstantValue
+ -- , fConstantValue
   ) where
 
+import           Control.DeepSeq         (NFData)
 import           Data.Binary
-import           Control.DeepSeq (NFData)
 import           GHC.Generics            (Generic)
 
 import           Language.JVM.AccessFlag
@@ -24,35 +27,40 @@ import           Language.JVM.Attribute
 import           Language.JVM.Constant
 import           Language.JVM.Utils
 
-import qualified Data.Set as Set
+import qualified Data.Set                as Set
 
-import qualified Data.Text as Text
+import qualified Data.Text               as Text
 
 -- | A Field in the class-file, as described
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.5).
-data Field = Field
+data Field r = Field
   { fAccessFlags'    :: BitSet16 FAccessFlag
-  , fNameIndex       :: Index Text.Text
-  , fDescriptorIndex :: Index FieldDescriptor
-  , fAttributes      :: SizedList16 Attribute
-  } deriving (Show, Eq, Generic, NFData)
+  , fNameIndex       :: Ref r Text.Text
+  , fDescriptorIndex :: Ref r FieldDescriptor
+  , fAttributes      :: SizedList16 (Attribute r)
+  }
 
-instance Binary Field where
+deriving instance Reference r => Show (Field r)
+deriving instance Reference r => Eq (Field r)
+deriving instance Reference r => Generic (Field r)
+deriving instance Reference r => NFData (Field r)
 
--- | Get the name of the field
-fName :: Field -> PoolAccess Text.Text
-fName = derefF fNameIndex
+deriving instance Binary (Field Index)
+
+-- -- | Get the name of the field
+-- fName :: Field -> PoolAccess Text.Text
+-- fName = derefF fNameIndex
 
 -- | Get the set of access flags
-fAccessFlags :: Field -> Set.Set FAccessFlag
+fAccessFlags :: Field r -> Set.Set FAccessFlag
 fAccessFlags = toSet . fAccessFlags'
 
--- | Get the descriptor of the field
-fDescriptor :: Field -> PoolAccess FieldDescriptor
-fDescriptor = derefF fDescriptorIndex
+-- -- | Get the descriptor of the field
+-- fDescriptor :: Field -> PoolAccess FieldDescriptor
+-- fDescriptor = derefF fDescriptorIndex
 
--- | Fetch the 'ConstantValue' attribute.
--- There can only one be one exceptions attribute on a field.
-fConstantValue :: Field -> PoolAccess (Maybe (Either String ConstantValue))
-fConstantValue =
-  fmap firstOne . matching fAttributes
+-- -- | Fetch the 'ConstantValue' attribute.
+-- -- There can only one be one exceptions attribute on a field.
+-- fConstantValue :: Field -> PoolAccess (Maybe (Either String ConstantValue))
+-- fConstantValue =
+--   fmap firstOne . matching fAttributes
