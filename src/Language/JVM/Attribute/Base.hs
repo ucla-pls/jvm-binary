@@ -9,9 +9,9 @@ License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
 -}
 module Language.JVM.Attribute.Base
-  ( Attribute
+  ( Attribute (..)
   , aInfo
---  , aName
+  , aName
   ) where
 
 import           Control.DeepSeq       (NFData)
@@ -27,8 +27,8 @@ import           Language.JVM.Utils    (SizedByteString32, unSizedByteString)
 -- | An Attribute, simply contains of a reference to a name and
 -- contains info.
 data Attribute r = Attribute
-  { aNameIndex :: Ref r Text.Text
-  , aInfo'     :: ! SizedByteString32
+  { aNameIndex :: ! (Ref r Text.Text)
+  , aInfo'     :: ! (SizedByteString32)
   }
 
 deriving instance Reference r => Show (Attribute r)
@@ -43,7 +43,12 @@ instance Binary (Attribute Index) where
 aInfo :: Attribute r -> BS.ByteString
 aInfo = unSizedByteString . aInfo'
 
--- -- | Extracts the name from the attribute, if it exists in the
--- -- ConstantPool.
--- aName :: Attribute -> PoolAccess Text.Text
--- aName = derefF aNameIndex
+-- | Extracts the name from the attribute, if it exists in the
+-- ConstantPool.
+aName :: Attribute Deref -> Text.Text
+aName = valueF aNameIndex
+
+instance ClassFileReadable Attribute where
+  untie (Attribute an ai) cp = do
+    an' <- deref an cp
+    return $ Attribute an' ai

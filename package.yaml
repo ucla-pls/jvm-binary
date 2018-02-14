@@ -59,6 +59,8 @@ benchmarks:
     dependencies:
     - jvm-binary
     - criterion
+    other-modules:
+    - SpecHelper
     ghc-options:
     - -rtsopts
     - -threaded

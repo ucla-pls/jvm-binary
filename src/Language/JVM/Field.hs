@@ -11,8 +11,8 @@ Maintainer  : kalhuage@cs.ucla.edu
 {-# LANGUAGE StandaloneDeriving #-}
 module Language.JVM.Field
   ( Field (..)
---  , fName
---  , fDescriptor
+  , fName
+  , fDescriptor
   , fAccessFlags
   -- * Attributes
  -- , fConstantValue
@@ -47,20 +47,27 @@ deriving instance Reference r => NFData (Field r)
 
 deriving instance Binary (Field Index)
 
--- -- | Get the name of the field
--- fName :: Field -> PoolAccess Text.Text
--- fName = derefF fNameIndex
+-- | Get the name of the field
+fName :: Field Deref -> Text.Text
+fName = valueF fNameIndex
 
 -- | Get the set of access flags
 fAccessFlags :: Field r -> Set.Set FAccessFlag
 fAccessFlags = toSet . fAccessFlags'
 
--- -- | Get the descriptor of the field
--- fDescriptor :: Field -> PoolAccess FieldDescriptor
--- fDescriptor = derefF fDescriptorIndex
+-- | Get the descriptor of the field
+fDescriptor :: Field Deref -> FieldDescriptor
+fDescriptor = valueF fDescriptorIndex
 
 -- -- | Fetch the 'ConstantValue' attribute.
 -- -- There can only one be one exceptions attribute on a field.
 -- fConstantValue :: Field -> PoolAccess (Maybe (Either String ConstantValue))
 -- fConstantValue =
 --   fmap firstOne . matching fAttributes
+
+instance ClassFileReadable Field where
+  untie field cp = do
+    fi <- deref (fNameIndex field) cp
+    fd <- deref (fDescriptorIndex field) cp
+    fattr <- mapM (flip untie cp) (fAttributes field)
+    return $ Field (fAccessFlags' field) fi fd fattr

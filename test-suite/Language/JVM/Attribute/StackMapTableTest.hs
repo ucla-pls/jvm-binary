@@ -10,22 +10,24 @@ import           Language.JVM.AttributeTest           ()
 import           Language.JVM.ConstantTest            ()
 import           Language.JVM.UtilsTest               ()
 
+import           Language.JVM.Constant
+
 import           Language.JVM.Attribute.StackMapTable
 
-prop_encode_and_decode :: StackMapTable -> Property
+prop_encode_and_decode :: StackMapTable Index -> Property
 prop_encode_and_decode = isoBinary
 
-prop_StackMapFrame_encode_and_decode :: StackMapFrame -> Property
+prop_StackMapFrame_encode_and_decode :: StackMapFrame Index -> Property
 prop_StackMapFrame_encode_and_decode = isoBinary
 
-instance Arbitrary StackMapTable where
+instance Arbitrary (StackMapTable Index) where
   arbitrary = StackMapTable <$> arbitrary
 
-instance Arbitrary StackMapFrame where
+instance Arbitrary ( StackMapFrame Index) where
   arbitrary =
     StackMapFrame <$> arbitrary <*> arbitrary
 
-instance Arbitrary StackMapFrameType where
+instance Arbitrary (StackMapFrameType Index) where
   arbitrary = oneof
     [ pure SameFrame
     , SameLocals1StackItemFrame <$> arbitrary
@@ -34,7 +36,7 @@ instance Arbitrary StackMapFrameType where
     , FullFrame <$> arbitrary <*> arbitrary
     ]
 
-instance Arbitrary (VerificationTypeInfo) where
+instance Arbitrary (VerificationTypeInfo Index) where
   arbitrary = oneof
     [ pure VTop
     , pure VInteger

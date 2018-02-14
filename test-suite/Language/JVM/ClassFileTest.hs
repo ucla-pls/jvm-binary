@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Language.JVM.ClassFileTest where
 
 import SpecHelper
@@ -15,10 +16,10 @@ import Language.JVM.ConstantTest ()
 import Language.JVM.FieldTest ()
 import Language.JVM.MethodTest ()
 
-prop_encode_and_decode :: ClassFile -> Property
+prop_encode_and_decode :: ClassFile Index -> Property
 prop_encode_and_decode = isoBinary
 
-instance Arbitrary ClassFile where
+instance Arbitrary (ClassFile Index) where
   arbitrary = ClassFile
     <$> arbitrary
     <*> arbitrary

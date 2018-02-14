@@ -13,10 +13,9 @@ module Language.JVM.Method
   ( Method (..)
 
   , mAccessFlags
+  , mName
+  , mDescriptor
   , mAttributes
-
-  -- , mName
-  -- , mDescriptor
 
   -- * Attributes
   -- , mCode
@@ -62,13 +61,13 @@ mAccessFlags = toSet . mAccessFlags'
 mAttributes :: Method r -> [Attribute r]
 mAttributes = unSizedList . mAttributes'
 
--- -- | Lookup the name of the method in the 'ConstantPool'.
--- mName :: Method -> PoolAccess Text.Text
--- mName = derefF  mNameIndex
+-- | Lookup the name of the method in the 'ConstantPool'.
+mName :: Method Deref -> Text.Text
+mName = valueF mNameIndex
 
--- -- | Lookup the descriptor of the method in the 'ConstantPool'.
--- mDescriptor :: Method -> PoolAccess MethodDescriptor
--- mDescriptor = derefF mDescriptorIndex
+-- | Lookup the descriptor of the method in the 'ConstantPool'.
+mDescriptor :: Method Deref -> MethodDescriptor
+mDescriptor = valueF mDescriptorIndex
 
 -- -- | Fetch the 'Code' attribute, if any.
 -- -- There can only be one code attribute in a method.
@@ -92,3 +91,10 @@ mAttributes = unSizedList . mAttributes'
 --       return $ Left msg
 --     Nothing ->
 --       return $ Right []
+
+instance ClassFileReadable Method where
+  untie (Method mf mn md mattr) cp = do
+    mn' <- deref (mn) cp
+    md' <- deref (md) cp
+    mattr' <- mapM (flip untie cp) mattr
+    return $ Method mf mn' md' mattr'

@@ -1,3 +1,4 @@
+{-# LANGUAGE UndecidableInstances #-}
 {-|
 Copyright   : (c) Christian Gram Kalhauge, 2017
 License     : MIT
@@ -30,11 +31,18 @@ module Language.JVM.Constant
   , Index (..)
   , Deref (..)
 
+  , refValue
+  , refIndex
+  , valueF
+
   -- ** Dereferencing
   , PoolAccessError(..)
   , derefConstant
 
   , Referenceable (..)
+
+  , deref
+  , ClassFileReadable (..)
 
     -- * Constants
   , Constant (..)
@@ -59,9 +67,9 @@ module Language.JVM.Constant
   , MethodHandleField (..)
   , MethodHandleMethod (..)
   , MethodHandleInterface (..)
-
+  , MethodHandleMethodKind (..)
+  , MethodHandleFieldKind (..)
   , InvokeDynamic (..)
-
   ) where
 
 import           Prelude            hiding (fail, lookup)
@@ -87,9 +95,9 @@ import           Text.Show.Deriving
 import           Data.Eq.Deriving
 
 import qualified Data.Text          as Text
--- import qualified Data.ByteString    as BS
--- import qualified Data.Text.Encoding as TE
--- import qualified Data.Text.Encoding.Error as TE
+import qualified Data.ByteString    as BS
+import qualified Data.Text.Encoding as TE
+import qualified Data.Text.Encoding.Error as TE
 
 import Data.Functor.Classes (Eq1, Show1, eq1, showsPrec1)
 
@@ -145,8 +153,7 @@ instance (Reference r, NFData a) => NFData (Ref r a) where
 
 deriving instance (Reference r, Generic a) => Generic (Ref r a)
 
-
--- | An access into the constant pool
+-- | An index into the constant pool
 data Index i = Index
   { indexAsWord :: {-# UNPACK #-} !Word16
   } -- deriving (Show, Eq, Generic, NFData, Binary)
@@ -162,6 +169,10 @@ deriving instance Generic1 Index
 instance Reference Index where
   asWord = indexAsWord
 
+unsafeCast :: Ref Index a -> Ref Index b
+unsafeCast (Ref (Index x)) =
+  Ref (Index x)
+
 -- | An access into the constant pool, de-referenced.
 data Deref i = Deref
   { derefIndex :: {-# UNPACK #-} !Word16
@@ -171,9 +182,17 @@ data Deref i = Deref
 deriving instance (NFData1 Deref)
 deriving instance (Generic1 Deref)
 
+refValue :: Ref Deref a -> a
+refValue = derefValue . unref
+
+refIndex :: Reference r => Ref r a -> Word16
+refIndex = asWord . unref
+
+valueF :: (b -> Ref Deref a) -> b -> a
+valueF f = refValue . f
+
 instance Reference Deref where
   asWord = derefIndex
-
 
 -- | A constant is a multi word item in the 'ConstantPool'. Each of
 -- the constructors are pretty much self-explanatory from the types.
@@ -363,9 +382,7 @@ deriving instance Reference r => Generic (InvokeDynamic r)
 deriving instance Reference r => NFData (InvokeDynamic r)
 deriving instance Binary (InvokeDynamic Index)
 
-
--- toFieldId :: NameAndType r -> FieldId
-
+-- | Hack that returns the name of a constant.
 typeToStr :: Reference r => Constant r -> String
 typeToStr = head . words . show
 
@@ -422,6 +439,66 @@ constantSize x =
 -- The 'ConstantPool' contains all the constants, and is accessible using the
 -- Lookup methods.
 
+wrongType :: Reference r => String -> Constant r -> String
+wrongType n cons =
+  "Expected '" ++ n ++ "', but found'" ++ typeToStr cons ++ "'."
+
+badEncoding :: String -> BS.ByteString -> String
+badEncoding str bs =
+  "Could not encode '" ++ str ++ "': " ++ show bs
+
+-- | 'Referenceable' is something that can exist in the constant pool.
+class Referenceable a where
+  fromConst :: Constant Deref -> Either String a
+
+instance Referenceable Text.Text where
+  fromConst cons =
+    case cons of
+      CString str ->
+        case TE.decodeUtf8' . unSizedByteString $ str of
+          Left (TE.DecodeError msg _) -> Left $ badEncoding msg (unSizedByteString str)
+          Left _ -> error "This is deprecated in the api"
+          Right txt -> return txt
+      a -> Left $ wrongType "String" a
+
+instance Referenceable ClassName where
+  fromConst (CClassRef (Ref r)) =
+    return . ClassName $ derefValue r
+  fromConst a = Left $ wrongType "ClassRef" a
+
+instance Referenceable FieldDescriptor where
+  fromConst c = do
+    txt <- fromConst c
+    fieldDescriptorFromText txt
+
+instance Referenceable (FieldId Deref) where
+  fromConst (CNameAndType rn (Ref (Deref w txt))) = do
+    t' <- fieldDescriptorFromText $ txt
+    return $ FieldId rn (Ref (Deref w t'))
+  fromConst c = Left $ wrongType "NameAndType" c
+
+instance Referenceable MethodDescriptor where
+  fromConst c = do
+    txt <- fromConst c
+    methodDescriptorFromText txt
+
+instance Referenceable (MethodId Deref) where
+  fromConst (CNameAndType rn (Ref (Deref w txt))) = do
+    t' <- methodDescriptorFromText $ txt
+    return $ MethodId rn (Ref (Deref w t'))
+  fromConst c = Left $ wrongType "NameAndType" c
+
+instance Referenceable (InClass FieldId Deref) where
+  fromConst (CFieldRef c) = do
+    return $ c
+  fromConst c = Left $ wrongType "FieldRef" c
+
+instance Referenceable (InClass MethodId Deref) where
+  fromConst (CMethodRef c) = do
+    return $ c
+  fromConst c = Left $ wrongType "FieldRef" c
+
+
 -- | A pool access error
 data PoolAccessError = PoolAccessError
   { paErrorRef :: !Word16
@@ -434,9 +511,6 @@ derefConstant (Ref (Index ref)) (ConstantPool cp) =
   case IM.lookup (fromIntegral ref) cp of
     Just x -> Right x
     Nothing -> Left $ PoolAccessError ref "No such element."
-
-class Referenceable a where
-  fromConst :: Constant Deref -> Either String a
 
 deref :: Referenceable a => Ref Index a -> ConstantPool Deref -> Either ClassFileError (Ref Deref a)
 deref r cp =
@@ -463,7 +537,7 @@ bootstrapUntie reffed =
   case stage (ConstantPool IM.empty, IM.toList $ unConstantPool reffed) of
     (cp, []) ->
       Right cp
-    (cp, _:_) ->
+    (_, _:_) ->
       Left (CFEInconsistentClassPool "Could not load all constants in the constant pool")
   where
     stage (cp, mis) =
@@ -477,44 +551,70 @@ bootstrapUntie reffed =
     grow cp (k,a) =
       case untie a cp of
         Right c -> (IM.singleton k c, Endo id)
-        Left e -> (IM.empty, Endo ((k,a):))
+        Left _ -> (IM.empty, Endo ((k,a):))
 
 instance ClassFileReadable ConstantPool where
   untie cp = const $ bootstrapUntie cp
 
+instance (Referenceable (a Deref)) => ClassFileReadable (InClass a) where
+  untie (InClass cn cid) cp = do
+    cn' <- deref cn cp
+    cid' <- deref (unsafeCast cid) cp
+    return $ InClass cn' cid'
+
+instance ClassFileReadable MethodHandle where
+  untie (MHField r) cp =
+    MHField <$> untie r cp
+  untie (MHMethod r) cp =
+    MHMethod <$> untie r cp
+  untie (MHInterface r) cp =
+    MHInterface <$> untie r cp
+
+instance ClassFileReadable MethodHandleField where
+  untie (MethodHandleField k ref) cp = do
+    MethodHandleField k <$> deref (unsafeCast ref) cp
+
+instance ClassFileReadable MethodHandleMethod where
+  untie (MethodHandleMethod k ref) cp =
+    MethodHandleMethod k <$> deref (unsafeCast ref) cp
+
+instance ClassFileReadable MethodHandleInterface where
+  untie (MethodHandleInterface ref) cp =
+    MethodHandleInterface <$> deref (unsafeCast ref) cp
+
+instance ClassFileReadable InvokeDynamic where
+  untie (InvokeDynamic w ref) cp =
+    InvokeDynamic w <$> deref (unsafeCast ref) cp
+
 instance ClassFileReadable Constant where
   untie c cp =
     case c of
-      -- CString st -> return $ CString st
-      -- CInteger i -> return $ CInteger i
-      -- CFloat f -> return $ CFloat f
-      -- CLong l -> return $ CLong l
-      -- CDouble l -> return $ CDouble l
-      -- CClassRef r ->
-      --   CClassRef <$> deref r cp
-      -- CStringRef r ->
-      --   CStringRef <$> deref r cp
-      -- CFieldRef a ->
-      --   CFieldRef <$> deref a cp
-      -- CMethodRef m ->
-      --   CMethodRef <$> deref m cp
-      -- CInterfaceMethodRef i ->
-      --   CInterfaceMethodRef <$> deref i cp
-      -- CNameAndType r1 r2-> do
-      --   t1 <- deref r1 cp
-      --   t2 <- deref r2 cp
-      --   return $ CNameAndType t1 t2
-      -- CMethodHandle r1 -> do
-      --   t <- deref r1 cp
-      --   t' <- untie t cp
-      --   return $ CMethodHandle t'
-      -- CMethodType m -> do
-      --   t <- deref m cp
-      --   t' <- untie t cp
-      --   return $ CMethodType t'
-      -- CInvokeDynamic t -> do
-      --   t' <- untie t cp
-      --   return $ CInvokeDynamic t'
+      CString st -> return $ CString st
+      CInteger i -> return $ CInteger i
+      CFloat f -> return $ CFloat f
+      CLong l -> return $ CLong l
+      CDouble l -> return $ CDouble l
+      CClassRef r ->
+        CClassRef <$> deref r cp
+      CStringRef r ->
+        CStringRef <$> deref r cp
+      CFieldRef a ->
+        CFieldRef <$> untie a cp
+      CMethodRef m ->
+        CMethodRef <$> untie m cp
+      CInterfaceMethodRef i ->
+        CInterfaceMethodRef <$> untie i cp
+      CNameAndType r1 r2-> do
+        t1 <- deref r1 cp
+        t2 <- deref r2 cp
+        return $ CNameAndType t1 t2
+      CMethodHandle r1 -> do
+        CMethodHandle <$> untie r1 cp
+      CMethodType m -> do
+        CMethodType <$> deref m cp
+      CInvokeDynamic t -> do
+        t' <- untie t cp
+        return $ CInvokeDynamic t'
 
 -- -- | The pool access monad.
 -- newtype PoolAccess a = PoolAccess

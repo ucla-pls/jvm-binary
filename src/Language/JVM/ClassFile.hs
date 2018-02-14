@@ -15,13 +15,13 @@ module Language.JVM.ClassFile
 
   , cAccessFlags
   , cInterfaceIndicies
-  --, cInterfaces
+  , cInterfaces
   , cFields
   , cMethods
   , cAttributes
 
-  -- , cThisClass
-  -- , cSuperClass
+  , cThisClass
+  , cSuperClass
 
   -- * Attributes
   -- , cBootstrapMethods
@@ -77,9 +77,9 @@ cAccessFlags = toSet . cAccessFlags'
 cInterfaceIndicies :: ClassFile r -> [ Ref r ClassName ]
 cInterfaceIndicies = unSizedList . cInterfaceIndicies'
 
--- -- | Get a list of 'ClassName'
--- cInterfaces :: ClassFile -> PoolAccess [ ClassName ]
--- cInterfaces = mapM deref . cInterfaceIndicies
+-- | Get a list of 'ClassName'
+cInterfaces :: ClassFile Deref -> [ ClassName ]
+cInterfaces = Prelude.map (refValue) .  cInterfaceIndicies
 
 -- | Get a list of 'Field's of a ClassFile.
 cFields :: ClassFile r -> [Field r]
@@ -90,12 +90,12 @@ cMethods :: ClassFile r -> [Method r]
 cMethods = unSizedList . cMethods'
 
 -- | Lookup the this class in a ConstantPool
--- cThisClass :: ClassFile -> PoolAccess ClassName
--- cThisClass = derefF cThisClassIndex
+cThisClass :: ClassFile Deref -> ClassName
+cThisClass = valueF cThisClassIndex
 
 -- | Lookup the super class in the ConstantPool
--- cSuperClass :: ClassFile -> PoolAccess ClassName
--- cSuperClass = derefF cSuperClassIndex
+cSuperClass :: ClassFile Deref -> ClassName
+cSuperClass = valueF cSuperClassIndex
 
 -- | Get a list of 'Attribute's of a ClassFile.
 cAttributes :: ClassFile r -> [Attribute r]
@@ -107,3 +107,21 @@ cAttributes = unSizedList . cAttributes'
 -- cBootstrapMethods :: ClassFile -> PoolAccess (Maybe (Either String BootstrapMethods))
 -- cBootstrapMethods =
 --   fmap firstOne . matching cAttributes'
+
+instance ClassFileReadable ClassFile where
+  untie cf cp = do
+    tci' <- deref (cThisClassIndex cf) cp
+    sci' <- deref (cSuperClassIndex cf) cp
+    cii' <- mapM (flip deref cp) $ cInterfaceIndicies' cf
+    cf' <- mapM (flip untie cp) $ cFields' cf
+    cm' <- mapM (flip untie cp) $ cMethods' cf
+    ca' <- mapM (flip untie cp) $ cAttributes' cf
+    return $ cf
+      { cConstantPool = cp -- set The Constant Pool to the Botstrapped one
+      , cThisClassIndex = tci'
+      , cSuperClassIndex = sci'
+      , cInterfaceIndicies' = cii'
+      , cFields'            = cf'
+      , cMethods'           = cm'
+      , cAttributes'        = ca'
+      }
