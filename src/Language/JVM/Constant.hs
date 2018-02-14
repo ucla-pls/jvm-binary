@@ -107,11 +107,6 @@ newtype ConstantPool r = ConstantPool
   { unConstantPool :: IM.IntMap (Constant r)
   }
 
-deriving instance Reference r => Show (ConstantPool r)
-deriving instance Reference r => Eq (ConstantPool r)
-deriving instance Reference r => Generic (ConstantPool r)
-deriving instance Reference r => NFData (ConstantPool r)
-
 instance Binary (ConstantPool Index) where
   get = do
     len <- fromIntegral <$> getInt16be
@@ -142,7 +137,7 @@ class (Generic1 r, Eq1 r, Show1 r, NFData1 r) => Reference r where
 -- make them an instance of 'Generic', 'Show', 'Eq', and 'NFData'
 newtype Ref r a = Ref { unref :: (r a) }
 
-instance (Reference r, Show a) => Show (Ref r a) where
+instance (Show1 r, Show a) => Show (Ref r a) where
   showsPrec i = showsPrec1 i . unref
 
 instance (Reference r, Eq a) => Eq (Ref r a) where
@@ -151,7 +146,6 @@ instance (Reference r, Eq a) => Eq (Ref r a) where
 instance (Reference r, NFData a) => NFData (Ref r a) where
   rnf = rnf1 . unref
 
-deriving instance (Reference r, Generic a) => Generic (Ref r a)
 
 -- | An index into the constant pool
 data Index i = Index
@@ -159,12 +153,10 @@ data Index i = Index
   } -- deriving (Show, Eq, Generic, NFData, Binary)
 
 instance Binary (Ref Index a) where
-  get = get
+  get = Ref . Index <$> get
   put a =
     put . indexAsWord . unref $ a
 
-deriving instance NFData1 Index
-deriving instance Generic1 Index
 
 instance Reference Index where
   asWord = indexAsWord
@@ -179,8 +171,6 @@ data Deref i = Deref
   , derefValue :: i
   } -- deriving (Show, Eq, Generic, NFData)
 
-deriving instance (NFData1 Deref)
-deriving instance (Generic1 Deref)
 
 refValue :: Ref Deref a -> a
 refValue = derefValue . unref
@@ -212,10 +202,6 @@ data Constant r
   | CMethodType !(Ref r MethodDescriptor)
   | CInvokeDynamic !(InvokeDynamic r)
 
-deriving instance Reference r => Show (Constant r)
-deriving instance Reference r => Eq (Constant r)
-deriving instance Reference r => Generic (Constant r)
-deriving instance Reference r => NFData (Constant r)
 
 --deriving (Show, Eq, Generic, NFData)
 
@@ -231,20 +217,10 @@ data MethodId r = MethodId
   , methodIdDescription :: !(Ref r MethodDescriptor)
   }
 
-deriving instance Reference r => Show (MethodId r)
-deriving instance Reference r => Eq (MethodId r)
-deriving instance Reference r => Generic (MethodId r)
-deriving instance Reference r => NFData (MethodId r)
-deriving instance Binary (MethodId Index)
 
 -- | An absolute reference to a method
 type AbsMethodId = InClass MethodId
 
-deriving instance Reference r => Show (AbsMethodId r)
-deriving instance Reference r => Eq (AbsMethodId r)
-deriving instance Reference r => Generic (AbsMethodId r)
-deriving instance Reference r => NFData (AbsMethodId r)
-deriving instance Binary (AbsMethodId Index)
 
 -- | A field identifier
 data FieldId r = FieldId
@@ -252,20 +228,10 @@ data FieldId r = FieldId
   , fieldIdDescription :: !(Ref r FieldDescriptor)
   } -- deriving (Show, Eq, Ord, Generic, NFData)
 
-deriving instance Reference r => Show (FieldId r)
-deriving instance Reference r => Eq (FieldId r)
-deriving instance Reference r => Generic (FieldId r)
-deriving instance Reference r => NFData (FieldId r)
-deriving instance Binary (FieldId Index)
 
 -- | An absolute reference to a field
 type AbsFieldId = InClass FieldId
 
-deriving instance Reference r => Show (AbsFieldId r)
-deriving instance Reference r => Eq (AbsFieldId r)
-deriving instance Reference r => Generic (AbsFieldId r)
-deriving instance Reference r => NFData (AbsFieldId r)
-deriving instance Binary (AbsFieldId Index)
 
 
 -- | An interface identifier, essentially a method id
@@ -273,10 +239,6 @@ data InterfaceId r = InterfaceId
   { interfaceMethodId :: !(AbsMethodId r)
   }
 
-deriving instance Reference r => Show (InterfaceId r)
-deriving instance Reference r => Eq (InterfaceId r)
-deriving instance Reference r => Generic (InterfaceId r)
-deriving instance Reference r => NFData (InterfaceId r)
 
 -- | The union type over the different method handles.
 data MethodHandle r
@@ -284,10 +246,6 @@ data MethodHandle r
   | MHMethod !(MethodHandleMethod r)
   | MHInterface !(MethodHandleInterface r)
 
-deriving instance Reference r => Show (MethodHandle r)
-deriving instance Reference r => Eq (MethodHandle r)
-deriving instance Reference r => Generic (MethodHandle r)
-deriving instance Reference r => NFData (MethodHandle r)
 
 instance Binary (MethodHandle Index) where
   get = do
@@ -321,7 +279,7 @@ instance Binary (MethodHandle Index) where
         MHInvokeVirtual-> 5
         MHInvokeStatic -> 6
         MHInvokeSpecial -> 7
-        MHNewInvokeSpecial -> 7
+        MHNewInvokeSpecial -> 8
       put $ methodHandleMethodRef h
 
     MHInterface h -> do
@@ -334,10 +292,6 @@ data MethodHandleField r = MethodHandleField
   , methodHandleFieldRef :: !(Ref r (AbsFieldId r))
   }
 
-deriving instance Reference r => Show (MethodHandleField r)
-deriving instance Reference r => Eq (MethodHandleField r)
-deriving instance Reference r => Generic (MethodHandleField r)
-deriving instance Reference r => NFData (MethodHandleField r)
 
 data MethodHandleFieldKind
   = MHGetField
@@ -351,10 +305,6 @@ data MethodHandleMethod r = MethodHandleMethod
   , methodHandleMethodRef :: !(Ref r (AbsMethodId r))
   }
 
-deriving instance Reference r => Show (MethodHandleMethod r)
-deriving instance Reference r => Eq (MethodHandleMethod r)
-deriving instance Reference r => Generic (MethodHandleMethod r)
-deriving instance Reference r => NFData (MethodHandleMethod r)
 
 data MethodHandleMethodKind
   = MHInvokeVirtual
@@ -366,21 +316,12 @@ data MethodHandleMethodKind
 data MethodHandleInterface r = MethodHandleInterface
   {  methodHandleInterfaceRef :: !(Ref r (AbsMethodId r))
   }
-deriving instance Reference r => Show (MethodHandleInterface r)
-deriving instance Reference r => Eq (MethodHandleInterface r)
-deriving instance Reference r => Generic (MethodHandleInterface r)
-deriving instance Reference r => NFData (MethodHandleInterface r)
 
 data InvokeDynamic r = InvokeDynamic
   { invokeDynamicAttrIndex :: !Word16
   , invokeDynamicMethod :: !(Ref r (MethodId r))
   }
 
-deriving instance Reference r => Show (InvokeDynamic r)
-deriving instance Reference r => Eq (InvokeDynamic r)
-deriving instance Reference r => Generic (InvokeDynamic r)
-deriving instance Reference r => NFData (InvokeDynamic r)
-deriving instance Binary (InvokeDynamic Index)
 
 -- | Hack that returns the name of a constant.
 typeToStr :: Reference r => Constant r -> String
@@ -616,145 +557,67 @@ instance ClassFileReadable Constant where
         t' <- untie t cp
         return $ CInvokeDynamic t'
 
--- -- | The pool access monad.
--- newtype PoolAccess a = PoolAccess
---   { runWithPool :: (ConstantPool Ref) -> Either PoolAccessError a
---   } deriving (Functor)
-
--- instance Applicative (PoolAccess) where
---   pure x = PoolAccess . const $ Right x
---   mf <*> ma = PoolAccess $ \c ->
---      runWithPool mf c <*> runWithPool ma c
-
--- instance Monad (PoolAccess) where
---   return = pure
---   ma >>= fm = PoolAccess $ \c ->
---     case runWithPool ma c of
---       Left p -> Left p
---       Right b -> runWithPool (fm b) c
-
--- -- This part contains helpers to describe some of the semantics of the
--- -- class file.
-
--- -- | Describes an index into the constant pool
--- newtype Index x = Index
---   { indexAsWord :: Word16
---   } deriving (Show, Eq, Generic, NFData)
-
--- instance (InConstantPool x) => Binary (Index x) where
---   get = Index <$> get
---   put (Index ref) = put ref
-
--- -- | Describes if a type is in the constant pool
--- class InConstantPool a where
---   deref :: Index a -> PoolAccess a
-
--- instance InConstantPool Constant where
---   deref (Index ref) = PoolAccess $ \cp ->
---     case derefConstant cp ref of
---       Just c -> Right c
---       Nothing -> runWithPool (outofbounds ref) cp
-
--- -- | Lookup a 'Text.Text' in the 'ConstantPool', returns 'Nothing' if the
--- -- reference does not point to something in the ConstantPool, if it points to
--- -- something not a 'Language.JVM.Constant.String' Constant, or if it is
--- -- impossible to decode the 'ByteString' as Utf8.
--- instance InConstantPool Text.Text where
---   deref (Index ref) = do
---     cons <- derefW ref
---     case cons of
---       String str ->
---         case TE.decodeUtf8' . unSizedByteString $ str of
---           Left (TE.DecodeError msg _) -> badEncoding ref msg (unSizedByteString str)
---           Left _ -> error "This is deprecated in the api"
---           Right txt -> return txt
---       a -> wrongType ref "String" a
-
--- instance InConstantPool ClassName where
---   deref (Index ref) = do
---     cons <- derefW ref
---     case cons of
---       ClassRef r ->
---         ClassName <$> deref r
---       a -> wrongType ref "ClassRef" a
-
--- instance InConstantPool (InClass MethodId) where
---   deref (Index ref) = do
---     cons <- derefW ref
---     case cons of
---       MethodRef cn rt ->
---         InClass <$> deref cn <*> deref rt
---       a -> wrongType ref "MethodRef" a
-
--- instance InConstantPool (InClass FieldId) where
---   deref (Index ref) = do
---     cons <- derefW ref
---     case cons of
---       FieldRef cn rt ->
---         InClass <$> deref cn <*> deref rt
---       a -> wrongType ref "FieldRef" a
-
--- instance InConstantPool MethodId where
---   deref (Index ref) = do
---     cons <- derefW ref
---     case cons of
---       NameAndType n (Index i) ->
---         MethodId <$> deref n <*> derefW i
---       a -> wrongType ref "NameAndType" a
-
--- instance InConstantPool FieldId where
---   deref (Index ref) = do
---     cons <- derefW ref
---     case cons of
---       NameAndType n (Index i) ->
---         FieldId <$> deref n <*> derefW i
---       a -> wrongType ref "NameAndType" a
-
--- instance InConstantPool MethodDescriptor where
---   deref (Index ref) = do
---     txt <- derefW ref
---     case methodDescriptorFromText txt of
---       Just x -> return x
---       Nothing -> parseError ref txt
-
--- instance InConstantPool FieldDescriptor where
---   deref (Index ref) = do
---     txt <- derefW ref
---     case fieldDescriptorFromText txt of
---       Just x -> return x
---       Nothing -> parseError ref txt
-
--- -- Helper functions
-
--- -- | Given a function from an object b to an 'Index a' create a function from b
--- -- to 'PoolAccess a'. Very useful for defining functions.
--- derefF :: InConstantPool a => (b -> Index a) -> b -> PoolAccess a
--- derefF fn b = deref (fn b)
-
--- -- Hidden access method.
-
--- derefW :: InConstantPool a => Word16 -> PoolAccess a
--- derefW w = deref (Index w)
-
--- -- Hidden exception methods
-
--- wrongType :: Word16 -> String -> Constant -> PoolAccess a
--- wrongType w expected got = PoolAccess $ \_ ->
---   Left (PoolAccessError w ("Expected '" ++ expected ++ "' but got '" ++ typeToStr got ++ "'"))
-
--- outofbounds :: Word16 -> PoolAccess a
--- outofbounds w = PoolAccess $ \_ ->
---   Left (PoolAccessError w "Out of bounds")
-
--- parseError :: Word16 -> Text.Text -> PoolAccess a
--- parseError w t = PoolAccess $ \_ ->
---   Left (PoolAccessError w $ "Could not parse '" ++ Text.unpack t ++ "'")
-
--- badEncoding :: Word16 -> String -> BS.ByteString -> PoolAccess a
--- badEncoding w str bs = PoolAccess $ \_ ->
---   Left (PoolAccessError w $ "Could not encode '" ++ str ++ "': " ++ show bs)
-
 $(deriveShow1 ''Index)
 $(deriveShow1 ''Deref)
 $(deriveEq1 ''Index)
 $(deriveEq1 ''Deref)
+
+
+deriving instance Reference r => Show (ConstantPool r)
+deriving instance Reference r => Eq (ConstantPool r)
+deriving instance Reference r => Generic (ConstantPool r)
+deriving instance Reference r => NFData (ConstantPool r)
+deriving instance (Reference r, Generic a) => Generic (Ref r a)
+deriving instance NFData1 Index
+deriving instance Generic1 Index
+deriving instance (NFData1 Deref)
+deriving instance (Generic1 Deref)
+deriving instance Reference r => Show (Constant r)
+deriving instance Reference r => Eq (Constant r)
+deriving instance Reference r => Generic (Constant r)
+deriving instance Reference r => NFData (Constant r)
+deriving instance Reference r => Show (MethodId r)
+deriving instance Reference r => Eq (MethodId r)
+deriving instance Reference r => Generic (MethodId r)
+deriving instance Reference r => NFData (MethodId r)
+deriving instance Binary (MethodId Index)
+deriving instance Reference r => Show (AbsMethodId r)
+deriving instance Reference r => Eq (AbsMethodId r)
+deriving instance Reference r => Generic (AbsMethodId r)
+deriving instance Reference r => NFData (AbsMethodId r)
+deriving instance Binary (AbsMethodId Index)
+deriving instance Reference r => Show (FieldId r)
+deriving instance Reference r => Eq (FieldId r)
+deriving instance Reference r => Generic (FieldId r)
+deriving instance Reference r => NFData (FieldId r)
+deriving instance Binary (FieldId Index)
+deriving instance Reference r => Show (AbsFieldId r)
+deriving instance Reference r => Eq (AbsFieldId r)
+deriving instance Reference r => Generic (AbsFieldId r)
+deriving instance Reference r => NFData (AbsFieldId r)
+deriving instance Binary (AbsFieldId Index)
+deriving instance Reference r => Show (InterfaceId r)
+deriving instance Reference r => Eq (InterfaceId r)
+deriving instance Reference r => Generic (InterfaceId r)
+deriving instance Reference r => NFData (InterfaceId r)
+deriving instance Reference r => Show (MethodHandle r)
+deriving instance Reference r => Eq (MethodHandle r)
+deriving instance Reference r => Generic (MethodHandle r)
+deriving instance Reference r => NFData (MethodHandle r)
+deriving instance Reference r => Show (MethodHandleField r)
+deriving instance Reference r => Eq (MethodHandleField r)
+deriving instance Reference r => Generic (MethodHandleField r)
+deriving instance Reference r => NFData (MethodHandleField r)
+deriving instance Reference r => Show (MethodHandleMethod r)
+deriving instance Reference r => Eq (MethodHandleMethod r)
+deriving instance Reference r => Generic (MethodHandleMethod r)
+deriving instance Reference r => NFData (MethodHandleMethod r)
+deriving instance Reference r => Show (MethodHandleInterface r)
+deriving instance Reference r => Eq (MethodHandleInterface r)
+deriving instance Reference r => Generic (MethodHandleInterface r)
+deriving instance Reference r => NFData (MethodHandleInterface r)
+deriving instance Reference r => Show (InvokeDynamic r)
+deriving instance Reference r => Eq (InvokeDynamic r)
+deriving instance Reference r => Generic (InvokeDynamic r)
+deriving instance Reference r => NFData (InvokeDynamic r)
+deriving instance Binary (InvokeDynamic Index)

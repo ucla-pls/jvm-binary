@@ -2,9 +2,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.JVM.TypeTest where
 
-import SpecHelper
+-- -- -- import SpecHelper
 
-import Language.JVM.Type
+-- -- -- import Language.JVM.Type
 
 -- import Text.Megaparsec
 -- import Test.Hspec.Megaparsec

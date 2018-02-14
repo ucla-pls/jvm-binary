@@ -1,6 +1,5 @@
-resolver: lts-9.21
+resolver: lts-10.5
 packages:
 - .
 flags: {}
-extra-deps:
-  - deepseq-1.4.3.0
+extra-deps: []

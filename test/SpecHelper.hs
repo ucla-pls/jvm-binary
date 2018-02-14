@@ -34,7 +34,7 @@ toHex x =
 
 testAllFiles :: SpecWith BL.ByteString -> IO [TestTree]
 testAllFiles spec = do
-  files <- filter isClass <$> recursiveContents "test-suite/data"
+  files <- filter isClass <$> recursiveContents "test/data"
   forM files $ \file -> testSpec file (beforeAll (blReadFile file) spec)
   where
     isClass p = takeExtension p == ".class"
@@ -45,8 +45,8 @@ testSomeFiles spec =
   forM files $ \file -> testSpec file (beforeAll (blReadFile file) spec)
   where
     files =
-      [ "test-suite/data/java/util/zip/ZipOutputStream.class"
-      , "test-suite/data/project/Main.class"
+      [ "test/data/java/util/zip/ZipOutputStream.class"
+      , "test/data/project/Main.class"
       ]
 
 isoBinary :: (Binary a, Eq a, Show a) => a -> Property

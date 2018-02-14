@@ -4,13 +4,13 @@ module Language.JVM.Attribute.CodeTest where
 
 import           SpecHelper
 
-import           Data.Word
+-- -- -- import           Data.Word
 
-import           Language.JVM.Attribute     (Attribute)
+-- -- -- -- import           Language.JVM.Attribute     (Attribute)
 import           Language.JVM.AttributeTest ()
 
 import           Language.JVM.Attribute.Code
-import qualified Language.JVM.Constant      as Constant
+import           Language.JVM.Constant  (Index)
 import           Language.JVM.UtilsTest ()
 
 
@@ -20,7 +20,7 @@ import           Language.JVM.UtilsTest ()
 -- prop_encode_and_decode :: Code Attribute -> Property
 -- prop_encode_and_decode = isoBinary
 
-instance Arbitrary (Code Attribute) where
+instance Arbitrary (Code Index) where
   arbitrary = Code
     <$> arbitrary
     <*> arbitrary
@@ -35,16 +35,16 @@ instance Arbitrary ArithmeticType where
 instance Arbitrary LocalType where
   arbitrary = elements [ LInt, LLong, LFloat, LDouble, LRef ]
 
-instance Arbitrary ByteCodeInst where
+instance Arbitrary (ByteCodeInst Index) where
   arbitrary = ByteCodeInst <$> arbitrary <*> arbitrary
 
-instance Arbitrary ByteCodeOpr where
+instance Arbitrary (ByteCodeOpr Index) where
   arbitrary = oneof
     [ pure Nop
     , Push <$> arbitrary
     ]
 
-instance Arbitrary Constant where
+instance Arbitrary (CConstant Index) where
   arbitrary = oneof
     [ pure CNull
     , pure CIntM1
@@ -68,15 +68,15 @@ instance Arbitrary Constant where
     , CByte <$> arbitrary
     , CShort <$> arbitrary
 
-    , CHalfRef . Constant.ConstantRef . fromIntegral <$> (arbitrary  :: Gen Word8)
+    , CHalfRef <$> arbitrary
     , CRef One <$> arbitrary
     , CRef Two <$> arbitrary
     ]
 
-instance Arbitrary ByteCode where
+instance Arbitrary (ByteCode Index) where
   arbitrary = ByteCode <$> arbitrary
 
-instance Arbitrary ExceptionTable where
+instance Arbitrary (ExceptionTable Index) where
   arbitrary = ExceptionTable
     <$> arbitrary
     <*> arbitrary

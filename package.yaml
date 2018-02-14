@@ -11,7 +11,6 @@ github: ucla-pls/jvm-binary
 
 description: A library for reading Java class-files.
 
-ghc-options: -Wall
 
 extra-source-files:
 - CHANGELOG.md
@@ -33,9 +32,10 @@ dependencies:
 
 library:
   source-dirs: src
+  ghc-options: -Wall
 
 tests:
-  jvm-binary-test-suite:
+  jvm-binary-test:
     dependencies:
     - jvm-binary
     - tasty
@@ -45,22 +45,19 @@ tests:
     - filepath
     - directory
     - text
-    - hspec-megaparsec
     ghc-options:
     - -rtsopts
     - -threaded
     - -with-rtsopts=-N
     - -fno-warn-orphans
     main: Test.hs
-    source-dirs: test-suite
+    source-dirs: test
 
 benchmarks:
   jvm-binary-benchmarks:
     dependencies:
     - jvm-binary
     - criterion
-    other-modules:
-    - SpecHelper
     ghc-options:
     - -rtsopts
     - -threaded

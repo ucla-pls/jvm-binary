@@ -2,14 +2,20 @@ module Language.JVMTest where
 
 import SpecHelper
 
-import Control.Monad
+-- -- import Control.Monad
 -- import Data.Text as Text
-import Data.Maybe
+-- -- import Data.Maybe
 import Data.Either
 -- import Debug.Trace
 
 import Language.JVM
 import Language.JVM.Attribute.Code ()
+
+tests :: IO TestTree
+tests =
+  testGroup "Language.JVM" <$> sequence
+  [ testGroup "Reading classfile" <$> test_reading_classfile
+  ]
 
 test_reading_classfile :: IO [TestTree]
 test_reading_classfile = testSomeFiles $ do
