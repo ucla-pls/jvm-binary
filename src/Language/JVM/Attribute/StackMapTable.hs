@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveGeneric   #-}
@@ -22,14 +23,12 @@ module Language.JVM.Attribute.StackMapTable
   , VerificationTypeInfo (..)
   ) where
 
-import           GHC.Generics          (Generic)
 
 import           Data.Binary
-import           Control.DeepSeq
 import           Numeric
 import           Control.Monad (replicateM)
 
-import           Language.JVM.Constant (Index, Ref, Reference, ClassName)
+import           Language.JVM.ConstantPool 
 import           Language.JVM.Utils
 
 -- | An Exceptions attribute is a list of references into the
@@ -37,12 +36,6 @@ import           Language.JVM.Utils
 data StackMapTable r = StackMapTable
   { stackMapTable :: SizedList16 (StackMapFrame r)
   }
-
-deriving instance Reference r => Show (StackMapTable r)
-deriving instance Reference r => Eq (StackMapTable r)
-deriving instance Reference r => Generic (StackMapTable r)
-deriving instance Reference r => NFData (StackMapTable r)
-
 
 instance Binary (StackMapTable Index) where
 
@@ -55,11 +48,6 @@ data StackMapFrame r = StackMapFrame
   , frameType :: StackMapFrameType r
   }
 
-deriving instance Reference r => Show (StackMapFrame r)
-deriving instance Reference r => Eq (StackMapFrame r)
-deriving instance Reference r => Generic (StackMapFrame r)
-deriving instance Reference r => NFData (StackMapFrame r)
-
 -- | An stack map frame type
 data StackMapFrameType r
   = SameFrame
@@ -69,11 +57,6 @@ data StackMapFrameType r
   | FullFrame
       (SizedList16 (VerificationTypeInfo r))
       (SizedList16 (VerificationTypeInfo r))
-
-deriving instance Reference r => Show (StackMapFrameType r)
-deriving instance Reference r => Eq (StackMapFrameType r)
-deriving instance Reference r => Generic (StackMapFrameType r)
-deriving instance Reference r => NFData (StackMapFrameType r)
 
 instance Binary (StackMapFrame Index) where
   get = do
@@ -163,10 +146,6 @@ data VerificationTypeInfo r
   | VObject (Ref r ClassName)
   | VUninitialized !Word16
 
-deriving instance Reference r => Show (VerificationTypeInfo r)
-deriving instance Reference r => Eq (VerificationTypeInfo r)
-deriving instance Reference r => Generic (VerificationTypeInfo r)
-deriving instance Reference r => NFData (VerificationTypeInfo r)
 
 instance Binary (VerificationTypeInfo Index) where
   get = do
@@ -194,3 +173,8 @@ instance Binary (VerificationTypeInfo Index) where
       VUninitializedThis -> putWord8 6
       VObject s -> do putWord8 7; put s
       VUninitialized s -> do putWord8 8; put s
+
+$(deriveBase ''StackMapTable)
+$(deriveBase ''StackMapFrame)
+$(deriveBase ''StackMapFrameType)
+$(deriveBase ''VerificationTypeInfo)

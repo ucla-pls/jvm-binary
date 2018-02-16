@@ -8,32 +8,21 @@ The main entry point for using the library.
 -}
 
 module Language.JVM
-  ( decodeClassFile
-
-  , module Language.JVM.AccessFlag
+  ( module Language.JVM.AccessFlag
   , module Language.JVM.Attribute
   , module Language.JVM.ClassFile
-  , module Language.JVM.Constant
+  , module Language.JVM.ConstantPool
+  , module Language.JVM.ClassFileReader
   , module Language.JVM.Field
   , module Language.JVM.Method
   , module Language.JVM.Utils
   ) where
 
-import qualified Data.ByteString.Lazy   as BL
-import           Data.Binary
-
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
 import           Language.JVM.ClassFile
-import           Language.JVM.Constant
+import           Language.JVM.ClassFileReader
+import           Language.JVM.ConstantPool
 import           Language.JVM.Field
 import           Language.JVM.Method
 import           Language.JVM.Utils
-
--- | Create a class file from a lazy 'BL.ByteString'
-decodeClassFile :: BL.ByteString -> Either String (ClassFile Index)
-decodeClassFile bs = do
-  case decodeOrFail bs of
-    Right (_, _, cf) -> Right cf
-    Left (_, _, msg) -> Left msg
-

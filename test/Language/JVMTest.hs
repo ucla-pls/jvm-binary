@@ -2,30 +2,27 @@ module Language.JVMTest where
 
 import SpecHelper
 
--- -- import Control.Monad
--- import Data.Text as Text
--- -- import Data.Maybe
 import Data.Either
--- import Debug.Trace
-
 import Language.JVM
 import Language.JVM.Attribute.Code ()
-
-tests :: IO TestTree
-tests =
-  testGroup "Language.JVM" <$> sequence
-  [ testGroup "Reading classfile" <$> test_reading_classfile
-  ]
 
 test_reading_classfile :: IO [TestTree]
 test_reading_classfile = testSomeFiles $ do
   it "can parse the bytestring" $ \bs -> do
     decodeClassFile bs `shouldSatisfy` isRight
 
-  beforeWith (\bs -> either fail return $ decodeClassFile bs) $ do
+  beforeWith (\bs -> either (fail . show) return $ decodeClassFile bs) $ do
 
     it "has a the magic number: 0xCAFEBABE" $ \cls ->
       cMagicNumber cls `shouldBe` 0xCAFEBABE
+
+    it "can bootstrap the constant pool" $ \cls -> do
+      let cp = bootstrapDeref (cConstantPool cls)
+      cp `shouldSatisfy` isRight
+
+    it "can untie the whole class file" $ \cls -> do
+      let cls' = untieClassFile cls
+      untieClassFile cls `shouldSatisfy` isRight
 
     -- it "has a class name" $ \cls ->
     --   runWithPool (cThisClass cls) (cConstantPool cls) `shouldSatisfy` isRight

@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
@@ -15,21 +16,15 @@ module Language.JVM.Attribute.ConstantValue
   ( ConstantValue (..)
   ) where
 
-import           Control.DeepSeq       (NFData)
-import           GHC.Generics          (Generic)
-
-import           Data.Binary
-
-import           Language.JVM.Constant (Constant, Index, Ref, Reference)
+import           Language.JVM.ConstantPool
 
 -- | A constant value is just a index into the constant pool.
 data ConstantValue r = ConstantValue
   { constantValueIndex :: Ref r (Constant r)
   }
 
-deriving instance Reference r => Show (ConstantValue r)
-deriving instance Reference r => Eq (ConstantValue r)
-deriving instance Reference r => Generic (ConstantValue r)
-deriving instance Reference r => NFData (ConstantValue r)
+instance Staged ConstantValue where
+  stage f (ConstantValue r) =
+    ConstantValue <$> deepreref f r
 
-instance Binary (ConstantValue Index) where
+$(deriveBaseB ''Index ''ConstantValue)

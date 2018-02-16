@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-|
 Module      : Language.JVM.Field
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -18,18 +19,13 @@ module Language.JVM.Field
  -- , fConstantValue
   ) where
 
-import           Control.DeepSeq         (NFData)
-import           Data.Binary
-import           GHC.Generics            (Generic)
+import qualified Data.Set                as Set
+import qualified Data.Text               as Text
 
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
-import           Language.JVM.Constant
+import           Language.JVM.ConstantPool
 import           Language.JVM.Utils
-
-import qualified Data.Set                as Set
-
-import qualified Data.Text               as Text
 
 -- | A Field in the class-file, as described
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.5).
@@ -39,13 +35,6 @@ data Field r = Field
   , fDescriptorIndex :: Ref r FieldDescriptor
   , fAttributes      :: SizedList16 (Attribute r)
   }
-
-deriving instance Reference r => Show (Field r)
-deriving instance Reference r => Eq (Field r)
-deriving instance Reference r => Generic (Field r)
-deriving instance Reference r => NFData (Field r)
-
-deriving instance Binary (Field Index)
 
 -- | Get the name of the field
 fName :: Field Deref -> Text.Text
@@ -65,9 +54,11 @@ fDescriptor = valueF fDescriptorIndex
 -- fConstantValue =
 --   fmap firstOne . matching fAttributes
 
-instance ClassFileReadable Field where
-  untie field cp = do
-    fi <- deref (fNameIndex field) cp
-    fd <- deref (fDescriptorIndex field) cp
-    fattr <- mapM (flip untie cp) (fAttributes field)
+instance Staged Field where
+  stage f field = do
+    fi <- f (fNameIndex field)
+    fd <- f (fDescriptorIndex field)
+    fattr <- mapM (stage f) (fAttributes field)
     return $ Field (fAccessFlags' field) fi fd fattr
+
+$(deriveBaseB ''Index ''Field)

@@ -57,15 +57,12 @@ import           Data.Int
 import qualified Data.Vector                 as V
 
 import           Language.JVM.Attribute.Base
-import           Language.JVM.Constant       (ClassName, Constant, FieldId,
-                                              InClass, Index (), MethodId,
-                                              Reference,
-                                              Ref)
+import           Language.JVM.ConstantPool
 import           Language.JVM.Utils
 
--- | Code contains the actual byte-code. The 'i' type parameter is added to allow
--- indicate the two stages of the code file, before and after access to the 'ConstantPool'.
--- i should be either 'Ref' or 'Deref'.
+-- | Code contains the actual byte-code. The 'i' type parameter is added to
+-- allow indicate the two stages of the code file, before and after access to
+-- the 'ConstantPool'. i should be either 'Ref' or 'Deref'.
 data Code r = Code
   { codeMaxStack       :: Int16
   , codeMaxLocals      :: Int16
@@ -74,33 +71,9 @@ data Code r = Code
   , codeAttributes     :: SizedList16 (Attribute r)
   }
 
-deriving instance Reference r => Show (Code r)
-deriving instance Reference r => Eq (Code r)
-deriving instance Reference r => Generic (Code r)
-deriving instance Reference r => NFData (Code r)
-deriving instance Binary (Code Index)
-
--- data Ref i = Ref i
--- data Deref i = Deref i
-
--- class Indexable f where
---   deref :: f Ref -> f Deref
-
--- instance Indexable Code where
---   deref code = do
---     bc <- deref $ codeByteCode code
---     et <- sequence $ codeExceptionTable code
---     code { codeByteCode = bc, codeExceptionTable = et}
-
-
 newtype ByteCode i = ByteCode
   { unByteCode :: [ByteCodeInst i]
   }
-
-deriving instance Reference r => Show (ByteCode r)
-deriving instance Reference r => Eq (ByteCode r)
-deriving instance Reference r => Generic (ByteCode r)
-deriving instance Reference r => NFData (ByteCode r)
 
 instance Binary (ByteCode Index) where
   get = do
@@ -133,22 +106,10 @@ data ExceptionTable i = ExceptionTable
   , catchType :: ! (Ref i ClassName)
   }
 
-deriving instance Reference r => Show (ExceptionTable r)
-deriving instance Reference r => Eq (ExceptionTable r)
-deriving instance Reference r => Generic (ExceptionTable r)
-deriving instance Reference r => NFData (ExceptionTable r)
-
-deriving instance Binary (ExceptionTable Index)
-
 data ByteCodeInst i = ByteCodeInst
   { offset :: LongOffset
   , opcode :: ByteCodeOpr i
   }
-
-deriving instance Reference r => Show (ByteCodeInst r)
-deriving instance Reference r => Eq (ByteCodeInst r)
-deriving instance Reference r => Generic (ByteCodeInst r)
-deriving instance Reference r => NFData (ByteCodeInst r)
 
 instance Binary (ByteCodeInst Index) where
   get =
@@ -214,11 +175,6 @@ data CConstant r
 
   | CHalfRef (Ref r (Constant r))
   | CRef WordSize (Ref r (Constant r))
-
-deriving instance Reference r => Show (CConstant r)
-deriving instance Reference r => Eq (CConstant r)
-deriving instance Reference r => Generic (CConstant r)
-deriving instance Reference r => NFData (CConstant r)
 
 data BinOpr
   = Add
@@ -343,10 +299,6 @@ data ByteCodeOpr r
 
 -- deriving (Eq, Generic, NFData)
 
-deriving instance Reference r => Show (ByteCodeOpr r)
-deriving instance Reference r => Eq (ByteCodeOpr r)
-deriving instance Reference r => Generic (ByteCodeOpr r)
-deriving instance Reference r => NFData (ByteCodeOpr r)
 
 instance Binary (ByteCodeOpr Index) where
   get = do
@@ -709,3 +661,10 @@ instance Binary (ByteCodeOpr Index) where
       Push (CRef One r) -> putInt8 0x13 >> put r
       Push (CRef Two r) -> putInt8 0x14 >> put r
       _ -> P.fail $ "Is not able to print '" ++ show bc ++ "' yet."
+
+$(deriveBaseB ''Index ''Code)
+$(deriveBase ''ByteCode)
+$(deriveBaseB ''Index ''ExceptionTable)
+$(deriveBase ''ByteCodeInst)
+$(deriveBase ''CConstant)
+$(deriveBase ''ByteCodeOpr)

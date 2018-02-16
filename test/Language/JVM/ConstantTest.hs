@@ -5,6 +5,7 @@ module Language.JVM.ConstantTest where
 import SpecHelper
 
 import Language.JVM.Constant
+import Language.JVM.ConstantPool
 import Language.JVM.UtilsTest ()
 
 import qualified Data.IntMap as IM

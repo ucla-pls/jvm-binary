@@ -14,15 +14,17 @@ module Language.JVM.Type
   , JType (..)
 
   , MethodDescriptor (..)
+  , methodDescriptorFromText
+  , methodDescriptorToText
+
   , FieldDescriptor (..)
+  , fieldDescriptorFromText
+  , fieldDescriptorToText
 
   -- * Parsers
   , parseJType
-
   , parseMethodDescriptor
-  , methodDescriptorFromText
   , parseFieldDescriptor
-  , fieldDescriptorFromText
   ) where
 
 import           Control.DeepSeq      (NFData)
@@ -86,6 +88,13 @@ parseJType = try $ do
     'Z' -> return JTBoolean
     '[' -> JTArray <$> parseJType
     _ -> fail $ "Unknown char " ++ show s
+
+
+methodDescriptorToText :: MethodDescriptor -> Text.Text
+methodDescriptorToText = undefined
+
+fieldDescriptorToText :: FieldDescriptor -> Text.Text
+fieldDescriptorToText = undefined
 
 -- | Parse a method descriptor
 parseMethodDescriptor :: Parser MethodDescriptor

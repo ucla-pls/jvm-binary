@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-|
 Module      : Language.JVM.Method
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -24,17 +25,13 @@ module Language.JVM.Method
 
   ) where
 
-import           Data.Binary
 import           Data.Set (Set)
 import qualified Data.Text as Text
-import           GHC.Generics            (Generic)
-
-import           Control.DeepSeq (NFData)
 
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
 -- import           Language.JVM.Attribute.Exceptions (exceptionIndexTable)
-import           Language.JVM.Constant
+import           Language.JVM.ConstantPool
 import           Language.JVM.Utils
 
 -- | A Method in the class-file, as described
@@ -46,13 +43,6 @@ data Method r = Method
   , mAttributes'     :: SizedList16 (Attribute r)
   }
 
-deriving instance Reference r => Show (Method r)
-deriving instance Reference r => Eq (Method r)
-deriving instance Reference r => Generic (Method r)
-deriving instance Reference r => NFData (Method r)
-
-deriving instance Binary (Method Index)
-
 -- | Unpack the BitSet and get the AccessFlags as a Set.
 mAccessFlags :: Method r -> Set MAccessFlag
 mAccessFlags = toSet . mAccessFlags'
@@ -62,11 +52,11 @@ mAttributes :: Method r -> [Attribute r]
 mAttributes = unSizedList . mAttributes'
 
 -- | Lookup the name of the method in the 'ConstantPool'.
-mName :: Method Deref -> Text.Text
+mName :: (WithValue r) => Method r -> Text.Text
 mName = valueF mNameIndex
 
 -- | Lookup the descriptor of the method in the 'ConstantPool'.
-mDescriptor :: Method Deref -> MethodDescriptor
+mDescriptor :: (WithValue r) => Method r -> MethodDescriptor
 mDescriptor = valueF mDescriptorIndex
 
 -- -- | Fetch the 'Code' attribute, if any.
@@ -92,9 +82,11 @@ mDescriptor = valueF mDescriptorIndex
 --     Nothing ->
 --       return $ Right []
 
-instance ClassFileReadable Method where
-  untie (Method mf mn md mattr) cp = do
-    mn' <- deref (mn) cp
-    md' <- deref (md) cp
-    mattr' <- mapM (flip untie cp) mattr
+instance Staged Method where
+  stage f (Method mf mn md mattr) = do
+    mn' <- f mn
+    md' <- f md
+    mattr' <- mapM (stage f) mattr
     return $ Method mf mn' md' mattr'
+
+$(deriveBaseB ''Index ''Method)

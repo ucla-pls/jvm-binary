@@ -62,7 +62,7 @@ import qualified Data.ByteString as BS
 -- length N of type 'w' and then N items of type 'a'.
 newtype SizedList w a = SizedList
   { unSizedList :: [ a ]
-  } deriving (Show, Eq, Functor, NFData)
+  } deriving (Show, Eq, Functor, NFData, Ord)
 
 -- | Get the size of the sized list.
 listSize :: Num w => SizedList w a -> w
@@ -89,7 +89,7 @@ instance (Binary w, Integral w, Binary a) => Binary (SizedList w a) where
 -- | A byte string with a size w.
 newtype SizedByteString w = SizedByteString
   { unSizedByteString :: BS.ByteString
-  } deriving (Show, Eq, NFData)
+  } deriving (Show, Eq, NFData, Ord)
 
 -- | Get the size of a SizedByteString
 byteStringSize :: (Num w) => SizedByteString w -> w

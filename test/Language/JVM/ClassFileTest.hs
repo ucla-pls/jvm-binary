@@ -7,7 +7,7 @@ import SpecHelper
 import qualified Data.IntMap as IM
 
 import Language.JVM.ClassFile
-import Language.JVM.Constant
+import Language.JVM.ConstantPool
 
 import Language.JVM.Utils
 import Language.JVM.UtilsTest ()

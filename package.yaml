@@ -11,7 +11,6 @@ github: ucla-pls/jvm-binary
 
 description: A library for reading Java class-files.
 
-
 extra-source-files:
 - CHANGELOG.md
 - LICENSE.md
@@ -28,7 +27,9 @@ dependencies:
 - vector
 - deepseq >= 1.4.3.0
 - deriving-compat
-- attoparsec 
+- attoparsec
+- mtl
+- template-haskell
 
 library:
   source-dirs: src
