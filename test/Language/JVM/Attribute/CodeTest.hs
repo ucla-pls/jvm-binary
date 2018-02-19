@@ -1,17 +1,19 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Language.JVM.Attribute.CodeTest where
 
+-- -- import           Data.Int
+import qualified Data.Vector as V
+import           Generic.Random
 import           SpecHelper
 
--- -- -- import           Data.Word
-
--- -- -- -- import           Language.JVM.Attribute     (Attribute)
-import           Language.JVM.AttributeTest ()
-
+import           Language.JVM.AttributeTest  ()
 import           Language.JVM.Attribute.Code
-import           Language.JVM.Constant  (Index)
-import           Language.JVM.UtilsTest ()
+import           Language.JVM.Constant       (Index)
+import           Language.JVM.UtilsTest      ()
 
 
 -- prop_encode_and_decode_ByteCode :: ByteCode -> Property
@@ -19,6 +21,9 @@ import           Language.JVM.UtilsTest ()
 
 -- prop_encode_and_decode :: Code Attribute -> Property
 -- prop_encode_and_decode = isoBinary
+
+prop_encode_and_decode_ByteCodeOpr :: ByteCodeOpr Index -> Property
+prop_encode_and_decode_ByteCodeOpr = isoBinary
 
 instance Arbitrary (Code Index) where
   arbitrary = Code
@@ -39,39 +44,46 @@ instance Arbitrary (ByteCodeInst Index) where
   arbitrary = ByteCodeInst <$> arbitrary <*> arbitrary
 
 instance Arbitrary (ByteCodeOpr Index) where
-  arbitrary = oneof
-    [ pure Nop
-    , Push <$> arbitrary
-    ]
+  arbitrary =
+   genericArbitrary uniform
+
+instance Arbitrary a => Arbitrary (V.Vector a) where
+  arbitrary = V.fromList <$> arbitrary
+
+instance Arbitrary a => Arbitrary (ArrayType a) where
+  arbitrary =
+    genericArbitrary uniform
+
+instance Arbitrary LocalAddress where
+  arbitrary =
+    genericArbitrary uniform
+
+instance Arbitrary BinOpr where
+  arbitrary = genericArbitrary uniform
+
+instance Arbitrary BitOpr where
+  arbitrary = genericArbitrary uniform
+
+instance Arbitrary OneOrTwo where
+  arbitrary = genericArbitrary uniform
+
+instance Arbitrary IncrementAmount where
+  arbitrary = genericArbitrary uniform
+
+instance Arbitrary SmallArithmeticType where
+  arbitrary = genericArbitrary uniform
+
+instance Arbitrary CmpOpr where
+  arbitrary = genericArbitrary uniform
+
+instance Arbitrary FieldAccess where
+  arbitrary = genericArbitrary uniform
+
+instance Arbitrary Invokation where
+  arbitrary = genericArbitrary uniform
 
 instance Arbitrary (CConstant Index) where
-  arbitrary = oneof
-    [ pure CNull
-    , pure CIntM1
-    , pure CInt0
-    , pure CInt1
-    , pure CInt2
-    , pure CInt3
-    , pure CInt4
-    , pure CInt5
-
-    , pure CLong0
-    , pure CLong1
-
-    , pure CFloat0
-    , pure CFloat1
-    , pure CFloat2
-
-    , pure CDouble0
-    , pure CDouble1
-
-    , CByte <$> arbitrary
-    , CShort <$> arbitrary
-
-    , CHalfRef <$> arbitrary
-    , CRef One <$> arbitrary
-    , CRef Two <$> arbitrary
-    ]
+  arbitrary = genericArbitrary uniform
 
 instance Arbitrary (ByteCode Index) where
   arbitrary = ByteCode <$> arbitrary

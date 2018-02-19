@@ -495,9 +495,9 @@ instance Binary (ByteCodeOpr Index) where
       0x94 -> return $ CompareLongs
 
       0x95 -> return $ CompareFloating True One
-      0x96 -> return $ CompareFloating False Two
+      0x96 -> return $ CompareFloating False One
 
-      0x97 -> return $ CompareFloating True One
+      0x97 -> return $ CompareFloating True Two
       0x98 -> return $ CompareFloating False Two
 
       0x99 -> If CEq One <$> get
@@ -633,33 +633,316 @@ instance Binary (ByteCodeOpr Index) where
 
   put bc =
     case bc of
-      Nop -> putInt8 0x00
-      Push CNull -> putInt8 0x01
+      Nop -> putWord8 0x00
+      Push CNull -> putWord8 0x01
 
-      Push CIntM1 -> putInt8 0x02
-      Push CInt0 -> putInt8 0x03
-      Push CInt1 -> putInt8 0x04
-      Push CInt2 -> putInt8 0x05
-      Push CInt3 -> putInt8 0x06
-      Push CInt4 -> putInt8 0x07
-      Push CInt5 -> putInt8 0x08
+      Push CIntM1 -> putWord8 0x02
+      Push CInt0 -> putWord8 0x03
+      Push CInt1 -> putWord8 0x04
+      Push CInt2 -> putWord8 0x05
+      Push CInt3 -> putWord8 0x06
+      Push CInt4 -> putWord8 0x07
+      Push CInt5 -> putWord8 0x08
 
-      Push CLong0 -> putInt8 0x09
-      Push CLong1 -> putInt8 0x0a
+      Push CLong0 -> putWord8 0x09
+      Push CLong1 -> putWord8 0x0a
 
-      Push CFloat0 -> putInt8 0x0b
-      Push CFloat1 -> putInt8 0x0c
-      Push CFloat2 -> putInt8 0x0d
+      Push CFloat0 -> putWord8 0x0b
+      Push CFloat1 -> putWord8 0x0c
+      Push CFloat2 -> putWord8 0x0d
 
-      Push CDouble0 -> putInt8 0x0e
-      Push CDouble1 -> putInt8 0x0f
+      Push CDouble0 -> putWord8 0x0e
+      Push CDouble1 -> putWord8 0x0f
 
-      Push (CByte x) -> putInt8 0x10 >> put x
-      Push (CShort x) -> putInt8 0x11 >> put x
+      Push (CByte x) -> putWord8 0x10 >> put x
+      Push (CShort x) -> putWord8 0x11 >> put x
 
-      Push (CHalfRef x) -> putInt8 0x12 >> put x
-      Push (CRef One r) -> putInt8 0x13 >> put r
-      Push (CRef Two r) -> putInt8 0x14 >> put r
+      Push (CHalfRef x) -> putWord8 0x12 >> put x
+      Push (CRef One r) -> putWord8 0x13 >> put r
+      Push (CRef Two r) -> putWord8 0x14 >> put r
+
+      Load LInt (LSingle 0) -> putWord8 0x1a
+      Load LInt (LSingle 1) -> putWord8 0x1b
+      Load LInt (LSingle 2) -> putWord8 0x1c
+      Load LInt (LSingle 3) -> putWord8 0x1d
+
+      Load LLong (LSingle 0) -> putWord8 0x1e
+      Load LLong (LSingle 1) -> putWord8 0x1f
+      Load LLong (LSingle 2) -> putWord8 0x20
+      Load LLong (LSingle 3) -> putWord8 0x21
+
+      Load LFloat (LSingle 0) -> putWord8 0x22
+      Load LFloat (LSingle 1) -> putWord8 0x23
+      Load LFloat (LSingle 2) -> putWord8 0x24
+      Load LFloat (LSingle 3) -> putWord8 0x25
+
+      Load LDouble (LSingle 0) -> putWord8 0x26
+      Load LDouble (LSingle 1) -> putWord8 0x27
+      Load LDouble (LSingle 2) -> putWord8 0x28
+      Load LDouble (LSingle 3) -> putWord8 0x29
+
+      Load LRef (LSingle 0) -> putWord8 0x2a
+      Load LRef (LSingle 1) -> putWord8 0x2b
+      Load LRef (LSingle 2) -> putWord8 0x2c
+      Load LRef (LSingle 3) -> putWord8 0x2d
+
+      ArrayLoad AInt -> putWord8 0x2e
+      ArrayLoad ALong -> putWord8 0x2f
+      ArrayLoad AFloat -> putWord8 0x30
+      ArrayLoad ADouble -> putWord8 0x31
+      ArrayLoad (ARef ()) -> putWord8 0x32
+      ArrayLoad AByte -> putWord8 0x33
+      ArrayLoad AChar -> putWord8 0x34
+      ArrayLoad AShort -> putWord8 0x35
+
+      Store LInt (LSingle 0) -> putWord8 0x3b
+      Store LInt (LSingle 1) -> putWord8 0x3c
+      Store LInt (LSingle 2) -> putWord8 0x3d
+      Store LInt (LSingle 3) -> putWord8 0x3e
+
+      Store LLong (LSingle 0) -> putWord8 0x3f
+      Store LLong (LSingle 1) -> putWord8 0x40
+      Store LLong (LSingle 2) -> putWord8 0x41
+      Store LLong (LSingle 3) -> putWord8 0x42
+
+      Store LFloat (LSingle 0) -> putWord8 0x43
+      Store LFloat (LSingle 1) -> putWord8 0x44
+      Store LFloat (LSingle 2) -> putWord8 0x45
+      Store LFloat (LSingle 3) -> putWord8 0x46
+
+      Store LDouble (LSingle 0) -> putWord8 0x47
+      Store LDouble (LSingle 1) -> putWord8 0x48
+      Store LDouble (LSingle 2) -> putWord8 0x49
+      Store LDouble (LSingle 3) -> putWord8 0x4a
+
+      Store LRef (LSingle 0) -> putWord8 0x4b
+      Store LRef (LSingle 1) -> putWord8 0x4c
+      Store LRef (LSingle 2) -> putWord8 0x4d
+      Store LRef (LSingle 3) -> putWord8 0x4e
+
+      Store LInt (LSingle a) -> putInt8 0x36 >> put a
+      Store LLong  (LSingle a) -> putInt8 0x37 >> put a
+      Store LFloat (LSingle a) -> putInt8 0x38 >> put a
+      Store LDouble (LSingle a) -> putInt8 0x39 >> put a
+      Store LRef (LSingle a) -> putInt8 0x3a >> put a
+
+      ArrayStore AInt -> putWord8 0x4f
+      ArrayStore ALong -> putWord8 0x50
+      ArrayStore AFloat -> putWord8 0x51
+      ArrayStore ADouble -> putWord8 0x52
+      ArrayStore (ARef ()) -> putWord8 0x53
+      ArrayStore AByte -> putWord8 0x54
+      ArrayStore AChar -> putWord8 0x55
+      ArrayStore AShort -> putWord8 0x56
+
+      Pop One -> putWord8 0x57
+      Pop Two -> putWord8 0x58
+
+      Dup One -> putWord8 0x59
+      DupX1 One -> putWord8 0x5a
+      DupX2 One -> putWord8 0x5b
+
+      Dup Two -> putWord8 0x5c
+      DupX1 Two -> putWord8 0x5d
+      DupX2 Two -> putWord8 0x5e
+
+      Swap -> putWord8 0x5f
+
+      BinaryOpr Add MInt -> putWord8 0x60
+      BinaryOpr Add MLong -> putWord8 0x61
+      BinaryOpr Add MFloat -> putWord8 0x62
+      BinaryOpr Add MDouble -> putWord8 0x63
+
+      BinaryOpr Sub MInt -> putWord8 0x64
+      BinaryOpr Sub MLong -> putWord8 0x65
+      BinaryOpr Sub MFloat -> putWord8 0x66
+      BinaryOpr Sub MDouble -> putWord8 0x67
+
+      BinaryOpr Mul MInt -> putWord8 0x68
+      BinaryOpr Mul MLong -> putWord8 0x69
+      BinaryOpr Mul MFloat -> putWord8 0x6a
+      BinaryOpr Mul MDouble -> putWord8 0x6b
+
+      BinaryOpr Div MInt -> putWord8 0x6c
+      BinaryOpr Div MLong -> putWord8 0x6d
+      BinaryOpr Div MFloat -> putWord8 0x6e
+      BinaryOpr Div MDouble -> putWord8 0x6f
+
+      BinaryOpr Rem MInt -> putWord8 0x70
+      BinaryOpr Rem MLong -> putWord8 0x71
+      BinaryOpr Rem MFloat -> putWord8 0x72
+      BinaryOpr Rem MDouble -> putWord8 0x73
+
+      Neg MInt -> putWord8 0x74
+      Neg MLong -> putWord8 0x75
+      Neg MFloat -> putWord8 0x76
+      Neg MDouble -> putWord8 0x77
+
+      BitOpr ShL One -> putWord8 0x78
+      BitOpr ShL Two -> putWord8 0x79
+      BitOpr ShR One -> putWord8 0x7a
+      BitOpr ShR Two -> putWord8 0x7b
+
+      BitOpr UShR One -> putWord8 0x7c
+      BitOpr UShR Two -> putWord8 0x7d
+
+      BitOpr And One -> putWord8 0x7e
+      BitOpr And Two -> putWord8 0x7f
+      BitOpr Or One -> putWord8 0x80
+      BitOpr Or Two -> putWord8 0x81
+      BitOpr XOr One -> putWord8 0x82
+      BitOpr XOr Two -> putWord8 0x83
+
+      IncrLocal (LSingle s1) (ISingle s2) ->
+        putWord8 0x84 >> put s1 >> put s2
+
+      Cast MInt MLong -> putWord8 0x85
+      Cast MInt MFloat -> putWord8 0x86
+      Cast MInt MDouble -> putWord8 0x87
+
+      Cast MLong MInt -> putWord8 0x88
+      Cast MLong MFloat -> putWord8 0x89
+      Cast MLong MDouble -> putWord8 0x8a
+
+      Cast MFloat MInt -> putWord8 0x8b
+      Cast MFloat MLong -> putWord8 0x8c
+      Cast MFloat MDouble -> putWord8 0x8d
+
+      Cast MDouble MInt -> putWord8 0x8e
+      Cast MDouble MLong -> putWord8 0x8f
+      Cast MDouble MFloat -> putWord8 0x90
+
+      CastDown MByte -> putWord8 0x91
+      CastDown MChar -> putWord8 0x92
+      CastDown MShort -> putWord8 0x93
+
+      CompareLongs -> putWord8 0x94
+
+      CompareFloating True One -> putWord8 0x95
+      CompareFloating False One -> putWord8 0x96
+
+      CompareFloating True Two -> putWord8 0x97
+      CompareFloating False Two -> putWord8 0x98
+
+      If CEq One a -> putWord8 0x99 >> put a
+      If CNe One a -> putWord8 0x9a >> put a
+      If CLt One a -> putWord8 0x9b >> put a
+      If CGe One a -> putWord8 0x9c >> put a
+      If CGt One a -> putWord8 0x9d >> put a
+      If CLe One a -> putWord8 0x9e >> put a
+
+      If CEq Two a -> putWord8 0x9f >> put a
+      If CNe Two a -> putWord8 0xa0 >> put a
+      If CLt Two a -> putWord8 0xa1 >> put a
+      If CGe Two a -> putWord8 0xa2 >> put a
+      If CGt Two a -> putWord8 0xa3 >> put a
+      If CLe Two a -> putWord8 0xa4 >> put a
+
+      IfRef True Two a -> putWord8 0xa5 >> put a
+      IfRef False Two a -> putWord8 0xa6 >> put a
+
+      Goto a -> putWord8 0xa7 >> putInt32be a
+      Jsr a -> putWord8 0xa8 >> putInt32be a
+
+      -- Goto a -> putWord8 0xc8 >> putInt32be a
+      -- Jsr a -> putWord8 0xc9 >> putInt32be a
+
+      Ret (LSingle a) -> putWord8 0xa9 >> putWord8 a
+
+      -- TableSwitch dft low high table -> do
+      --   putWord8 0xaa
+      --   putInt32be dft
+      --   putInt32be low
+      --   putInt32be high
+      --   V.mapM_ putInt32be table
+      -- 0xaa -> do
+      --   offset' <- bytesRead
+      --   let skipAmount = (4 - offset' `mod` 4) `mod` 4
+      --   if skipAmount > 0 then skip $ fromIntegral skipAmount else return ()
+      --   dft <- getInt32be
+      --   low <- getInt32be
+      --   high <- getInt32be
+      --   table <- V.replicateM (fromIntegral $ high - low + 1) getInt32be
+      --   return $ TableSwitch dft low high table
+
+      -- 0xab -> do
+      --   offset' <- bytesRead
+      --   let skipAmount = (4 - offset' `mod` 4) `mod` 4
+      --   if skipAmount > 0 then skip $ fromIntegral skipAmount else return ()
+      --   dft <- getInt32be
+      --   npairs <- getInt32be
+      --   pairs <- V.replicateM (fromIntegral npairs) get
+      --   return $ LookupSwitch dft pairs
+
+      Return ( Just LInt ) -> putWord8 0xac
+      Return ( Just LLong ) -> putWord8 0xad
+      Return ( Just LFloat ) -> putWord8 0xae
+      Return ( Just LDouble ) -> putWord8 0xaf
+      Return ( Just LRef ) -> putWord8 0xb0
+      Return Nothing -> putWord8 0xb1
+
+      Get FldStatic a -> putWord8 0xb2 >> put a
+      Put FldStatic a -> putWord8 0xb3 >> put a
+
+      Get FldField a -> putWord8 0xb4 >> put a
+      Put FldField a -> putWord8 0xb5 >> put a
+
+      Invoke InvkVirtual a -> putWord8 0xb6 >> put a
+      Invoke InvkSpecial a -> putWord8 0xb7 >> put a
+      Invoke InvkStatic a -> putWord8 0xb8 >> put a
+      Invoke (InvkInterface count) ref -> putWord8 0xb9 >> put ref >> put count >> putWord8 0
+      Invoke InvkDynamic ref -> putWord8 0xba >> put ref >> putWord8 0 >> putWord8 0
+      New a -> putWord8 0xbb >> put a
+      NewArray x -> do
+        case x of
+          ABoolean -> putWord8 0xbc >> putWord8 4
+          AChar -> putWord8 0xbc >> putWord8 5
+          AFloat -> putWord8 0xbc >> putWord8 6
+          ADouble -> putWord8 0xbc >> putWord8 7
+          AByte -> putWord8 0xbc >> putWord8 8
+          AShort -> putWord8 0xbc >> putWord8 9
+          AInt -> putWord8 0xbc >> putWord8 10
+          ALong -> putWord8 0xbc >> putWord8 11
+          ARef a -> putWord8 0xbd >> put a
+      ArrayLength -> putWord8 0xbe
+      Throw -> putWord8 0xbf
+
+      CheckCast a -> putWord8 0xc0 >> put a
+      InstanceOf a -> putWord8 0xc1 >> put a
+
+      Monitor True -> putWord8 0xc2
+      Monitor False -> putWord8 0xc3
+
+      Load LInt ( LWide a ) ->
+        putWord8 0xc4 >> putWord8 0x15 >> put a
+      Load LLong ( LWide a ) ->
+        putWord8 0xc4 >> putWord8 0x16 >> put a
+      Load LFloat ( LWide a ) ->
+        putWord8 0xc4 >> putWord8 0x17 >> put a
+      Load LDouble ( LWide a ) ->
+        putWord8 0xc4 >> putWord8 0x18 >> put a
+      Load LRef ( LWide a ) ->
+        putWord8 0xc4 >> putWord8 0x19 >> put a
+      Store LInt ( LWide a ) ->
+        putWord8 0xc4 >> putWord8 0x36 >> put a
+      Store LLong ( LWide a ) ->
+        putWord8 0xc4 >> putWord8 0x37 >> put a
+      Store LFloat ( LWide a ) ->
+        putWord8 0xc4 >> putWord8 0x38 >> put a
+      Store LDouble ( LWide a ) ->
+        putWord8 0xc4 >> putWord8 0x39 >> put a
+      Store LRef ( LWide a ) ->
+        putWord8 0xc4 >> putWord8 0x3a >> put a
+      IncrLocal (LWide a) (IWide b) ->
+        putWord8 0xc4 >> putWord8 0x84 >> put a >> put b
+      Ret (LWide a) ->
+        putWord8 0xc4 >> putWord8 0xa9 >> put a
+
+      MultiNewArray a b -> putWord8 0xc5 >> put a >> put b
+
+      IfRef False One a -> putWord8 0xc6 >> put a
+      IfRef True One a -> putWord8 0xc7 >> put a
+
       _ -> P.fail $ "Is not able to print '" ++ show bc ++ "' yet."
 
 $(deriveBaseB ''Index ''Code)

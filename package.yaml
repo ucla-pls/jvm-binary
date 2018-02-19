@@ -46,6 +46,7 @@ tests:
     - filepath
     - directory
     - text
+    - generic-random
     ghc-options:
     - -rtsopts
     - -threaded
