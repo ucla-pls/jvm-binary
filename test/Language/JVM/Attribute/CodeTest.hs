@@ -50,24 +50,42 @@ instance Arbitrary (ByteCodeOpr Index) where
 instance Arbitrary a => Arbitrary (V.Vector a) where
   arbitrary = V.fromList <$> arbitrary
 
-instance Arbitrary a => Arbitrary (ArrayType a) where
-  arbitrary =
-    genericArbitrary uniform
-
-instance Arbitrary LocalAddress where
-  arbitrary =
-    genericArbitrary uniform
+instance Arbitrary ArrayType where
+  arbitrary = genericArbitrary uniform
+instance Arbitrary (ExactArrayType Index) where
+  arbitrary = genericArbitrary uniform
 
 instance Arbitrary BinOpr where
   arbitrary = genericArbitrary uniform
+
+instance Arbitrary CastOpr where
+  arbitrary =
+    oneof . map pure $
+      [ CastTo MInt MLong
+      , CastTo MInt MFloat
+      , CastTo MInt MDouble
+
+      , CastTo MLong MInt
+      , CastTo MLong MFloat
+      , CastTo MLong MDouble
+
+      , CastTo MFloat MInt
+      , CastTo MFloat MLong
+      , CastTo MFloat MDouble
+
+      , CastTo MDouble MInt
+      , CastTo MDouble MLong
+      , CastTo MDouble MFloat
+
+      , CastDown MByte
+      , CastDown MChar
+      , CastDown MShort
+      ]
 
 instance Arbitrary BitOpr where
   arbitrary = genericArbitrary uniform
 
 instance Arbitrary OneOrTwo where
-  arbitrary = genericArbitrary uniform
-
-instance Arbitrary IncrementAmount where
   arbitrary = genericArbitrary uniform
 
 instance Arbitrary SmallArithmeticType where
@@ -83,6 +101,9 @@ instance Arbitrary Invokation where
   arbitrary = genericArbitrary uniform
 
 instance Arbitrary (CConstant Index) where
+  arbitrary = genericArbitrary uniform
+
+instance Arbitrary SwitchTable where
   arbitrary = genericArbitrary uniform
 
 instance Arbitrary (ByteCode Index) where

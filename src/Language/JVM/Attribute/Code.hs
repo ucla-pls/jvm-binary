@@ -20,28 +20,39 @@ module Language.JVM.Attribute.Code
   , ByteCodeOpr (..)
 
   , CConstant (..)
-  , WordSize
   , OneOrTwo (..)
-  , ArithmeticType (..)
-  , SmallArithmeticType (..)
-  , BinOpr (..)
-  , LocalType (..)
-  , ArrayType (..)
-  , CmpOpr (..)
-  , LongOffset
-  , Offset
 
-  , LocalAddress (..)
-  , IncrementAmount (..)
-  , BitOpr (..)
+  , SwitchTable (..)
+  , switchHigh
+
   , FieldAccess (..)
   , Invokation (..)
+
+  -- * Operations 
+  , BinOpr (..)
+  , BitOpr (..)
+  , CmpOpr (..)
+  , CastOpr (..)
+
+  -- * Type sets
+  , ArithmeticType (..)
+  , SmallArithmeticType (..)
+  , LocalType (..)
+  , ArrayType (..)
+  , ExactArrayType (..)
+
+  -- * Renames 
+  , WordSize
+  , LongOffset
+  , Offset
+  , LocalAddress 
+  , IncrementAmount 
   ) where
 
 import           GHC.Generics                (Generic)
 
 import           Prelude                     hiding (fail)
-import qualified Prelude                     as P
+-- import qualified Prelude                     as P
 
 import           Numeric                     (showHex)
 
@@ -126,9 +137,14 @@ data SmallArithmeticType = MByte | MChar | MShort
 data LocalType = LInt | LLong | LFloat | LDouble | LRef
   deriving (Show, Eq, Enum, Bounded, Generic, NFData)
 
-data ArrayType a
-  = ABoolean | AByte | AChar | AShort | AInt | ALong
-  | AFloat | ADouble | ARef a
+data ArrayType
+  = AByte | AChar | AShort | AInt | ALong
+  | AFloat | ADouble | ARef
+  deriving (Show, Eq, Generic, NFData)
+
+data ExactArrayType r
+  = EABoolean | EAByte | EAChar | EAShort | EAInt | EALong
+  | EAFloat | EADouble | EARef (Ref r ClassName)
   deriving (Show, Eq, Generic, NFData)
 
 data Invokation
@@ -153,6 +169,7 @@ data CConstant r
   = CNull
 
   | CIntM1
+   -- ^ -1
   | CInt0
   | CInt1
   | CInt2
@@ -195,25 +212,42 @@ data BitOpr
 
 type Offset = Int16
 type LongOffset = Int32
+type LocalAddress = Word16
+type IncrementAmount = Int16
 
-data LocalAddress
-  = LWide Word16
-  | LSingle Word8
-  deriving (Show, Eq, Generic, NFData)
+maxWord8 :: Word16
+maxWord8 = 0xff
 
-data IncrementAmount
-  = IWide Int16
-  | ISingle Int8
-  deriving (Show, Eq, Generic, NFData)
+maxInt8 :: Int16
+maxInt8 = 0x7f
 
 data CmpOpr
   = CEq | CNe | CLt | CGe | CGt | CLe
   deriving (Show, Eq, Generic, NFData)
 
+data CastOpr
+  = CastDown SmallArithmeticType
+  -- ^ Cast from Int to a smaller type
+  | CastTo ArithmeticType ArithmeticType
+  -- ^ Cast from any to any arithmetic type. Cannot be the same type.
+  deriving (Show, Eq, Generic, NFData)
+
+
+data SwitchTable = SwitchTable
+  { switchLow :: Int32
+  , switchOffsets :: V.Vector (LongOffset)
+  } deriving (Show, Eq, Generic, NFData)
+
+switchHigh :: SwitchTable -> Int32
+switchHigh st =
+  len - 1 + switchLow st
+  where
+    len = fromIntegral . V.length $ switchOffsets st
+
 data ByteCodeOpr r
-  = ArrayLoad (ArrayType ())
+  = ArrayLoad ArrayType
   -- ^ aaload baload ...
-  | ArrayStore (ArrayType ())
+  | ArrayStore ArrayType
   -- ^ aastore bastore ...
 
   | Push (CConstant r)
@@ -234,10 +268,7 @@ data ByteCodeOpr r
   | IncrLocal !LocalAddress !IncrementAmount
   -- ^ Only works on ints, increment local #1, with #2
 
-  | Cast ArithmeticType ArithmeticType
-  -- ^ Only valid on different types
-
-  | CastDown SmallArithmeticType
+  | Cast CastOpr
   -- ^ Only valid on different types
 
   | CompareLongs
@@ -258,9 +289,8 @@ data ByteCodeOpr r
   | Jsr LongOffset
   | Ret LocalAddress
 
-  | TableSwitch Int32 Int32 Int32 (V.Vector Int32)
-  -- ^ a table switch has 3 values `default` `low` `high` and a list of
-  -- offets.
+  | TableSwitch Int32 SwitchTable
+  -- ^ a table switch has 2 values a `default` and a `SwitchTable`
   | LookupSwitch Int32 (V.Vector (Int32, Int32))
   -- ^ a lookup switch has a `default` value and a list of pairs.
 
@@ -270,7 +300,8 @@ data ByteCodeOpr r
   | Invoke Invokation (Ref r (InClass MethodId r))
 
   | New (Ref r ClassName)
-  | NewArray (ArrayType (Ref r ClassName))
+
+  | NewArray (ExactArrayType r)
 
   | ArrayLength
 
@@ -282,8 +313,10 @@ data ByteCodeOpr r
   | Monitor Bool
   -- ^ True => Enter, False => Exit
 
+  -- TODO: Fix this so that its more clear what it points to.
   | MultiNewArray (Ref r ClassName) Word8
   -- ^ Create a new multi array of #1 and with #2 dimensions
+  -- ^ This might point to an array type.
 
   | Return (Maybe LocalType)
 
@@ -332,82 +365,82 @@ instance Binary (ByteCodeOpr Index) where
       0x13 -> Push . CRef One <$> get
       0x14 -> Push . CRef Two <$> get
 
-      0x15 -> Load LInt . LSingle <$> get
-      0x16 -> Load LLong . LSingle <$> get
-      0x17 -> Load LFloat . LSingle <$> get
-      0x18 -> Load LDouble . LSingle <$> get
-      0x19 -> Load LRef . LSingle <$> get
+      0x15 -> Load LInt . fromIntegral <$> getWord8
+      0x16 -> Load LLong . fromIntegral <$> getWord8
+      0x17 -> Load LFloat . fromIntegral <$> getWord8
+      0x18 -> Load LDouble . fromIntegral <$> getWord8
+      0x19 -> Load LRef . fromIntegral <$> getWord8
 
-      0x1a -> return $ Load LInt (LSingle 0)
-      0x1b -> return $ Load LInt (LSingle 1)
-      0x1c -> return $ Load LInt (LSingle 2)
-      0x1d -> return $ Load LInt (LSingle 3)
+      0x1a -> return $ Load LInt 0
+      0x1b -> return $ Load LInt 1
+      0x1c -> return $ Load LInt 2
+      0x1d -> return $ Load LInt 3
 
-      0x1e -> return $ Load LLong (LSingle 0)
-      0x1f -> return $ Load LLong (LSingle 1)
-      0x20 -> return $ Load LLong (LSingle 2)
-      0x21 -> return $ Load LLong (LSingle 3)
+      0x1e -> return $ Load LLong 0
+      0x1f -> return $ Load LLong 1
+      0x20 -> return $ Load LLong 2
+      0x21 -> return $ Load LLong 3
 
-      0x22 -> return $ Load LFloat (LSingle 0)
-      0x23 -> return $ Load LFloat (LSingle 1)
-      0x24 -> return $ Load LFloat (LSingle 2)
-      0x25 -> return $ Load LFloat (LSingle 3)
+      0x22 -> return $ Load LFloat 0
+      0x23 -> return $ Load LFloat 1
+      0x24 -> return $ Load LFloat 2
+      0x25 -> return $ Load LFloat 3
 
-      0x26 -> return $ Load LDouble (LSingle 0)
-      0x27 -> return $ Load LDouble (LSingle 1)
-      0x28 -> return $ Load LDouble (LSingle 2)
-      0x29 -> return $ Load LDouble (LSingle 3)
+      0x26 -> return $ Load LDouble 0
+      0x27 -> return $ Load LDouble 1
+      0x28 -> return $ Load LDouble 2
+      0x29 -> return $ Load LDouble 3
 
-      0x2a -> return $ Load LRef (LSingle 0)
-      0x2b -> return $ Load LRef (LSingle 1)
-      0x2c -> return $ Load LRef (LSingle 2)
-      0x2d -> return $ Load LRef (LSingle 3)
+      0x2a -> return $ Load LRef 0
+      0x2b -> return $ Load LRef 1
+      0x2c -> return $ Load LRef 2
+      0x2d -> return $ Load LRef 3
 
       0x2e -> return $ ArrayLoad AInt
       0x2f -> return $ ArrayLoad ALong
       0x30 -> return $ ArrayLoad AFloat
       0x31 -> return $ ArrayLoad ADouble
-      0x32 -> return $ ArrayLoad (ARef ())
+      0x32 -> return $ ArrayLoad ARef
       0x33 -> return $ ArrayLoad AByte
       0x34 -> return $ ArrayLoad AChar
       0x35 -> return $ ArrayLoad AShort
 
-      0x36 -> Store LInt . LSingle <$> get
-      0x37 -> Store LLong . LSingle <$> get
-      0x38 -> Store LFloat . LSingle <$> get
-      0x39 -> Store LDouble . LSingle <$> get
-      0x3a -> Store LRef . LSingle <$> get
+      0x36 -> Store LInt . fromIntegral <$> getWord8
+      0x37 -> Store LLong . fromIntegral <$> getWord8
+      0x38 -> Store LFloat . fromIntegral <$> getWord8
+      0x39 -> Store LDouble . fromIntegral <$> getWord8
+      0x3a -> Store LRef . fromIntegral <$> getWord8
 
-      0x3b -> return $ Store LInt (LSingle 0)
-      0x3c -> return $ Store LInt (LSingle 1)
-      0x3d -> return $ Store LInt (LSingle 2)
-      0x3e -> return $ Store LInt (LSingle 3)
+      0x3b -> return $ Store LInt 0
+      0x3c -> return $ Store LInt 1
+      0x3d -> return $ Store LInt 2
+      0x3e -> return $ Store LInt 3
 
-      0x3f -> return $ Store LLong (LSingle 0)
-      0x40 -> return $ Store LLong (LSingle 1)
-      0x41 -> return $ Store LLong (LSingle 2)
-      0x42 -> return $ Store LLong (LSingle 3)
+      0x3f -> return $ Store LLong 0
+      0x40 -> return $ Store LLong 1
+      0x41 -> return $ Store LLong 2
+      0x42 -> return $ Store LLong 3
 
-      0x43 -> return $ Store LFloat (LSingle 0)
-      0x44 -> return $ Store LFloat (LSingle 1)
-      0x45 -> return $ Store LFloat (LSingle 2)
-      0x46 -> return $ Store LFloat (LSingle 3)
+      0x43 -> return $ Store LFloat 0
+      0x44 -> return $ Store LFloat 1
+      0x45 -> return $ Store LFloat 2
+      0x46 -> return $ Store LFloat 3
 
-      0x47 -> return $ Store LDouble (LSingle 0)
-      0x48 -> return $ Store LDouble (LSingle 1)
-      0x49 -> return $ Store LDouble (LSingle 2)
-      0x4a -> return $ Store LDouble (LSingle 3)
+      0x47 -> return $ Store LDouble 0
+      0x48 -> return $ Store LDouble 1
+      0x49 -> return $ Store LDouble 2
+      0x4a -> return $ Store LDouble 3
 
-      0x4b -> return $ Store LRef (LSingle 0)
-      0x4c -> return $ Store LRef (LSingle 1)
-      0x4d -> return $ Store LRef (LSingle 2)
-      0x4e -> return $ Store LRef (LSingle 3)
+      0x4b -> return $ Store LRef 0
+      0x4c -> return $ Store LRef 1
+      0x4d -> return $ Store LRef 2
+      0x4e -> return $ Store LRef 3
 
       0x4f -> return $ ArrayStore AInt
       0x50 -> return $ ArrayStore ALong
       0x51 -> return $ ArrayStore AFloat
       0x52 -> return $ ArrayStore ADouble
-      0x53 -> return $ ArrayStore (ARef ())
+      0x53 -> return $ ArrayStore ARef 
       0x54 -> return $ ArrayStore AByte
       0x55 -> return $ ArrayStore AChar
       0x56 -> return $ ArrayStore AShort
@@ -470,27 +503,27 @@ instance Binary (ByteCodeOpr Index) where
       0x82 -> return $ BitOpr XOr One
       0x83 -> return $ BitOpr XOr Two
 
-      0x84 -> IncrLocal <$> (LSingle <$> get) <*> (ISingle <$> get)
+      0x84 -> IncrLocal <$> (fromIntegral <$> getWord8) <*> (fromIntegral <$> getInt8)
 
-      0x85 -> return $ Cast MInt MLong
-      0x86 -> return $ Cast MInt MFloat
-      0x87 -> return $ Cast MInt MDouble
+      0x85 -> return $ Cast (CastTo MInt MLong)
+      0x86 -> return $ Cast (CastTo MInt MFloat)
+      0x87 -> return $ Cast (CastTo MInt MDouble)
 
-      0x88 -> return $ Cast MLong MInt
-      0x89 -> return $ Cast MLong MFloat
-      0x8a -> return $ Cast MLong MDouble
+      0x88 -> return $ Cast (CastTo MLong MInt)
+      0x89 -> return $ Cast (CastTo MLong MFloat)
+      0x8a -> return $ Cast (CastTo MLong MDouble)
 
-      0x8b -> return $ Cast MFloat MInt
-      0x8c -> return $ Cast MFloat MLong
-      0x8d -> return $ Cast MFloat MDouble
+      0x8b -> return $ Cast (CastTo MFloat MInt)
+      0x8c -> return $ Cast (CastTo MFloat MLong)
+      0x8d -> return $ Cast (CastTo MFloat MDouble)
 
-      0x8e -> return $ Cast MDouble MInt
-      0x8f -> return $ Cast MDouble MLong
-      0x90 -> return $ Cast MDouble MFloat
+      0x8e -> return $ Cast (CastTo MDouble MInt)
+      0x8f -> return $ Cast (CastTo MDouble MLong)
+      0x90 -> return $ Cast (CastTo MDouble MFloat)
 
-      0x91 -> return $ CastDown MByte
-      0x92 -> return $ CastDown MChar
-      0x93 -> return $ CastDown MShort
+      0x91 -> return $ Cast (CastDown MByte)
+      0x92 -> return $ Cast (CastDown MChar)
+      0x93 -> return $ Cast (CastDown MShort)
 
       0x94 -> return $ CompareLongs
 
@@ -519,7 +552,8 @@ instance Binary (ByteCodeOpr Index) where
 
       0xa7 -> Goto . fromIntegral <$> getInt16be
       0xa8 -> Jsr . fromIntegral <$> getInt16be
-      0xa9 -> Ret . LSingle <$> get
+
+      0xa9 -> Ret . fromIntegral <$> getWord8
 
       0xaa -> do
         offset' <- bytesRead
@@ -529,7 +563,7 @@ instance Binary (ByteCodeOpr Index) where
         low <- getInt32be
         high <- getInt32be
         table <- V.replicateM (fromIntegral $ high - low + 1) getInt32be
-        return $ TableSwitch dft low high table
+        return $ TableSwitch dft (SwitchTable low table)
 
       0xab -> do
         offset' <- bytesRead
@@ -575,17 +609,17 @@ instance Binary (ByteCodeOpr Index) where
       0xbc -> do
         x <- getWord8
         NewArray <$> case x of
-          4  -> return ABoolean
-          5  -> return AChar
-          6  -> return AFloat
-          7  -> return ADouble
-          8  -> return AByte
-          9  -> return AShort
-          10 -> return AInt
-          11 -> return ALong
+          4  -> return EABoolean
+          5  -> return EAChar
+          6  -> return EAFloat
+          7  -> return EADouble
+          8  -> return EAByte
+          9  -> return EAShort
+          10 -> return EAInt
+          11 -> return EALong
           _  -> fail $ "Unknown type '0x" ++ showHex x "'."
 
-      0xbd -> NewArray . ARef <$> get
+      0xbd -> NewArray . EARef <$> get
 
       0xbe -> return ArrayLength
 
@@ -600,24 +634,23 @@ instance Binary (ByteCodeOpr Index) where
       0xc4 -> do
         subopcode <- getWord8
         case subopcode of
-          0x15 -> Load LInt . LWide <$> get
-          0x16 -> Load LLong . LWide <$> get
-          0x17 -> Load LFloat . LWide <$> get
-          0x18 -> Load LDouble . LWide <$> get
-          0x19 -> Load LRef . LWide <$> get
+          0x15 -> Load LInt <$> get
+          0x16 -> Load LLong <$> get
+          0x17 -> Load LFloat <$> get
+          0x18 -> Load LDouble <$> get
+          0x19 -> Load LRef <$> get
 
-          0x36 -> Store LInt . LWide <$> get
-          0x37 -> Store LLong . LWide <$> get
-          0x38 -> Store LFloat . LWide <$> get
-          0x39 -> Store LDouble . LWide <$> get
-          0x3a -> Store LRef . LWide <$> get
+          0x36 -> Store LInt <$> get
+          0x37 -> Store LLong <$> get
+          0x38 -> Store LFloat <$> get
+          0x39 -> Store LDouble <$> get
+          0x3a -> Store LRef <$> get
 
-          0x84 -> IncrLocal <$> (LWide <$> get)
-                            <*> (IWide <$> get)
+          0x84 -> IncrLocal <$> get <*> get
 
-          0xa9 -> Ret . LWide <$> get
+          0xa9 -> Ret <$> get
 
-          _ -> fail $ "Wide does not work for opcode 'Ox"
+          _ -> fail $ "Wide does not work for opcode '0x"
                 ++ showHex subopcode "'"
 
       0xc5 -> MultiNewArray <$> get <*> get
@@ -661,76 +694,149 @@ instance Binary (ByteCodeOpr Index) where
       Push (CRef One r) -> putWord8 0x13 >> put r
       Push (CRef Two r) -> putWord8 0x14 >> put r
 
-      Load LInt (LSingle 0) -> putWord8 0x1a
-      Load LInt (LSingle 1) -> putWord8 0x1b
-      Load LInt (LSingle 2) -> putWord8 0x1c
-      Load LInt (LSingle 3) -> putWord8 0x1d
+      -- 0x15 -> Load LInt . fromIntegral <$> getWord8
+      -- 0x16 -> Load LLong . fromIntegral <$> getWord8
+      -- 0x17 -> Load LFloat . fromIntegral <$> getWord8
+      -- 0x18 -> Load LDouble . fromIntegral <$> getWord8
+      -- 0x19 -> Load LRef . fromIntegral <$> getWord8
 
-      Load LLong (LSingle 0) -> putWord8 0x1e
-      Load LLong (LSingle 1) -> putWord8 0x1f
-      Load LLong (LSingle 2) -> putWord8 0x20
-      Load LLong (LSingle 3) -> putWord8 0x21
+      Load tp vl ->
+        case tp of
+          LInt ->
+            case vl of
+              0 -> putWord8 0x1a
+              1 -> putWord8 0x1b
+              2 -> putWord8 0x1c
+              3 -> putWord8 0x1d
+              a | a <= maxWord8 -> do
+                  putWord8 0x15
+                  putWord8 (fromIntegral a)
+              a -> do
+                putWord8 0xc4 >> putWord8 0x15 >> put a
+          LLong ->
+            case vl of
+              0 -> putWord8 0x1e
+              1 -> putWord8 0x1f
+              2 -> putWord8 0x20
+              3 -> putWord8 0x21
+              a | a <= maxWord8 -> do
+                  putWord8 0x16
+                  putWord8 (fromIntegral a)
+              a -> do
+                putWord8 0xc4 >> putWord8 0x16 >> put a
+          LFloat ->
+            case vl of
+              0 -> putWord8 0x22
+              1 -> putWord8 0x23
+              2 -> putWord8 0x24
+              3 -> putWord8 0x25
+              a | a <= maxWord8 -> do
+                  putWord8 0x17
+                  putWord8 (fromIntegral a)
+              a -> do
+                putWord8 0xc4 >> putWord8 0x17 >> put a
+          LDouble ->
+            case vl of
+              0 -> putWord8 0x26
+              1 -> putWord8 0x27
+              2 -> putWord8 0x28
+              3 -> putWord8 0x29
+              a | a <= maxWord8 -> do
+                  putWord8 0x18
+                  putWord8 (fromIntegral a)
+              a -> do
+                putWord8 0xc4 >> putWord8 0x18 >> put a
+          LRef ->
+            case vl of
+              0 -> putWord8 0x2a
+              1 -> putWord8 0x2b
+              2 -> putWord8 0x2c
+              3 -> putWord8 0x2d
+              a | a <= maxWord8 -> do
+                  putWord8 0x19
+                  putWord8 (fromIntegral a)
+              a -> do
+                putWord8 0xc4 >> putWord8 0x19 >> put a
 
-      Load LFloat (LSingle 0) -> putWord8 0x22
-      Load LFloat (LSingle 1) -> putWord8 0x23
-      Load LFloat (LSingle 2) -> putWord8 0x24
-      Load LFloat (LSingle 3) -> putWord8 0x25
 
-      Load LDouble (LSingle 0) -> putWord8 0x26
-      Load LDouble (LSingle 1) -> putWord8 0x27
-      Load LDouble (LSingle 2) -> putWord8 0x28
-      Load LDouble (LSingle 3) -> putWord8 0x29
+      ArrayLoad t ->
+        case t of
+          AInt -> putWord8 0x2e
+          ALong -> putWord8 0x2f
+          AFloat -> putWord8 0x30
+          ADouble -> putWord8 0x31
+          ARef -> putWord8 0x32
+          AByte -> putWord8 0x33
+          AChar -> putWord8 0x34
+          AShort -> putWord8 0x35
 
-      Load LRef (LSingle 0) -> putWord8 0x2a
-      Load LRef (LSingle 1) -> putWord8 0x2b
-      Load LRef (LSingle 2) -> putWord8 0x2c
-      Load LRef (LSingle 3) -> putWord8 0x2d
+      Store tp vl ->
+        case tp of
+          LInt ->
+            case vl of
+              0 -> putWord8 0x3b
+              1 -> putWord8 0x3c
+              2 -> putWord8 0x3d
+              3 -> putWord8 0x3e
+              a | a <= maxWord8 -> do
+                  putWord8 0x36
+                  putWord8 (fromIntegral a)
+              a -> do
+                putWord8 0xc4 >> putWord8 0x36 >> put a
 
-      ArrayLoad AInt -> putWord8 0x2e
-      ArrayLoad ALong -> putWord8 0x2f
-      ArrayLoad AFloat -> putWord8 0x30
-      ArrayLoad ADouble -> putWord8 0x31
-      ArrayLoad (ARef ()) -> putWord8 0x32
-      ArrayLoad AByte -> putWord8 0x33
-      ArrayLoad AChar -> putWord8 0x34
-      ArrayLoad AShort -> putWord8 0x35
+          LLong ->
+            case vl of
+              0 -> putWord8 0x3f
+              1 -> putWord8 0x40
+              2 -> putWord8 0x41
+              3 -> putWord8 0x42
+              a | a <= maxWord8 -> do
+                  putWord8 0x37
+                  putWord8 (fromIntegral a)
+              a -> do
+                putWord8 0xc4 >> putWord8 0x37 >> put a
 
-      Store LInt (LSingle 0) -> putWord8 0x3b
-      Store LInt (LSingle 1) -> putWord8 0x3c
-      Store LInt (LSingle 2) -> putWord8 0x3d
-      Store LInt (LSingle 3) -> putWord8 0x3e
+          LFloat ->
+            case vl of
+              0 -> putWord8 0x43
+              1 -> putWord8 0x44
+              2 -> putWord8 0x45
+              3 -> putWord8 0x46
+              a | a <= maxWord8 -> do
+                  putWord8 0x38
+                  putWord8 (fromIntegral a)
+              a -> do
+                putWord8 0xc4 >> putWord8 0x38 >> put a
 
-      Store LLong (LSingle 0) -> putWord8 0x3f
-      Store LLong (LSingle 1) -> putWord8 0x40
-      Store LLong (LSingle 2) -> putWord8 0x41
-      Store LLong (LSingle 3) -> putWord8 0x42
+          LDouble ->
+            case vl of
+              0 -> putWord8 0x47
+              1 -> putWord8 0x48
+              2 -> putWord8 0x49
+              3 -> putWord8 0x4a
+              a | a <= maxWord8 -> do
+                  putWord8 0x39
+                  putWord8 (fromIntegral a)
+              a -> do
+                putWord8 0xc4 >> putWord8 0x39 >> put a
 
-      Store LFloat (LSingle 0) -> putWord8 0x43
-      Store LFloat (LSingle 1) -> putWord8 0x44
-      Store LFloat (LSingle 2) -> putWord8 0x45
-      Store LFloat (LSingle 3) -> putWord8 0x46
-
-      Store LDouble (LSingle 0) -> putWord8 0x47
-      Store LDouble (LSingle 1) -> putWord8 0x48
-      Store LDouble (LSingle 2) -> putWord8 0x49
-      Store LDouble (LSingle 3) -> putWord8 0x4a
-
-      Store LRef (LSingle 0) -> putWord8 0x4b
-      Store LRef (LSingle 1) -> putWord8 0x4c
-      Store LRef (LSingle 2) -> putWord8 0x4d
-      Store LRef (LSingle 3) -> putWord8 0x4e
-
-      Store LInt (LSingle a) -> putInt8 0x36 >> put a
-      Store LLong  (LSingle a) -> putInt8 0x37 >> put a
-      Store LFloat (LSingle a) -> putInt8 0x38 >> put a
-      Store LDouble (LSingle a) -> putInt8 0x39 >> put a
-      Store LRef (LSingle a) -> putInt8 0x3a >> put a
+          LRef ->
+            case vl of
+              0 -> putWord8 0x4b
+              1 -> putWord8 0x4c
+              2 -> putWord8 0x4d
+              3 -> putWord8 0x4e
+              a | a <= maxWord8 -> do
+                  putWord8 0x3a
+                  putWord8 (fromIntegral a)
+              a -> do
+                putWord8 0xc4 >> putWord8 0x3a >> put a
 
       ArrayStore AInt -> putWord8 0x4f
       ArrayStore ALong -> putWord8 0x50
       ArrayStore AFloat -> putWord8 0x51
       ArrayStore ADouble -> putWord8 0x52
-      ArrayStore (ARef ()) -> putWord8 0x53
+      ArrayStore ARef -> putWord8 0x53
       ArrayStore AByte -> putWord8 0x54
       ArrayStore AChar -> putWord8 0x55
       ArrayStore AShort -> putWord8 0x56
@@ -793,28 +899,35 @@ instance Binary (ByteCodeOpr Index) where
       BitOpr XOr One -> putWord8 0x82
       BitOpr XOr Two -> putWord8 0x83
 
-      IncrLocal (LSingle s1) (ISingle s2) ->
-        putWord8 0x84 >> put s1 >> put s2
+      IncrLocal s1 s2 ->
+        if s1 > maxWord8 || abs s2 > maxInt8 then
+          putWord8 0xc4 >> putWord8 0x84 >> put s1 >> put s2
+        else
+          putWord8 0x84 >> putWord8 (fromIntegral s1) >> putInt8 (fromIntegral s2)
 
-      Cast MInt MLong -> putWord8 0x85
-      Cast MInt MFloat -> putWord8 0x86
-      Cast MInt MDouble -> putWord8 0x87
+      Cast a ->
+        case a of
+          CastTo MInt MLong -> putWord8 0x85
+          CastTo MInt MFloat -> putWord8 0x86
+          CastTo MInt MDouble -> putWord8 0x87
 
-      Cast MLong MInt -> putWord8 0x88
-      Cast MLong MFloat -> putWord8 0x89
-      Cast MLong MDouble -> putWord8 0x8a
+          CastTo MLong MInt -> putWord8 0x88
+          CastTo MLong MFloat -> putWord8 0x89
+          CastTo MLong MDouble -> putWord8 0x8a
 
-      Cast MFloat MInt -> putWord8 0x8b
-      Cast MFloat MLong -> putWord8 0x8c
-      Cast MFloat MDouble -> putWord8 0x8d
+          CastTo MFloat MInt -> putWord8 0x8b
+          CastTo MFloat MLong -> putWord8 0x8c
+          CastTo MFloat MDouble -> putWord8 0x8d
 
-      Cast MDouble MInt -> putWord8 0x8e
-      Cast MDouble MLong -> putWord8 0x8f
-      Cast MDouble MFloat -> putWord8 0x90
+          CastTo MDouble MInt -> putWord8 0x8e
+          CastTo MDouble MLong -> putWord8 0x8f
+          CastTo MDouble MFloat -> putWord8 0x90
 
-      CastDown MByte -> putWord8 0x91
-      CastDown MChar -> putWord8 0x92
-      CastDown MShort -> putWord8 0x93
+          CastDown MByte -> putWord8 0x91
+          CastDown MChar -> putWord8 0x92
+          CastDown MShort -> putWord8 0x93
+
+          _ -> error $ "Cannot cast from " ++ show a ++ " to " ++ show a ++ "."
 
       CompareLongs -> putWord8 0x94
 
@@ -841,29 +954,45 @@ instance Binary (ByteCodeOpr Index) where
       IfRef True Two a -> putWord8 0xa5 >> put a
       IfRef False Two a -> putWord8 0xa6 >> put a
 
-      Goto a -> putWord8 0xa7 >> putInt32be a
-      Jsr a -> putWord8 0xa8 >> putInt32be a
+      Goto a -> do
+        if (abs a) < (2 :: Int32) ^ (15 :: Int32) then do
+          putWord8 0xa7
+          putInt16be (fromIntegral a)
+        else do
+          putWord8 0xc8
+          putInt32be a
+      Jsr a ->
+        if (abs a) < (2 :: Int32) ^ (15 :: Int32) then do
+          putWord8 0xa8
+          putInt16be (fromIntegral a)
+        else do
+          putWord8 0xc9
+          putInt32be a
 
-      -- Goto a -> putWord8 0xc8 >> putInt32be a
-      -- Jsr a -> putWord8 0xc9 >> putInt32be a
+      Ret a ->
+        -- Check if correct size
+        if a <= maxWord8
+        then do
+          putWord8 0xa9
+          putWord8 (fromIntegral a)
+        else do
+          putWord8 0xc4 >> putWord8 0xa9 >> put a
 
-      Ret (LSingle a) -> putWord8 0xa9 >> putWord8 a
+      TableSwitch dft table -> do
+        putWord8 0xaa
+        -- missing pad
+        putWord8 0 >> putWord8 0 >> putWord8 0
+        putInt32be dft
+        putInt32be (switchLow table)
+        putInt32be (switchHigh table)
+        V.mapM_ putInt32be (switchOffsets table)
 
-      -- TableSwitch dft low high table -> do
-      --   putWord8 0xaa
-      --   putInt32be dft
-      --   putInt32be low
-      --   putInt32be high
-      --   V.mapM_ putInt32be table
-      -- 0xaa -> do
-      --   offset' <- bytesRead
-      --   let skipAmount = (4 - offset' `mod` 4) `mod` 4
-      --   if skipAmount > 0 then skip $ fromIntegral skipAmount else return ()
-      --   dft <- getInt32be
-      --   low <- getInt32be
-      --   high <- getInt32be
-      --   table <- V.replicateM (fromIntegral $ high - low + 1) getInt32be
-      --   return $ TableSwitch dft low high table
+      LookupSwitch dft pairs -> do
+        putWord8 0xab
+        putWord8 0 >> putWord8 0 >> putWord8 0
+        putInt32be dft
+        putInt32be . fromIntegral $ V.length pairs
+        V.mapM_ put pairs
 
       -- 0xab -> do
       --   offset' <- bytesRead
@@ -895,15 +1024,15 @@ instance Binary (ByteCodeOpr Index) where
       New a -> putWord8 0xbb >> put a
       NewArray x -> do
         case x of
-          ABoolean -> putWord8 0xbc >> putWord8 4
-          AChar -> putWord8 0xbc >> putWord8 5
-          AFloat -> putWord8 0xbc >> putWord8 6
-          ADouble -> putWord8 0xbc >> putWord8 7
-          AByte -> putWord8 0xbc >> putWord8 8
-          AShort -> putWord8 0xbc >> putWord8 9
-          AInt -> putWord8 0xbc >> putWord8 10
-          ALong -> putWord8 0xbc >> putWord8 11
-          ARef a -> putWord8 0xbd >> put a
+          EABoolean -> putWord8 0xbc >> putWord8 4
+          EAChar    -> putWord8 0xbc >> putWord8 5
+          EAFloat   -> putWord8 0xbc >> putWord8 6
+          EADouble  -> putWord8 0xbc >> putWord8 7
+          EAByte    -> putWord8 0xbc >> putWord8 8
+          EAShort   -> putWord8 0xbc >> putWord8 9
+          EAInt     -> putWord8 0xbc >> putWord8 10
+          EALong    -> putWord8 0xbc >> putWord8 11
+          EARef a   -> putWord8 0xbd >> put a
       ArrayLength -> putWord8 0xbe
       Throw -> putWord8 0xbf
 
@@ -913,37 +1042,13 @@ instance Binary (ByteCodeOpr Index) where
       Monitor True -> putWord8 0xc2
       Monitor False -> putWord8 0xc3
 
-      Load LInt ( LWide a ) ->
-        putWord8 0xc4 >> putWord8 0x15 >> put a
-      Load LLong ( LWide a ) ->
-        putWord8 0xc4 >> putWord8 0x16 >> put a
-      Load LFloat ( LWide a ) ->
-        putWord8 0xc4 >> putWord8 0x17 >> put a
-      Load LDouble ( LWide a ) ->
-        putWord8 0xc4 >> putWord8 0x18 >> put a
-      Load LRef ( LWide a ) ->
-        putWord8 0xc4 >> putWord8 0x19 >> put a
-      Store LInt ( LWide a ) ->
-        putWord8 0xc4 >> putWord8 0x36 >> put a
-      Store LLong ( LWide a ) ->
-        putWord8 0xc4 >> putWord8 0x37 >> put a
-      Store LFloat ( LWide a ) ->
-        putWord8 0xc4 >> putWord8 0x38 >> put a
-      Store LDouble ( LWide a ) ->
-        putWord8 0xc4 >> putWord8 0x39 >> put a
-      Store LRef ( LWide a ) ->
-        putWord8 0xc4 >> putWord8 0x3a >> put a
-      IncrLocal (LWide a) (IWide b) ->
-        putWord8 0xc4 >> putWord8 0x84 >> put a >> put b
-      Ret (LWide a) ->
-        putWord8 0xc4 >> putWord8 0xa9 >> put a
 
       MultiNewArray a b -> putWord8 0xc5 >> put a >> put b
 
       IfRef False One a -> putWord8 0xc6 >> put a
       IfRef True One a -> putWord8 0xc7 >> put a
 
-      _ -> P.fail $ "Is not able to print '" ++ show bc ++ "' yet."
+      -- _ -> P.fail $ "Is not able to print '" ++ show bc ++ "' yet."
 
 $(deriveBaseB ''Index ''Code)
 $(deriveBase ''ByteCode)
