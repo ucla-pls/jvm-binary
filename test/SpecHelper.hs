@@ -21,6 +21,7 @@ import System.Directory
 import Control.Monad
 import Data.Binary
 import Data.Bits
+import qualified Data.List as List
 
 blReadFile :: FilePath -> IO BL.ByteString
 blReadFile = BL.readFile
@@ -52,7 +53,7 @@ testSomeFiles spec =
 isoBinary :: (Binary a, Eq a, Show a) => a -> Property
 isoBinary a =
   let bs = encode a
-  in counterexample (concat . map toHex $ BL.unpack bs) $
+  in counterexample (List.intercalate " " (group 8 . concat . map toHex $ BL.unpack bs)) $
       decode bs === a
 
 folderContents :: FilePath -> IO [ FilePath ]
@@ -66,3 +67,9 @@ recursiveContents fp = do
     content <- folderContents fp
     concat <$> mapM recursiveContents content
   else return []
+
+group :: Int -> [a] -> [[a]]
+group _ [] = []
+group n l
+  | n > 0 = (take n l) : (group n (drop n l))
+  | otherwise = error "Negative n"
