@@ -62,6 +62,8 @@ module Language.JVM.Constant
 
   ) where
 
+-- TODO: Data.Binary.IEEE754?
+
 import           Prelude            hiding (fail, lookup)
 import           Numeric (showHex)
 -- import           Control.Monad.Fail (fail)

@@ -59,6 +59,15 @@ mName = valueF mNameIndex
 mDescriptor :: (WithValue r) => Method r -> MethodDescriptor
 mDescriptor = valueF mDescriptorIndex
 
+-- mCode :: (WithValue r) => Method r -> Maybe (Code r)
+-- mCode = . choseValue . mAttributes'
+
+data MethodAttributes r = MethodAttributes
+  { maCode :: Maybe (Code r)
+  , maExceptions :: Maybe (Exceptions r)
+  , maAttributes :: [Attribute r]
+  }
+
 -- -- | Fetch the 'Code' attribute, if any.
 -- -- There can only be one code attribute in a method.
 -- mCode :: Method -> PoolAccess (Maybe (Either String Code))
