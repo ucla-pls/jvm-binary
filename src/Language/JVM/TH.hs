@@ -11,17 +11,20 @@ module Language.JVM.TH
   , deriveEq1
 
   , Eq1
+  , Eq2
   , Show1
+  , Show2
   , Generic
   , Generic1
   , NFData
   , NFData1
+  , NFData2
   ) where
 
 import Language.Haskell.TH
-import Data.Functor.Classes (Eq1, Show1)
-import GHC.Generics (Generic, Generic1)
-import Control.DeepSeq (NFData, NFData1)
+import Data.Functor.Classes (Eq1, Show1, Eq2, Show2)
+import GHC.Generics
+import Control.DeepSeq (NFData, NFData1, NFData2)
 
 import Data.Binary
 import           Text.Show.Deriving
@@ -31,15 +34,15 @@ import           Data.Eq.Deriving
 -- from something that is 'Staged'
 deriveBase :: Name -> Q [Dec]
 deriveBase name = do
-  m1 <- [d|deriving instance Show1 r => Show ($n r)|]
-  m2 <- [d|deriving instance Eq1 r => Eq ($n r)|]
-  m3 <- [d|deriving instance Generic1 r => Generic ($n r)|]
-  m4 <- [d|deriving instance (NFData1 r, Generic1 r) => NFData ($n r)|]
+  m1 <- [d|deriving instance Show2 r => Show ($n r)|]
+  m2 <- [d|deriving instance Eq2 r => Eq ($n r)|]
+  m3 <- [d|deriving instance Generic ($n r)|]
+  m4 <- [d|deriving instance NFData2 r => NFData ($n r)|]
   return (m1 ++ m2 ++ m3 ++ m4)
   where n = conT name
 
--- | Derives the 'NFData', 'Show', 'Eq', and 'Generic'
--- from something that is 'Staged'
+-- | Derives the 'NFData', 'Show', 'Eq', and 'Generic' from something that is
+-- 'Staged'
 deriveBaseB :: Name -> Name -> Q [Dec]
 deriveBaseB tp name = do
   b <- deriveBase name

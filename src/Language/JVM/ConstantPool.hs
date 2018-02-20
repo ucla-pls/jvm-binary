@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveFunctor #-}
 -- {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -126,40 +127,39 @@ class Stage s where
   -- sderef = undefined
 
   smapM :: (Monad m) => (a -> m a') -> Ref s a -> m (Ref s a')
-  restage :: (Monad m, Stage s', Staged g) => Stager m s' s -> s (g s') -> m (s (g s))
+  restage :: (Monad m, Stage s', Staged g) => Stager m s' s -> Ref s (g s') -> m (Ref s (g s))
   deepreref ::
     (Monad m, Stage s', Staged g, Referenceable (g s), Referenceable (g s'))
     => Stager m s' s
     -> Ref s' (g s')
     -> m (Ref s (g s))
   deepreref f r = do
-    r' <- restage f . unref =<< f r
-    return $ Ref r'
+    restage f =<< f r
 
 instance Stage Index where
-  restage _ (Index w) = pure $ (Index w)
+  restage _ (Ref (Index w)) = pure $ (Ref $ Index w)
   smapM _ (Ref (Index w)) = return $ Ref (Index w)
   asValue s = Left s
-  fromDeref (Ref (Deref w _)) = return $ (Ref (Index w))
+  fromDeref (Ref (Deref (w, _))) = return $ (Ref (Index w))
 
 instance Stage Deref where
-  restage f (Deref w v) =
-    Deref w <$> stage f v
+  restage f (Ref (Deref (w,v))) =
+    Ref . Deref . (w,) <$> stage f v
   asValue = Right . getValue
-  smapM f (Ref (Deref w v)) = do
+  smapM f (Ref (Deref (w,v))) = do
     x <- f v
-    return $ Ref (Deref w x)
-  fromDeref (Ref (Deref w v)) =
-    return $ Ref (Deref w v)
+    return $ Ref (Deref (w,x))
+  fromDeref (Ref (Deref (w,x))) =
+    return $ Ref (Deref (w,x))
 
 instance Stage Value where
-  restage f (Value v) =
-    Value <$> stage f v
+  restage f (Ref (Value v)) =
+    Ref . Value <$> stage f v
   asValue = Right . getValue
   smapM f (Ref (Value v)) = do
     x <- f v
     return $ Ref (Value x)
-  fromDeref (Ref (Deref _ v)) =
+  fromDeref (Ref (Deref (_,v))) =
     return $ Ref (Value v)
 
 class Staged f where
@@ -242,7 +242,7 @@ instance Staged MethodHandleInterface where
   stage f (MethodHandleInterface ref) =
     MethodHandleInterface <$> deepreref f ref
 
-wrongType :: Show1 r => String -> Constant r -> String
+wrongType :: Show2 r => String -> Constant r -> String
 wrongType n c =
   "Expected '" ++ n ++ "', but found'" ++ typeToStr c ++ "'."
 

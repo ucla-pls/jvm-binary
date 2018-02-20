@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-|
 Copyright   : (c) Christian Gram Kalhauge, 2017
 License     : MIT
@@ -27,7 +28,9 @@ module Language.JVM.Constant
   , typeToStr
 
   , Ref (..)
---  , DeepRef 
+--  , DeepRef
+
+  , Choice (..)
 
   , Index (..)
   , idx
@@ -62,8 +65,8 @@ module Language.JVM.Constant
 import           Prelude            hiding (fail, lookup)
 import           Numeric (showHex)
 -- import           Control.Monad.Fail (fail)
-import           Control.DeepSeq (NFData, NFData1, rnf, rnf1)
-import           GHC.Generics (Generic, Generic1)
+import           Control.DeepSeq (NFData, rnf, rnf2)
+import           GHC.Generics (Generic)
 import           Control.Monad.Reader
 import           Data.Binary
 import qualified Data.Text          as Text
@@ -72,41 +75,89 @@ import           Language.JVM.Utils
 import           Language.JVM.Type
 import           Language.JVM.TH
 
-import Data.Functor.Classes (Eq1, Show1, eq1, showsPrec1)
+import Data.Functor.Classes
 
 -- | This wraps a reference type 'r' and an 'Referenceable' 'a', and
 -- make them an instance of 'Generic', 'Show', 'Eq', and 'NFData'
 newtype Ref r a = Ref
-  { unref :: (r a)
+  { unref :: (r Word16 a)
   }
 
-deriving instance (Generic1 r, Generic a) => Generic (Ref r a)
+deriving instance Generic (Ref r a)
 
-instance (Show1 r, Show a) => Show (Ref r a) where
-  showsPrec i = showsPrec1 i . unref
+instance (Show2 r, Show a) => Show (Ref r a) where
+  showsPrec i = showsPrec2 i . unref
 
-instance (Eq1 r, Eq a) => Eq (Ref r a) where
-  (==) a b = eq1 (unref a) (unref b)
+instance (Eq2 r, Eq a) => Eq (Ref r a) where
+  (==) a b = eq2 (unref a) (unref b)
 
-instance (NFData1 r, NFData a) => NFData (Ref r a) where
-  rnf = rnf1 . unref
+instance (NFData2 r, NFData a) => NFData (Ref r a) where
+  rnf = rnf2 . unref
+
+instance (Ord2 r, Ord a) => Ord (Ref r a) where
+  compare a b = compare2 ( unref a) (unref b)
+
+-- | This wraps two arguments between each stage.
+newtype Choice r a b = Choice {choseOne :: (r a b)}
 
 type DeepRef r f = Ref r (f r)
 
 -- | An index into the constant pool
-data Index i = Index {-# UNPACK #-} !Word16
+newtype Index i a = Index i
+
+deriving instance Generic (Index a b)
+
+instance Eq2 Index where
+  liftEq2 f _ (Index a) (Index b) = f a b
+
+instance Ord2 Index where
+  liftCompare2 f _ (Index a) (Index b) = f a b
+
+instance Show2 Index where
+  liftShowsPrec2 f _ _ _ d (Index a) =
+    showsUnaryWith f "Index" d a
+
+instance Eq2 Deref where
+  liftEq2 f g (Deref (a,b)) (Deref (a',b')) =
+    f a a' && g b b'
+
+instance Ord2 Deref where
+  liftCompare2 f g (Deref (a,b)) (Deref (a',b')) =
+    case f a a' of
+      EQ -> g b b'
+      x -> x
+instance Show2 Deref where
+  liftShowsPrec2 f lf g lg d (Deref v) =
+    showString "Deref " . liftShowsPrec2 f lf g lg d v
+
+instance Eq2 Value where
+  liftEq2 _ g (Value a) (Value b) = g a b
+
+instance Ord2 Value where
+  liftCompare2 _ g (Value a) (Value b) = g a b
+
+instance Show2 Value where
+  liftShowsPrec2 _ _ g _ d (Value v) =
+    showsUnaryWith g "Value" d v
+
+-- deriving instance Show2 Index
+-- deriving instance Show2 Deref
+-- deriving instance Show2 Value
+-- deriving instance Show2 Index
+-- deriving instance Show2 Deref
+-- deriving instance Show2 Value
 
 instance Binary (Ref Index a) where
   get = Ref . Index <$> get
   put = put . idx
 
--- | An access into the constant pool, de-referenced.
-data Deref i = Deref {-# UNPACK #-} !Word16 !i
-
-newtype Value a = Value a
-
 idx :: Ref Index a -> Word16
 idx (Ref (Index w)) = w
+
+-- | An access into the constant pool, de-referenced.
+newtype Deref i a = Deref (i, a)
+
+newtype Value i a = Value a
 
 class WithValue r where
   getValue :: Ref r v -> v
@@ -115,7 +166,7 @@ instance WithValue Value where
   getValue (Ref (Value a)) = a
 
 instance WithValue Deref where
-  getValue (Ref (Deref _ a)) = a
+  getValue (Ref (Deref (_, a))) = a
 
 class WithIndex r where
   getIndex :: Ref r v -> Word16
@@ -124,15 +175,13 @@ instance WithIndex Index where
   getIndex (Ref (Index v)) = v
 
 instance WithIndex Deref where
-  getIndex (Ref (Deref v _)) = v
+  getIndex (Ref (Deref (v, _))) = v
 
 -- refIndex :: Reference r => Ref r a -> Word16
 -- refIndex = asWord . unref
 
 valueF :: WithValue r => (b -> Ref r a) -> b -> a
 valueF f = getValue . f
-
-
 
 -- | A constant is a multi word item in the 'ConstantPool'. Each of
 -- the constructors are pretty much self-explanatory from the types.
@@ -155,12 +204,6 @@ data Constant r
 --deriving (Show, Eq, Generic, NFData)
 
 deriving instance Ord (Constant Index)
-deriving instance Eq (Index x)
-deriving instance Ord (Index x)
-deriving instance Eq (InClass x Index)
-deriving instance Ord (InClass x Index)
-deriving instance Eq (Ref Index x)
-deriving instance Ord (Ref Index x)
 
 -- | Anything pointing inside a class
 data InClass a r = InClass
@@ -264,7 +307,7 @@ data InvokeDynamic r = InvokeDynamic
   }
 
 -- | Hack that returns the name of a constant.
-typeToStr :: Show1 r => Constant r -> String
+typeToStr :: Show2 r => Constant r -> String
 typeToStr = head . words . show
 
 instance Binary (Constant Index) where
@@ -316,19 +359,13 @@ constantSize x =
     CLong _   -> 2
     _        -> 1
 
-$(deriveShow1 ''Index)
-$(deriveShow1 ''Deref)
-$(deriveShow1 ''Value)
-$(deriveEq1 ''Index)
-$(deriveEq1 ''Deref)
-$(deriveEq1 ''Value)
+-- deriving instance NFData i => NFData1 (Index i)
+-- deriving instance Generic i => Generic1 (Index i)
+-- deriving instance NFData i => NFData1 (Deref i)
+-- deriving instance Generic i => Generic1 (Deref i)
+-- deriving instance NFData i => NFData1 (Value i)
+-- deriving instance Generic i => Generic1 (Value i)
 
-deriving instance NFData1 Index
-deriving instance Generic1 Index
-deriving instance NFData1 Deref
-deriving instance Generic1 Deref
-deriving instance NFData1 Value
-deriving instance Generic1 Value
 
 $(deriveBase ''Constant)
 $(deriveBaseBO ''Index ''MethodId)

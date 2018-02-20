@@ -94,7 +94,7 @@ deref' :: Stage s => Stager Derefer Index s
 deref' r = do
   c <- fromEither CFEPoolAccessError . access (getIndex r) =<< ask
   a <- fromConst (throwError . CFEConversionError) c
-  fromDeref $ Ref (Deref (getIndex r) a)
+  fromDeref $ Ref (Deref ((getIndex r), a))
 
 
 -- | Untie the constant pool, this requires a special operation as the constant pool
