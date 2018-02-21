@@ -23,12 +23,12 @@ module Language.JVM.Attribute.StackMapTable
   , VerificationTypeInfo (..)
   ) where
 
-
 import           Data.Binary
 import           Numeric
 import           Control.Monad (replicateM)
 
-import           Language.JVM.ConstantPool 
+import           Language.JVM.Constant
+import           Language.JVM.Stage
 import           Language.JVM.Utils
 
 -- | An Exceptions attribute is a list of references into the
@@ -36,8 +36,6 @@ import           Language.JVM.Utils
 data StackMapTable r = StackMapTable
   { stackMapTable :: SizedList16 (StackMapFrame r)
   }
-
-instance Binary (StackMapTable Index) where
 
 -- | A delta offset
 type DeltaOffset = Word8
@@ -58,7 +56,7 @@ data StackMapFrameType r
       (SizedList16 (VerificationTypeInfo r))
       (SizedList16 (VerificationTypeInfo r))
 
-instance Binary (StackMapFrame Index) where
+instance Binary (StackMapFrame Low) where
   get = do
     ft <- getWord8
     let
@@ -143,11 +141,11 @@ data VerificationTypeInfo r
   | VDouble
   | VNull
   | VUninitializedThis
-  | VObject (Ref r ClassName)
+  | VObject (Ref ClassName r)
   | VUninitialized !Word16
 
 
-instance Binary (VerificationTypeInfo Index) where
+instance Binary (VerificationTypeInfo Low) where
   get = do
     tag <- getWord8
     case tag of
@@ -174,7 +172,7 @@ instance Binary (VerificationTypeInfo Index) where
       VObject s -> do putWord8 7; put s
       VUninitialized s -> do putWord8 8; put s
 
-$(deriveBase ''StackMapTable)
+$(deriveBaseWithBinary ''StackMapTable)
 $(deriveBase ''StackMapFrame)
 $(deriveBase ''StackMapFrameType)
 $(deriveBase ''VerificationTypeInfo)

@@ -1,8 +1,8 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell    #-}
 {-|
 Module      : Language.JVM.Attribute.ConstantValue
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -16,15 +16,18 @@ module Language.JVM.Attribute.ConstantValue
   ( ConstantValue (..)
   ) where
 
-import           Language.JVM.ConstantPool
+import           Language.JVM.Constant
+import           Language.JVM.Stage
 
 -- | A constant value is just a index into the constant pool.
 data ConstantValue r = ConstantValue
-  { constantValueIndex :: Ref r (Constant r)
+  { constantValueIndex :: DeepRef Constant r
   }
 
 instance Staged ConstantValue where
-  stage f (ConstantValue r) =
-    ConstantValue <$> deepreref f r
+  evolve (ConstantValue r) =
+    ConstantValue <$> evolve r
+  devolve (ConstantValue r) =
+    ConstantValue <$> devolve r
 
-$(deriveBaseB ''Index ''ConstantValue)
+$(deriveBaseWithBinary ''ConstantValue)

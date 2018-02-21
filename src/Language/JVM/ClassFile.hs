@@ -33,7 +33,9 @@ import           Data.Set
 
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
-import           Language.JVM.ConstantPool
+import           Language.JVM.ConstantPool as CP
+import           Language.JVM.Constant
+import           Language.JVM.Stage
 import           Language.JVM.Field      (Field)
 import           Language.JVM.Method     (Method)
 import           Language.JVM.Utils
@@ -47,14 +49,14 @@ data ClassFile r = ClassFile
   , cMinorVersion       :: !Word16
   , cMajorVersion       :: !Word16
 
-  , cConstantPool       :: !(ConstantPool r)
+  , cConstantPool       :: !(Choice r (ConstantPool r) ())
 
   , cAccessFlags'       :: BitSet16 CAccessFlag
 
-  , cThisClassIndex     :: Ref r ClassName
-  , cSuperClassIndex    :: Ref r ClassName
+  , cThisClassIndex     :: Ref ClassName r
+  , cSuperClassIndex    :: Ref ClassName r
 
-  , cInterfaceIndicies' :: SizedList16 (Ref r ClassName)
+  , cInterfaceIndicies' :: SizedList16 (Ref ClassName r)
   , cFields'            :: SizedList16 (Field r)
   , cMethods'           :: SizedList16 (Method r)
   , cAttributes'        :: SizedList16 (Attribute r)
@@ -65,12 +67,12 @@ cAccessFlags :: ClassFile r -> Set CAccessFlag
 cAccessFlags = toSet . cAccessFlags'
 
 -- | Get a list of 'ConstantRef's to interfaces.
-cInterfaceIndicies :: ClassFile r -> [ Ref r ClassName ]
+cInterfaceIndicies :: ClassFile r -> [ Ref ClassName r ]
 cInterfaceIndicies = unSizedList . cInterfaceIndicies'
 
 -- | Get a list of 'ClassName'
-cInterfaces :: (WithValue r) => ClassFile r -> [ ClassName ]
-cInterfaces = Prelude.map getValue . cInterfaceIndicies
+cInterfaces :: ClassFile High -> [ ClassName ]
+cInterfaces = Prelude.map value . cInterfaceIndicies
 
 -- | Get a list of 'Field's of a ClassFile.
 cFields :: ClassFile r -> [Field r]
@@ -81,11 +83,11 @@ cMethods :: ClassFile r -> [Method r]
 cMethods = unSizedList . cMethods'
 
 -- | Lookup the this class in a ConstantPool
-cThisClass :: (WithValue r) => ClassFile r -> ClassName
+cThisClass :: ClassFile High -> ClassName
 cThisClass = valueF cThisClassIndex
 
 -- | Lookup the super class in the ConstantPool
-cSuperClass :: WithValue r => ClassFile r -> ClassName
+cSuperClass :: ClassFile High -> ClassName
 cSuperClass = valueF cSuperClassIndex
 
 -- | Get a list of 'Attribute's of a ClassFile.
@@ -100,16 +102,32 @@ cAttributes = unSizedList . cAttributes'
 --   fmap firstOne . matching cAttributes'
 
 instance Staged ClassFile where
-  stage f cf = do
-    tci' <- f (cThisClassIndex cf)
-    sci' <- f (cSuperClassIndex cf)
-    cp' <- stage f (cConstantPool cf)
-    cii' <- mapM f $ cInterfaceIndicies' cf
-    cf' <- mapM (stage f) $ cFields' cf
-    cm' <- mapM (stage f) $ cMethods' cf
-    ca' <- mapM (stage f) $ cAttributes' cf
+  evolve cf = do
+    tci' <- evolve (cThisClassIndex cf)
+    sci' <- evolve (cSuperClassIndex cf)
+    cii' <- mapM evolve $ cInterfaceIndicies' cf
+    cf' <- mapM evolve $ cFields' cf
+    cm' <- mapM evolve $ cMethods' cf
+    ca' <- mapM evolve $ cAttributes' cf
     return $ cf
-      { cConstantPool = cp' -- set The Constant Pool to the Botstrapped one
+      { cConstantPool = ()
+      , cThisClassIndex = tci'
+      , cSuperClassIndex = sci'
+      , cInterfaceIndicies' = cii'
+      , cFields'            = cf'
+      , cMethods'           = cm'
+      , cAttributes'        = ca'
+      }
+  devolve cf = do
+    tci' <- devolve (cThisClassIndex cf)
+    sci' <- devolve (cSuperClassIndex cf)
+    cii' <- mapM devolve $ cInterfaceIndicies' cf
+    cf' <- mapM devolve $ cFields' cf
+    cm' <- mapM devolve $ cMethods' cf
+    ca' <- mapM devolve $ cAttributes' cf
+    return $ cf
+      { cConstantPool = CP.empty
+      -- ^ We cannot yet set the constant pool
       , cThisClassIndex = tci'
       , cSuperClassIndex = sci'
       , cInterfaceIndicies' = cii'
@@ -118,4 +136,4 @@ instance Staged ClassFile where
       , cAttributes'        = ca'
       }
 
-$(deriveBaseB ''Index ''ClassFile)
+$(deriveBaseWithBinary ''ClassFile)

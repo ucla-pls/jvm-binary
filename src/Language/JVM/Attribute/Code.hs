@@ -69,7 +69,8 @@ import           Data.Int
 import qualified Data.Vector                 as V
 
 import           Language.JVM.Attribute.Base
-import           Language.JVM.ConstantPool
+import           Language.JVM.Constant
+import           Language.JVM.Stage
 import           Language.JVM.Utils
 
 -- | Code contains the actual byte-code. The 'i' type parameter is added to
@@ -87,7 +88,7 @@ newtype ByteCode i = ByteCode
   { unByteCode :: [ByteCodeInst i]
   }
 
-instance Binary (ByteCode Index) where
+instance Binary (ByteCode Low) where
   get = do
     x <- getWord32be
     bs <- getLazyByteString (fromIntegral x)
@@ -115,7 +116,7 @@ data ExceptionTable i = ExceptionTable
   -- ^ Exclusive program counter into 'code'
   , handler   :: ! Word16
   -- ^ A program counter into 'code' indicating the handler.
-  , catchType :: ! (Ref i ClassName)
+  , catchType :: ! (Ref ClassName i)
   }
 
 data ByteCodeInst i = ByteCodeInst
@@ -123,37 +124,36 @@ data ByteCodeInst i = ByteCodeInst
   , opcode :: ByteCodeOpr i
   }
 
-calculateOffsets :: [ByteCodeOpr Index] -> [ByteCodeInst Index]
+calculateOffsets :: [ByteCodeOpr Low] -> [ByteCodeInst Low]
 calculateOffsets = go 0
   where
     go n (bc:rest) =
       ByteCodeInst n bc : go (byteSize n bc + n) rest
     go _ [] = []
 
-instance Binary (ByteCodeInst Index) where
+instance Binary (ByteCodeInst Low) where
   get =
     ByteCodeInst <$> (fromIntegral <$> bytesRead) <*> get
   put x =
     putByteCode (offset x) $ opcode x
 
 data ArithmeticType = MInt | MLong | MFloat | MDouble
-  deriving (Show, Eq, Enum, Bounded, Generic, NFData)
+  deriving (Show, Ord, Eq, Enum, Bounded, Generic, NFData)
 
 data SmallArithmeticType = MByte | MChar | MShort
-  deriving (Show, Eq, Enum, Bounded, Generic, NFData)
+  deriving (Show, Ord, Eq, Enum, Bounded, Generic, NFData)
 
 data LocalType = LInt | LLong | LFloat | LDouble | LRef
-  deriving (Show, Eq, Enum, Bounded, Generic, NFData)
+  deriving (Show, Ord, Eq, Enum, Bounded, Generic, NFData)
 
 data ArrayType
   = AByte | AChar | AShort | AInt | ALong
   | AFloat | ADouble | ARef
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data ExactArrayType r
   = EABoolean | EAByte | EAChar | EAShort | EAInt | EALong
-  | EAFloat | EADouble | EARef (Ref r ClassName)
-  deriving (Show, Eq, Generic, NFData)
+  | EAFloat | EADouble | EARef (Ref ClassName r)
 
 data Invokation
   = InvkSpecial
@@ -162,12 +162,12 @@ data Invokation
   | InvkInterface Word8
   -- ^ Should be a positive number
   | InvkDynamic
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Ord, Eq, Generic, NFData)
 
 data FieldAccess
   = FldStatic
   | FldField
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Ord, Eq, Generic, NFData)
 
 data OneOrTwo = One | Two
   deriving (Show, Ord, Bounded, Eq, Enum, Generic, NFData)
@@ -199,8 +199,8 @@ data CConstant r
   | CByte Int8
   | CShort Int16
 
-  | CHalfRef (Ref r (Constant r))
-  | CRef WordSize (Ref r (Constant r))
+  | CHalfRef (DeepRef Constant r)
+  | CRef WordSize (DeepRef Constant r)
 
 data BinOpr
   = Add
@@ -208,7 +208,7 @@ data BinOpr
   | Mul
   | Div
   | Rem
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Ord, Eq, Generic, NFData)
 
 data BitOpr
   = ShL
@@ -217,7 +217,7 @@ data BitOpr
   | And
   | Or
   | XOr
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Ord, Eq, Generic, NFData)
 
 type Offset = Int16
 type LongOffset = Int32
@@ -232,20 +232,20 @@ maxInt8 = 0x7f
 
 data CmpOpr
   = CEq | CNe | CLt | CGe | CGt | CLe
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Ord, Eq, Generic, NFData)
 
 data CastOpr
   = CastDown SmallArithmeticType
   -- ^ Cast from Int to a smaller type
   | CastTo ArithmeticType ArithmeticType
   -- ^ Cast from any to any arithmetic type. Cannot be the same type.
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Ord, Eq, Generic, NFData)
 
 
 data SwitchTable = SwitchTable
   { switchLow :: Int32
   , switchOffsets :: V.Vector (LongOffset)
-  } deriving (Show, Eq, Generic, NFData)
+  } deriving (Show, Ord, Eq, Generic, NFData)
 
 switchHigh :: SwitchTable -> Int32
 switchHigh st =
@@ -303,12 +303,12 @@ data ByteCodeOpr r
   | LookupSwitch Int32 (V.Vector (Int32, Int32))
   -- ^ a lookup switch has a `default` value and a list of pairs.
 
-  | Get FieldAccess (Ref r (InClass FieldId r))
-  | Put FieldAccess (Ref r (InClass FieldId r))
+  | Get FieldAccess (DeepRef (InClass FieldId) r)
+  | Put FieldAccess (DeepRef (InClass FieldId) r)
 
-  | Invoke Invokation (Ref r (InClass MethodId r))
+  | Invoke Invokation (DeepRef (InClass MethodId) r)
 
-  | New (Ref r ClassName)
+  | New (Ref ClassName r)
 
   | NewArray (ExactArrayType r)
 
@@ -316,14 +316,14 @@ data ByteCodeOpr r
 
   | Throw
 
-  | CheckCast (Ref r ClassName)
-  | InstanceOf (Ref r ClassName)
+  | CheckCast (Ref ClassName r)
+  | InstanceOf (Ref ClassName r)
 
   | Monitor Bool
   -- ^ True => Enter, False => Exit
 
   -- TODO: Fix this so that its more clear what it points to.
-  | MultiNewArray (Ref r ClassName) Word8
+  | MultiNewArray (Ref ClassName r) Word8
   -- ^ Create a new multi array of #1 and with #2 dimensions
   -- ^ This might point to an array type.
 
@@ -341,11 +341,11 @@ data ByteCodeOpr r
 
 -- deriving (Eq, Generic, NFData)
 
-byteSize :: LongOffset -> ByteCodeOpr Index -> LongOffset
+byteSize :: LongOffset -> ByteCodeOpr Low -> LongOffset
 byteSize n x =
   fromIntegral . BL.length . runPut $ putByteCode n x
-  
-instance Binary (ByteCodeOpr Index) where
+
+instance Binary (ByteCodeOpr Low) where
   get = do
     cmd <- getWord8
     case cmd of
@@ -677,7 +677,7 @@ instance Binary (ByteCodeOpr Index) where
 
   put = putByteCode 0
 
-putByteCode :: LongOffset -> ByteCodeOpr Index -> Put
+putByteCode :: LongOffset -> ByteCodeOpr Low -> Put
 putByteCode n bc =
   case bc of
     Nop -> putWord8 0x00
@@ -1085,9 +1085,10 @@ putByteCode n bc =
     IfRef True One a -> putWord8 0xc7 >> put a
 
 
-$(deriveBaseB ''Index ''Code)
 $(deriveBase ''ByteCode)
-$(deriveBaseB ''Index ''ExceptionTable)
 $(deriveBase ''ByteCodeInst)
-$(deriveBase ''CConstant)
 $(deriveBase ''ByteCodeOpr)
+$(deriveBase ''CConstant)
+$(deriveBase ''ExactArrayType)
+$(deriveBaseWithBinary ''Code)
+$(deriveBaseWithBinary ''ExceptionTable)

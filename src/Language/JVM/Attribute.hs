@@ -94,27 +94,27 @@ readFromStrict =
 -- # Attributes
 
 -- | 'Code' is an Attribute.
-instance IsAttribute (Code Index) where
+instance IsAttribute (Code Low) where
   attrName = Const "Code"
   fromAttribute = readFromStrict
 
 -- | 'ConstantValue' is an Attribute.
-instance IsAttribute (ConstantValue Index) where
+instance IsAttribute (ConstantValue Low) where
   attrName = Const "ConstantValue"
   fromAttribute = readFromStrict
 
 -- | 'Exceptions' is an Attribute.
-instance IsAttribute (Exceptions Index) where
+instance IsAttribute (Exceptions Low) where
   attrName = Const "Exceptions"
   fromAttribute = readFromStrict
 
 -- | 'StackMapTable' is an Attribute.
-instance IsAttribute (StackMapTable Index) where
+instance IsAttribute (StackMapTable Low) where
   attrName = Const "StackMapTable"
   fromAttribute = readFromStrict
 
 -- | 'BootstrapMethods' is an Attribute.
-instance IsAttribute (BootstrapMethods Index) where
+instance IsAttribute (BootstrapMethods Low) where
   attrName = Const "BootstrapMethods"
   fromAttribute = readFromStrict
 

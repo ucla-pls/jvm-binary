@@ -18,13 +18,14 @@ module Language.JVM.Attribute.Base
 import           Data.Text             as Text
 import qualified Data.ByteString       as BS
 
-import           Language.JVM.ConstantPool
+import           Language.JVM.Stage
+import           Language.JVM.Constant
 import           Language.JVM.Utils    (SizedByteString32, unSizedByteString)
 
 -- | An Attribute, simply contains of a reference to a name and
 -- contains info.
 data Attribute r = Attribute
-  { aNameIndex :: ! (Ref r Text.Text)
+  { aNameIndex :: ! (Ref Text.Text r)
   , aInfo'     :: ! (SizedByteString32)
   }
 
@@ -35,12 +36,15 @@ aInfo = unSizedByteString . aInfo'
 
 -- | Extracts the name from the attribute, if it exists in the
 -- ConstantPool.
-aName :: Attribute Deref -> Text.Text
+aName :: Attribute High -> Text.Text
 aName = valueF aNameIndex
 
 instance Staged Attribute where
-  stage f (Attribute an ai) = do
-    an' <- f an
+  evolve (Attribute an ai) = do
+    an' <- evolve an
+    return $ Attribute an' ai
+  devolve (Attribute an ai) = do
+    an' <- devolve an
     return $ Attribute an' ai
 
-$(deriveBaseB ''Index ''Attribute)
+$(deriveBaseWithBinary ''Attribute)

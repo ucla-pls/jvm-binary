@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-|
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -28,17 +29,17 @@ module Language.JVM.Constant
   , typeToStr
 
   , Ref (..)
---  , DeepRef
+  , DeepRef (..)
+  , Choice
 
-  , Choice (..)
-
-  , Index (..)
+  , Index
+  , Low
+  , High
   , idx
-  , Deref (..)
-  , Value (..)
-  , WithValue (..)
-  , WithIndex (..)
   , valueF
+  , value
+
+  , Referenceable (..)
 
     -- * Special constants
   , ClassName (..)
@@ -67,7 +68,7 @@ module Language.JVM.Constant
 import           Prelude            hiding (fail, lookup)
 import           Numeric (showHex)
 -- import           Control.Monad.Fail (fail)
-import           Control.DeepSeq (NFData, rnf, rnf2)
+import           Control.DeepSeq (NFData)
 import           GHC.Generics (Generic)
 import           Control.Monad.Reader
 import           Data.Binary
@@ -77,152 +78,106 @@ import           Language.JVM.Utils
 import           Language.JVM.Type
 import           Language.JVM.TH
 
-import Data.Functor.Classes
+-- import qualified Data.Text as Text
+import qualified Data.ByteString as BS
+import qualified Data.Text.Encoding as TE
+import qualified Data.Text.Encoding.Error as TE
 
--- | This wraps a reference type 'r' and an 'Referenceable' 'a', and
--- make them an instance of 'Generic', 'Show', 'Eq', and 'NFData'
-newtype Ref r a = Ref
-  { unref :: (r Word16 a)
-  }
+-- import Data.Functor.Classes
 
-deriving instance Generic (Ref r a)
+data family Ref v r
+data instance Ref v High = RefV v
+data instance Ref v Low = RefI Word16
 
-instance (Show2 r, Show a) => Show (Ref r a) where
-  showsPrec i = showsPrec2 i . unref
+deriving instance Show (Ref v Low)
+deriving instance NFData (Ref v Low)
+deriving instance Generic (Ref v Low)
+deriving instance Eq (Ref v Low)
 
-instance (Eq2 r, Eq a) => Eq (Ref r a) where
-  (==) a b = eq2 (unref a) (unref b)
+deriving instance Ord (Ref v Low)
 
-instance (NFData2 r, NFData a) => NFData (Ref r a) where
-  rnf = rnf2 . unref
+deriving instance Show v => Show (Ref v High)
+deriving instance NFData v => NFData (Ref v High)
+deriving instance Generic (Ref v High)
+deriving instance Eq v => Eq (Ref v High)
 
-instance (Ord2 r, Ord a) => Ord (Ref r a) where
-  compare a b = compare2 ( unref a) (unref b)
 
--- | This wraps two arguments between each stage.
-newtype Choice r a b = Choice {choseOne :: (r a b)}
+type family Choice r a b
+type instance Choice High a b = b
+type instance Choice Low a b = a
 
-type DeepRef r f = Ref r (f r)
+type Index = Word16
 
--- | An index into the constant pool
-newtype Index i a = Index i
+value :: Ref v High -> v
+value (RefV v) = v
 
-deriving instance Generic (Index a b)
+valueF :: (a -> Ref v High) -> a -> v
+valueF f = value . f
 
-instance Eq2 Index where
-  liftEq2 f _ (Index a) (Index b) = f a b
 
-instance Ord2 Index where
-  liftCompare2 f _ (Index a) (Index b) = f a b
+-- data Choice r a b where
+--   ChoiceLow :: a -> Choice Low a b
+--   ChoiceHigh :: b -> Choice Low a b
 
-instance Show2 Index where
-  liftShowsPrec2 f _ _ _ d (Index a) =
-    showsUnaryWith f "Index" d a
-
-instance Eq2 Deref where
-  liftEq2 f g (Deref (a,b)) (Deref (a',b')) =
-    f a a' && g b b'
-
-instance Ord2 Deref where
-  liftCompare2 f g (Deref (a,b)) (Deref (a',b')) =
-    case f a a' of
-      EQ -> g b b'
-      x -> x
-instance Show2 Deref where
-  liftShowsPrec2 f lf g lg d (Deref v) =
-    showString "Deref " . liftShowsPrec2 f lf g lg d v
-
-instance Eq2 Value where
-  liftEq2 _ g (Value a) (Value b) = g a b
-
-instance Ord2 Value where
-  liftCompare2 _ g (Value a) (Value b) = g a b
-
-instance Show2 Value where
-  liftShowsPrec2 _ _ g _ d (Value v) =
-    showsUnaryWith g "Value" d v
-
--- deriving instance Show2 Index
--- deriving instance Show2 Deref
--- deriving instance Show2 Value
--- deriving instance Show2 Index
--- deriving instance Show2 Deref
--- deriving instance Show2 Value
-
-instance Binary (Ref Index a) where
-  get = Ref . Index <$> get
+instance Binary (Ref a Low) where
+  get = RefI <$> get
   put = put . idx
 
-idx :: Ref Index a -> Word16
-idx (Ref (Index w)) = w
+idx :: Ref a Low -> Word16
+idx (RefI w) = w
 
--- | An access into the constant pool, de-referenced.
-newtype Deref i a = Deref (i, a)
+newtype DeepRef v r = DeepRef (Ref (v r) r)
 
-newtype Value i a = Value a
+deriving instance Show (DeepRef v Low)
+deriving instance NFData (DeepRef v Low)
+deriving instance Generic (DeepRef v Low)
+deriving instance Eq (DeepRef v Low)
 
-class WithValue r where
-  getValue :: Ref r v -> v
+deriving instance Show (v High) => Show (DeepRef v High)
+deriving instance NFData (v High) => NFData (DeepRef v High)
+deriving instance Generic (DeepRef v High)
+deriving instance Eq (v High) => Eq (DeepRef v High)
 
-instance WithValue Value where
-  getValue (Ref (Value a)) = a
-
-instance WithValue Deref where
-  getValue (Ref (Deref (_, a))) = a
-
-class WithIndex r where
-  getIndex :: Ref r v -> Word16
-
-instance WithIndex Index where
-  getIndex (Ref (Index v)) = v
-
-instance WithIndex Deref where
-  getIndex (Ref (Deref (v, _))) = v
-
--- refIndex :: Reference r => Ref r a -> Word16
--- refIndex = asWord . unref
-
-valueF :: WithValue r => (b -> Ref r a) -> b -> a
-valueF f = getValue . f
+deriving instance Ord (DeepRef v Low)
+deriving instance Binary (DeepRef v Low)
 
 -- | A constant is a multi word item in the 'ConstantPool'. Each of
 -- the constructors are pretty much self-explanatory from the types.
 data Constant r
   = CString !SizedByteString16
+
   | CInteger !Word32
   | CFloat !Word32
   | CLong !Word64
   | CDouble !Word64
-  | CClassRef !(Ref r Text.Text)
-  | CStringRef !(Ref r Text.Text)
+  | CClassRef !(Ref Text.Text r)
+  | CStringRef !(Ref Text.Text r)
   | CFieldRef !(InClass FieldId r)
   | CMethodRef !(InClass MethodId r)
   | CInterfaceMethodRef !(InClass MethodId r)
-  | CNameAndType !(Ref r Text.Text) !(Ref r Text.Text)
+  | CNameAndType !(Ref Text.Text r) !(Ref Text.Text r)
   | CMethodHandle !(MethodHandle r)
-  | CMethodType !(Ref r MethodDescriptor)
+  | CMethodType !(Ref MethodDescriptor r)
   | CInvokeDynamic !(InvokeDynamic r)
 
 --deriving (Show, Eq, Generic, NFData)
 
-deriving instance Ord (Constant Index)
-
 -- | Anything pointing inside a class
 data InClass a r = InClass
-  { inClassName :: !(Ref r ClassName)
-  , inClassId :: !(Ref r (a r))
+  { inClassName :: !(Ref ClassName r)
+  , inClassId :: !(DeepRef a r)
   }
 
 -- | A method identifier
 data MethodId r = MethodId
-  { methodIdName :: !(Ref r Text.Text)
-  , methodIdDescription :: !(Ref r MethodDescriptor)
+  { methodIdName :: !(Ref Text.Text r)
+  , methodIdDescription :: !(Ref MethodDescriptor r)
   }
 
 -- | A field identifier
 data FieldId r = FieldId
-  { fieldIdName :: !(Ref r Text.Text)
-  , fieldIdDescription :: !(Ref r FieldDescriptor)
+  { fieldIdName :: !(Ref Text.Text r)
+  , fieldIdDescription :: !(Ref FieldDescriptor r)
   } -- deriving (Show, Eq, Ord, Generic, NFData)
 
 -- | An interface identifier, essentially a method id
@@ -236,7 +191,97 @@ data MethodHandle r
   | MHMethod !(MethodHandleMethod r)
   | MHInterface !(MethodHandleInterface r)
 
-instance Binary (MethodHandle Index) where
+
+data MethodHandleField r = MethodHandleField
+  { methodHandleFieldKind :: !MethodHandleFieldKind
+  , methodHandleFieldRef :: !(DeepRef (InClass FieldId) r)
+  }
+
+data MethodHandleFieldKind
+  = MHGetField
+  | MHGetStatic
+  | MHPutField
+  | MHPutStatic
+  deriving (Eq, Show, NFData, Generic, Ord)
+
+data MethodHandleMethod r = MethodHandleMethod
+  { methodHandleMethodKind :: !MethodHandleMethodKind
+  , methodHandleMethodRef :: !(DeepRef (InClass MethodId) r)
+  }
+
+data MethodHandleMethodKind
+  = MHInvokeVirtual
+  | MHInvokeStatic
+  | MHInvokeSpecial
+  | MHNewInvokeSpecial
+  deriving (Eq, Show, NFData, Generic, Ord)
+
+data MethodHandleInterface r = MethodHandleInterface
+  {  methodHandleInterfaceRef :: !(DeepRef (InClass MethodId) r)
+  }
+
+data InvokeDynamic r = InvokeDynamic
+  { invokeDynamicAttrIndex :: !Word16
+  , invokeDynamicMethod :: !(DeepRef MethodId r)
+  }
+
+-- | Hack that returns the name of a constant.
+typeToStr :: Constant r -> String
+typeToStr c =
+  case c of
+    CString _  -> "CString"
+    CInteger _  -> "CInteger"
+    CFloat _  -> "CFloat"
+    CLong _  -> "CLong"
+    CDouble _  -> "CDouble"
+    CClassRef _  -> "CClassRef"
+    CStringRef _  -> "CStringRef"
+    CFieldRef _  -> "CFieldRef"
+    CMethodRef _  -> "CMethodRef"
+    CInterfaceMethodRef _  -> "CInterfaceMethodRef"
+    CNameAndType _ _  -> "CNameAndType"
+    CMethodHandle _  -> "CMethodHandle"
+    CMethodType _  -> "CMethodType"
+    CInvokeDynamic _  -> "CInvokeDynamic"
+
+instance Binary (Constant Low) where
+  get = do
+    ident <- getWord8
+    case ident of
+      1  -> CString <$> get
+      3  -> CInteger <$> get
+      4  -> CFloat <$> get
+      5  -> CLong <$> get
+      6  -> CDouble <$> get
+      7  -> CClassRef <$> get
+      8  -> CStringRef <$> get
+      9  -> CFieldRef <$> get
+      10 -> CMethodRef <$> get
+      11 -> CInterfaceMethodRef <$> get
+      12 -> CNameAndType <$> get <*> get
+      15 -> CMethodHandle <$> get
+      16 -> CMethodType <$> get
+      18 -> CInvokeDynamic <$> get
+      _  -> fail $ "Unkown identifier " ++ show ident
+
+  put x =
+    case x of
+      CString bs              -> do putWord8 1; put bs
+      CInteger i              -> do putWord8 3; put i
+      CFloat i                -> do putWord8 4; put i
+      CLong i                 -> do putWord8 5; put i
+      CDouble i               -> do putWord8 6; put i
+      CClassRef i             -> do putWord8 7; put i
+      CStringRef i            -> do putWord8 8; put i
+      CFieldRef i             -> do putWord8 9; put i
+      CMethodRef i            -> do putWord8 10; put i
+      CInterfaceMethodRef i   -> do putWord8 11; put i
+      CNameAndType i j        -> do putWord8 12; put i; put j
+      CMethodHandle h         -> do putWord8 15; put h
+      CMethodType i           -> do putWord8 16; put i;
+      CInvokeDynamic i        -> do putWord8 18; put i
+
+instance Binary (MethodHandle Low) where
   get = do
     w <- getWord8
     case w of
@@ -275,80 +320,6 @@ instance Binary (MethodHandle Index) where
       putWord8  9
       put $ methodHandleInterfaceRef h
 
-data MethodHandleField r = MethodHandleField
-  { methodHandleFieldKind :: !MethodHandleFieldKind
-  , methodHandleFieldRef :: !(DeepRef r (InClass FieldId))
-  }
-
-data MethodHandleFieldKind
-  = MHGetField
-  | MHGetStatic
-  | MHPutField
-  | MHPutStatic
-  deriving (Eq, Show, NFData, Generic, Ord)
-
-data MethodHandleMethod r = MethodHandleMethod
-  { methodHandleMethodKind :: !MethodHandleMethodKind
-  , methodHandleMethodRef :: !(DeepRef r (InClass MethodId))
-  }
-
-data MethodHandleMethodKind
-  = MHInvokeVirtual
-  | MHInvokeStatic
-  | MHInvokeSpecial
-  | MHNewInvokeSpecial
-  deriving (Eq, Show, NFData, Generic, Ord)
-
-data MethodHandleInterface r = MethodHandleInterface
-  {  methodHandleInterfaceRef :: !(DeepRef r (InClass MethodId))
-  }
-
-data InvokeDynamic r = InvokeDynamic
-  { invokeDynamicAttrIndex :: !Word16
-  , invokeDynamicMethod :: !(DeepRef r MethodId)
-  }
-
--- | Hack that returns the name of a constant.
-typeToStr :: Show2 r => Constant r -> String
-typeToStr = head . words . show
-
-instance Binary (Constant Index) where
-  get = do
-    ident <- getWord8
-    case ident of
-      1  -> CString <$> get
-      3  -> CInteger <$> get
-      4  -> CFloat <$> get
-      5  -> CLong <$> get
-      6  -> CDouble <$> get
-      7  -> CClassRef <$> get
-      8  -> CStringRef <$> get
-      9  -> CFieldRef <$> get
-      10 -> CMethodRef <$> get
-      11 -> CInterfaceMethodRef <$> get
-      12 -> CNameAndType <$> get <*> get
-      15 -> CMethodHandle <$> get
-      16 -> CMethodType <$> get
-      18 -> CInvokeDynamic <$> get
-      _  -> fail $ "Unkown identifier " ++ show ident
-
-  put x =
-    case x of
-      CString bs              -> do putWord8 1; put bs
-      CInteger i              -> do putWord8 3; put i
-      CFloat i                -> do putWord8 4; put i
-      CLong i                 -> do putWord8 5; put i
-      CDouble i               -> do putWord8 6; put i
-      CClassRef i             -> do putWord8 7; put i
-      CStringRef i            -> do putWord8 8; put i
-      CFieldRef i             -> do putWord8 9; put i
-      CMethodRef i            -> do putWord8 10; put i
-      CInterfaceMethodRef i   -> do putWord8 11; put i
-      CNameAndType i j        -> do putWord8 12; put i; put j
-      CMethodHandle h         -> do putWord8 15; put h
-      CMethodType i           -> do putWord8 16; put i;
-      CInvokeDynamic i        -> do putWord8 18; put i
-
 -- | Some of the 'Constant's take up more space in the constant pool than other.
 -- Notice that 'Language.JVM.Constant.String' and 'MethodType' is not of size
 -- 32, but is still awarded value 1. This is due to an
@@ -368,18 +339,119 @@ constantSize x =
 -- deriving instance NFData i => NFData1 (Value i)
 -- deriving instance Generic i => Generic1 (Value i)
 
+-- | 'Referenceable' is something that can exist in the constant pool.
+class Referenceable a where
+  fromConst
+    :: (Monad m)
+    => (forall a'. String -> m a')
+    -> Constant High
+    -> m a
+  toConst
+    :: (Monad m)
+    => a
+    -> m (Constant High)
+
+instance Referenceable (Constant High) where
+  fromConst _ a = return a
+  toConst a = return a
+
+instance Referenceable (MethodId High) where
+  fromConst err (CNameAndType rn (RefV txt)) = do
+    md <- either err return $ methodDescriptorFromText txt
+    return $ MethodId rn (RefV md)
+  fromConst e c = expected "CNameAndType" e c
+
+  toConst (MethodId rn (RefV md)) =
+    return $ CNameAndType rn (RefV $ methodDescriptorToText md)
+
+instance Referenceable (FieldId High) where
+  fromConst err (CNameAndType rn (RefV txt)) = do
+    md <- either err return $ fieldDescriptorFromText txt
+    return $ FieldId rn (RefV md)
+  fromConst e c = expected "CNameAndType" e c
+
+  toConst (FieldId rn (RefV md)) =
+    return $ CNameAndType rn (RefV $ fieldDescriptorToText md)
+
+instance Referenceable Text.Text where
+  fromConst err c =
+    case c of
+      CString str ->
+        case TE.decodeUtf8' . unSizedByteString $ str of
+          Left (TE.DecodeError msg _) ->
+            err $ badEncoding msg (unSizedByteString str)
+          Left _ -> error "This is deprecated in the api"
+          Right txt -> return txt
+      a -> err $ wrongType "String" a
+
+  toConst txt =
+    return $ CString (SizedByteString $ TE.encodeUtf8 txt)
+
+instance Referenceable ClassName where
+  fromConst _ (CClassRef (RefV r)) =
+    return . ClassName $ r
+  fromConst err a =
+    err $ wrongType "ClassRef" a
+
+  toConst (ClassName txt) = do
+    return . CClassRef $ RefV txt
+
+instance Referenceable MethodDescriptor where
+  fromConst err c = do
+    txt <- fromConst err c
+    either err return $ methodDescriptorFromText txt
+
+  toConst c =
+    toConst (methodDescriptorToText c)
+
+instance Referenceable FieldDescriptor where
+  fromConst err c = do
+    txt <- fromConst err c
+    either err return $ fieldDescriptorFromText txt
+
+  toConst c =
+    toConst (fieldDescriptorToText c)
+
+instance Referenceable (InClass FieldId High) where
+  fromConst _ (CFieldRef s) = do
+    return $ s
+  fromConst err c = expected "FieldRef" err c
+
+  toConst s =
+    return $ CFieldRef s
+
+instance Referenceable (InClass MethodId High) where
+  fromConst _ (CMethodRef s) = do
+    return $ s
+  fromConst err c = expected "MethodRef" err c
+
+  toConst s =
+    return $ CMethodRef s
+
+
+expected :: String -> (String -> a) -> (Constant r) -> a
+expected name err c =
+  err $ wrongType name c
+
+wrongType :: String -> Constant r -> String
+wrongType n c =
+  "Expected '" ++ n ++ "', but found'" ++ typeToStr c ++ "'."
+
+badEncoding :: String -> BS.ByteString -> String
+badEncoding str bs =
+  "Could not encode '" ++ str ++ "': " ++ show bs
 
 $(deriveBase ''Constant)
-$(deriveBaseBO ''Index ''MethodId)
-$(deriveBaseBO ''Index ''FieldId)
-$(deriveBaseBO ''Index ''InterfaceId)
-$(deriveBaseO ''Index ''MethodHandle)
-$(deriveBaseO ''Index ''MethodHandleField)
-$(deriveBaseO ''Index ''MethodHandleMethod)
-$(deriveBaseO ''Index ''MethodHandleInterface)
-$(deriveBaseBO ''Index ''InvokeDynamic)
+$(deriveBase ''MethodHandle)
+$(deriveBase ''MethodHandleField)
+$(deriveBase ''MethodHandleMethod)
+$(deriveBase ''MethodHandleInterface)
+$(deriveBaseWithBinary ''MethodId)
+$(deriveBaseWithBinary ''FieldId)
+$(deriveBaseWithBinary ''InterfaceId)
+$(deriveBaseWithBinary ''InvokeDynamic)
 
 type AbsMethodId = InClass MethodId
 type AbsFieldId = InClass FieldId
-$(deriveBaseBO ''Index ''AbsMethodId)
-$(deriveBaseBO ''Index ''AbsFieldId)
+$(deriveBaseWithBinary ''AbsMethodId)
+$(deriveBaseWithBinary ''AbsFieldId)

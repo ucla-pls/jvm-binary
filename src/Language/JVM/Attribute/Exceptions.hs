@@ -17,17 +17,18 @@ module Language.JVM.Attribute.Exceptions
   , exceptionIndexTable
   ) where
 
-import           Language.JVM.ConstantPool
+import           Language.JVM.Stage
+import           Language.JVM.Constant
 import           Language.JVM.Utils
 
 -- | An Exceptions attribute is a list of references into the
 -- constant pool.
 data Exceptions r = Exceptions
-  { exceptionIndexTable' :: SizedList16 (Ref r ClassName)
+  { exceptionIndexTable' :: SizedList16 (Ref ClassName r)
   }
 
 -- | Get the constant refs that points .
-exceptionIndexTable :: Exceptions r -> [(Ref r ClassName)]
+exceptionIndexTable :: Exceptions r -> [(Ref ClassName r)]
 exceptionIndexTable = unSizedList . exceptionIndexTable'
 
-$(deriveBaseB ''Index ''Exceptions)
+$(deriveBaseWithBinary ''Exceptions)

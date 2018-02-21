@@ -20,7 +20,8 @@ module Language.JVM.Attribute.BootstrapMethods
   , arguments
   ) where
 
-import           Language.JVM.ConstantPool
+import           Language.JVM.Constant
+import           Language.JVM.Stage
 import           Language.JVM.Utils
 
 -- | Is a list of bootstrapped methods.
@@ -34,13 +35,13 @@ methods = unSizedList . methods'
 
 -- | A bootstraped methods.
 data BootstrapMethod r = BootstrapMethod
-  { methodIndex :: Ref r (InClass MethodId r)
-  , arguments' :: SizedList16 (Ref r (Constant r))
+  { methodIndex :: DeepRef (InClass MethodId) r
+  , arguments' :: SizedList16 (DeepRef Constant r)
   }
 
 -- | The arguments as a list
-arguments :: BootstrapMethod r -> [ Ref r (Constant r) ]
+arguments :: BootstrapMethod r -> [ DeepRef Constant r ]
 arguments = unSizedList . arguments'
 
-$(deriveBaseB ''Index ''BootstrapMethod)
-$(deriveBaseB ''Index ''BootstrapMethods)
+$(deriveBaseWithBinary ''BootstrapMethod)
+$(deriveBaseWithBinary ''BootstrapMethods)

@@ -31,15 +31,16 @@ import qualified Data.Text as Text
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
 -- import           Language.JVM.Attribute.Exceptions (exceptionIndexTable)
-import           Language.JVM.ConstantPool
+import           Language.JVM.Stage
+import           Language.JVM.Constant
 import           Language.JVM.Utils
 
 -- | A Method in the class-file, as described
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.6).
 data Method r = Method
   { mAccessFlags'    :: BitSet16 MAccessFlag
-  , mNameIndex       :: Ref r Text.Text
-  , mDescriptorIndex :: Ref r MethodDescriptor
+  , mNameIndex       :: Ref Text.Text r
+  , mDescriptorIndex :: Ref MethodDescriptor r
   , mAttributes'     :: SizedList16 (Attribute r)
   }
 
@@ -52,11 +53,11 @@ mAttributes :: Method r -> [Attribute r]
 mAttributes = unSizedList . mAttributes'
 
 -- | Lookup the name of the method in the 'ConstantPool'.
-mName :: (WithValue r) => Method r -> Text.Text
+mName :: Method High -> Text.Text
 mName = valueF mNameIndex
 
 -- | Lookup the descriptor of the method in the 'ConstantPool'.
-mDescriptor :: (WithValue r) => Method r -> MethodDescriptor
+mDescriptor :: Method High -> MethodDescriptor
 mDescriptor = valueF mDescriptorIndex
 
 -- mCode :: (WithValue r) => Method r -> Maybe (Code r)
@@ -92,10 +93,16 @@ data MethodAttributes r = MethodAttributes
 --       return $ Right []
 
 instance Staged Method where
-  stage f (Method mf mn md mattr) = do
-    mn' <- f mn
-    md' <- f md
-    mattr' <- mapM (stage f) mattr
+  evolve (Method mf mn md mattr) = do
+    mn' <- evolve mn
+    md' <- evolve md
+    mattr' <- mapM evolve mattr
     return $ Method mf mn' md' mattr'
 
-$(deriveBaseB ''Index ''Method)
+  devolve (Method mf mn md mattr) = do
+    mn' <- devolve mn
+    md' <- devolve md
+    mattr' <- mapM devolve mattr
+    return $ Method mf mn' md' mattr'
+
+$(deriveBaseWithBinary ''Method)
