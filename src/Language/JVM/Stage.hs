@@ -27,6 +27,7 @@ import Language.JVM.TH
 
 class Monad m => EvolveM m where
   link :: Referenceable r => Index -> m r
+  attributeError :: String -> m r
 
 class Monad m => DevolveM m where
   unlink :: Referenceable r => r -> m Index

@@ -27,6 +27,7 @@ module Language.JVM.Attribute
   , BootstrapMethods
 
   -- * Helpers
+  , fromAttributes
   , Const
   -- , matching
   , firstOne
@@ -42,7 +43,8 @@ import           Data.Binary
 
 import qualified Data.Text as Text
 
-import           Language.JVM.Constant
+import           Language.JVM.Stage
+-- import           Language.JVM.Constant
 import           Language.JVM.Utils                      (trd)
 
 import           Language.JVM.Attribute.BootstrapMethods (BootstrapMethods)
@@ -60,21 +62,21 @@ newtype Const a b = Const { unConst :: a }
 -- | A class-type that describes a data-type 'a' as an Attribute. Most notable
 -- it provides the 'fromAttribute'' method that enables converting an Attribute
 -- to a data-type 'a'.
-class IsAttribute a where
-  attrName :: Const Text.Text a
-  -- ^ The name of the attribute.
+class (Binary (a Low), Staged a) => IsAttribute a where
+  -- | The name of an attribute. This is used to lookup an attribute.
+  attrName :: Const Text.Text (a Low)
 
-  fromAttribute :: Attribute r -> Either String a
-  -- ^ Generate a 'a' from an Attribute.
+  -- | Generate an attribute in a low stage 'Low'.
+  fromAttribute' :: Attribute r -> Either String (a Low)
+  fromAttribute' = readFromStrict
 
-  -- fromAttribute'
-  --   :: Attribute
-  --   -> PoolAccess (Maybe (Either String a))
-  -- fromAttribute' as = do
-  --   name <- aName as
-  --   return $ if name == unConst (attrName :: Const Text.Text a)
-  --     then Just $ fromAttribute as
-  --     else Nothing
+  -- | Generate an attribute in the 'EvolveM' monad
+  fromAttribute :: EvolveM m => Attribute High -> Maybe (m (a High))
+  fromAttribute as =
+    if aName as == unConst (attrName :: Const Text.Text (a Low))
+    then Just $ do
+      either attributeError evolve $ fromAttribute' as
+    else Nothing
 
 -- -- | Return a list of either parsed attributes or error messages from an object
 -- -- given a function that object to a collection of attributes. The list only
@@ -87,36 +89,45 @@ class IsAttribute a where
 -- matching fn b = do
 --   catMaybes . toList <$> sequence (fromAttribute' <$> fn b)
 
+fromAttributes ::
+  (Foldable f, EvolveM m, Monoid a)
+  => (Attribute High -> m a)
+  -> f (Attribute Low)
+  -> m a
+fromAttributes f attrs =
+  foldl g (return mempty) attrs
+  where
+    g m a' = do
+      b <- m
+      x <- f =<< evolve a'
+      return $ b `mappend` x
+
 readFromStrict :: Binary a => Attribute r -> Either String a
 readFromStrict =
     bimap trd trd . decodeOrFail . BL.fromStrict . aInfo
 
 -- # Attributes
 
--- | 'Code' is an Attribute.
-instance IsAttribute (Code Low) where
-  attrName = Const "Code"
-  fromAttribute = readFromStrict
-
 -- | 'ConstantValue' is an Attribute.
-instance IsAttribute (ConstantValue Low) where
+instance IsAttribute ConstantValue where
   attrName = Const "ConstantValue"
-  fromAttribute = readFromStrict
 
--- | 'Exceptions' is an Attribute.
-instance IsAttribute (Exceptions Low) where
-  attrName = Const "Exceptions"
-  fromAttribute = readFromStrict
+-- -- | 'Code' is an Attribute.
+-- instance IsAttribute Code where
+--   attrName = Const "Code"
 
--- | 'StackMapTable' is an Attribute.
-instance IsAttribute (StackMapTable Low) where
-  attrName = Const "StackMapTable"
-  fromAttribute = readFromStrict
 
--- | 'BootstrapMethods' is an Attribute.
-instance IsAttribute (BootstrapMethods Low) where
-  attrName = Const "BootstrapMethods"
-  fromAttribute = readFromStrict
+-- -- | 'Exceptions' is an Attribute.
+-- instance IsAttribute Exceptions where
+--   attrName = Const "Exceptions"
+
+-- -- | 'StackMapTable' is an Attribute.
+-- instance IsAttribute StackMapTable where
+--   attrName = Const "StackMapTable"
+
+-- -- | 'BootstrapMethods' is an Attribute.
+-- instance IsAttribute BootstrapMethods where
+--   attrName = Const "BootstrapMethods"
 
 -- | Maybe return the first element of a list
 firstOne :: [a] -> Maybe a

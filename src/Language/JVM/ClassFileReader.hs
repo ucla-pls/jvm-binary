@@ -44,10 +44,21 @@ evolveClassFile cf = do
   cp <- bootstrapConstantPool (cConstantPool cf)
   runEvolve cp (evolve cf)
 
--- | Changed the stage from Index to Deref
+-- | Devolve a ClassFile from High to Low. This might make the 'ClassFile' contain
+-- invalid attributes, since we can't read all attributes. If this this is a problem
+-- see 'devolveClassFile''.
 devolveClassFile :: ClassFile High -> ClassFile Low
 devolveClassFile cf =
   let (cf', cpb) = runConstantPoolBuilder (devolve cf) cpbEmpty in
+  cf' { cConstantPool = cpbConstantPool cpb }
+
+-- | Devolve a 'ClassFile' form 'High' to 'Low', while maintaining the class
+-- pool of the original class file. This is useful if we care that unread
+-- attributes are still valid. This can cause untended bloat as we do not
+-- want to throw away anything in the program
+devolveClassFile' :: ConstantPool Low -> ClassFile High -> ClassFile Low
+devolveClassFile' cp cf =
+  let (cf', cpb) = runConstantPoolBuilder (devolve cf) (cpbFromCp cp) in
   cf' { cConstantPool = cpbConstantPool cpb }
 
 -- $deref
