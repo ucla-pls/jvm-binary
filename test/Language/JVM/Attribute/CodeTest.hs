@@ -12,7 +12,8 @@ import           SpecHelper
 
 import           Language.JVM.AttributeTest  ()
 import           Language.JVM.Attribute.Code
-import           Language.JVM.Constant       (Index)
+import           Language.JVM.Constant
+import           Language.JVM.ConstantTest
 import           Language.JVM.UtilsTest      ()
 import           Language.JVM.Utils
 
@@ -20,112 +21,123 @@ import           Language.JVM.Utils
 -- prop_encode_and_decode_ByteCode :: ByteCode -> Property
 -- prop_encode_and_decode_ByteCode = isoBinary
 
-prop_encode_and_decode :: Code Index -> Property
-prop_encode_and_decode = isoBinary
+-- prop_encode_and_decode :: Code Low -> Property
+-- prop_encode_and_decode = isoBinary
 
-prop_encode_and_decode_ByteCode :: ByteCode Index -> Property
-prop_encode_and_decode_ByteCode = isoBinary
+-- prop_encode_and_decode_ByteCode :: ByteCode Low -> Property
+-- prop_encode_and_decode_ByteCode = isoBinary
 
-prop_encode_and_decode_ByteCodeOpr :: ByteCodeOpr Index -> Property
-prop_encode_and_decode_ByteCodeOpr = isoBinary
+-- prop_encode_and_decode_ByteCodeOpr :: ByteCodeOpr Low -> Property
+-- prop_encode_and_decode_ByteCodeOpr = isoBinary
 
-instance Arbitrary (Code Index) where
-  arbitrary = Code
-    <$> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-  shrink (Code ms ml bc _ _) =
-    [ Code ms ml bc' (SizedList []) (SizedList []) | bc' <- shrink bc ]
+-- instance Arbitrary (Code Low) where
+--   arbitrary = Code
+--     <$> arbitrary
+--     <*> arbitrary
+--     <*> arbitrary
+--     <*> arbitrary
+--     <*> arbitrary
+--   shrink (Code ms ml bc _ _) =
+--     [ Code ms ml bc' (SizedList []) (SizedList []) | bc' <- shrink bc ]
 
-instance Arbitrary (ByteCode Index) where
-  arbitrary =
-     ByteCode . calculateOffsets <$> arbitrary
+-- instance Arbitrary (ByteCode Low) where
+--   arbitrary =
+--      ByteCode . calculateOffsets <$> arbitrary
 
-  shrink (ByteCode xs) =
-    ByteCode . calculateOffsets <$> shrink (map opcode xs)
+--   shrink (ByteCode xs) =
+--     ByteCode . calculateOffsets <$> shrink (map opcode xs)
 
-instance Arbitrary ArithmeticType where
-  arbitrary = elements [ MInt, MLong, MFloat, MDouble ]
+-- instance Arbitrary ArithmeticType where
+--   arbitrary = elements [ MInt, MLong, MFloat, MDouble ]
 
-instance Arbitrary LocalType where
-  arbitrary = elements [ LInt, LLong, LFloat, LDouble, LRef ]
+-- instance Arbitrary LocalType where
+--   arbitrary = elements [ LInt, LLong, LFloat, LDouble, LRef ]
 
-instance Arbitrary (ByteCodeOpr Index) where
-  arbitrary =
-   genericArbitrary uniform
+-- -- instance Arbitrary (ByteCodeOpr Low) where
+-- --   arbitrary =
+-- --    genericArbitrary uniform
 
-instance Arbitrary a => Arbitrary (V.Vector a) where
-  arbitrary = V.fromList <$> arbitrary
+-- instance Arbitrary a => Arbitrary (V.Vector a) where
+--   arbitrary = V.fromList <$> arbitrary
 
-instance Arbitrary ArrayType where
-  arbitrary = genericArbitrary uniform
-instance Arbitrary (ExactArrayType Index) where
-  arbitrary = genericArbitrary uniform
+-- instance Arbitrary ArrayType where
+--   arbitrary = genericArbitrary uniform
 
-instance Arbitrary BinOpr where
-  arbitrary = genericArbitrary uniform
+-- instance Arbitrary (ExactArrayType Low) where
+--   arbitrary =
+--     oneof
+--     [ pure EABoolean
+--     , pure EAByte
+--     , pure EAChar
+--     , pure EAShort
+--     , pure EAInt
+--     , pure EALong
+--     , pure EAFloat
+--     , pure EADouble
+--     , EARef <$> arbitrary
+--     ]
 
-instance Arbitrary CastOpr where
-  arbitrary =
-    oneof . map pure $
-      [ CastTo MInt MLong
-      , CastTo MInt MFloat
-      , CastTo MInt MDouble
+-- instance Arbitrary BinOpr where
+--   arbitrary = genericArbitrary uniform
 
-      , CastTo MLong MInt
-      , CastTo MLong MFloat
-      , CastTo MLong MDouble
+-- instance Arbitrary CastOpr where
+--   arbitrary =
+--     oneof . map pure $
+--       [ CastTo MInt MLong
+--       , CastTo MInt MFloat
+--       , CastTo MInt MDouble
 
-      , CastTo MFloat MInt
-      , CastTo MFloat MLong
-      , CastTo MFloat MDouble
+--       , CastTo MLong MInt
+--       , CastTo MLong MFloat
+--       , CastTo MLong MDouble
 
-      , CastTo MDouble MInt
-      , CastTo MDouble MLong
-      , CastTo MDouble MFloat
+--       , CastTo MFloat MInt
+--       , CastTo MFloat MLong
+--       , CastTo MFloat MDouble
 
-      , CastDown MByte
-      , CastDown MChar
-      , CastDown MShort
-      ]
+--       , CastTo MDouble MInt
+--       , CastTo MDouble MLong
+--       , CastTo MDouble MFloat
 
-instance Arbitrary BitOpr where
-  arbitrary = genericArbitrary uniform
+--       , CastDown MByte
+--       , CastDown MChar
+--       , CastDown MShort
+--       ]
 
-instance Arbitrary OneOrTwo where
-  arbitrary = genericArbitrary uniform
+-- instance Arbitrary BitOpr where
+--   arbitrary = genericArbitrary uniform
 
-instance Arbitrary SmallArithmeticType where
-  arbitrary = genericArbitrary uniform
+-- instance Arbitrary OneOrTwo where
+--   arbitrary = genericArbitrary uniform
 
-instance Arbitrary CmpOpr where
-  arbitrary = genericArbitrary uniform
+-- instance Arbitrary SmallArithmeticType where
+--   arbitrary = genericArbitrary uniform
 
-instance Arbitrary FieldAccess where
-  arbitrary = genericArbitrary uniform
+-- instance Arbitrary CmpOpr where
+--   arbitrary = genericArbitrary uniform
 
-instance Arbitrary Invokation where
-  arbitrary =
-    oneof
-    [ pure InvkSpecial
-    , pure InvkVirtual
-    , pure InvkStatic
-    , InvkInterface <$> arbitrary `suchThat` \i -> i > 0
-    , pure InvkDynamic
-    ]
+-- instance Arbitrary FieldAccess where
+--   arbitrary = genericArbitrary uniform
 
-instance Arbitrary (CConstant Index) where
-  arbitrary = genericArbitrary uniform
+-- instance Arbitrary Invokation where
+--   arbitrary =
+--     oneof
+--     [ pure InvkSpecial
+--     , pure InvkVirtual
+--     , pure InvkStatic
+--     , InvkInterface <$> arbitrary `suchThat` \i -> i > 0
+--     , pure InvkDynamic
+--     ]
 
-instance Arbitrary SwitchTable where
-  arbitrary = genericArbitrary uniform
+-- -- instance Arbitrary (CConstant Low) where
+-- --   arbitrary = genericArbitrary uniform
 
+-- instance Arbitrary SwitchTable where
+--   arbitrary = genericArbitrary uniform
 
-instance Arbitrary (ExceptionTable Index) where
-  arbitrary = ExceptionTable
-    <$> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
+-- instance Arbitrary (ExceptionTable Low) where
+--   arbitrary = ExceptionTable
+--     <$> arbitrary
+--     <*> arbitrary
+--     <*> arbitrary
+--     <*> arbitrary

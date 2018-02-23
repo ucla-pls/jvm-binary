@@ -2,9 +2,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.JVM.TypeTest where
 
--- -- -- import SpecHelper
+import SpecHelper
 
--- -- -- import Language.JVM.Type
+import Language.JVM.Type
 
 -- import Text.Megaparsec
 -- import Test.Hspec.Megaparsec
@@ -27,3 +27,15 @@ module Language.JVM.TypeTest where
 --       MethodDescriptor [JTByte, JTBoolean] (Just JTByte)
 --   it "does not parse if there is too much" $
 --     methodDescriptorFromText "(BZ)Bx" `shouldBe` Nothing
+
+instance Arbitrary ClassName where
+  arbitrary = pure $ ClassName "package.Main"
+
+instance Arbitrary JType where
+  arbitrary = genericArbitrary uniform
+
+instance Arbitrary MethodDescriptor where
+  arbitrary = genericArbitrary uniform
+
+instance Arbitrary FieldDescriptor where
+  arbitrary = genericArbitrary uniform

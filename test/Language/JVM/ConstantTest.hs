@@ -10,17 +10,21 @@ import Language.JVM.UtilsTest ()
 
 import qualified Data.IntMap as IM
 
-prop_encode_and_decode :: ConstantPool Index -> Property
+prop_encode_and_decode :: ConstantPool Low -> Property
 prop_encode_and_decode = isoBinary
 
-prop_Constant_encode_and_decode :: Constant Index -> Property
+prop_Constant_encode_and_decode :: Constant Low -> Property
 prop_Constant_encode_and_decode = isoBinary
 
-instance Arbitrary (Ref Index a) where
+instance Arbitrary (Ref a Low) where
   arbitrary =
-    Ref . Index <$> arbitrary
+    RefI <$> arbitrary
 
-instance Arbitrary (ConstantPool Index) where
+instance Arbitrary (DeepRef a Low) where
+  arbitrary =
+    DeepRef .RefI <$> arbitrary
+
+instance Arbitrary (ConstantPool Low) where
   arbitrary =
     ConstantPool . IM.fromList . go 1 <$> arbitrary
     where
@@ -28,7 +32,7 @@ instance Arbitrary (ConstantPool Index) where
         (n, e) : go (n + constantSize e) lst
       go _ [] = []
 
-instance Arbitrary (Constant Index) where
+instance Arbitrary (Constant Low) where
   arbitrary = oneof
     [ CString <$> arbitrary
     , CInteger <$> arbitrary
@@ -46,16 +50,16 @@ instance Arbitrary (Constant Index) where
     , CInvokeDynamic <$> arbitrary
     ]
 
-instance (Arbitrary (a Index)) => Arbitrary (InClass a Index) where
+instance (Arbitrary (a Low)) => Arbitrary (InClass a Low) where
   arbitrary = InClass <$> arbitrary <*> arbitrary
 
-instance Arbitrary (FieldId Index) where
+instance Arbitrary (FieldId Low) where
   arbitrary = FieldId <$> arbitrary <*> arbitrary
 
-instance Arbitrary (MethodId Index) where
+instance Arbitrary (MethodId Low) where
   arbitrary = MethodId <$> arbitrary <*> arbitrary
 
-instance Arbitrary (MethodHandle Index) where
+instance Arbitrary (MethodHandle Low) where
   arbitrary =
     oneof
       [ MHField <$> ( MethodHandleField <$> arbitrary <*> arbitrary)
@@ -71,5 +75,5 @@ instance Arbitrary MethodHandleMethodKind where
   arbitrary =
     oneof [ pure x | x <- [ MHInvokeVirtual , MHInvokeStatic , MHInvokeSpecial , MHNewInvokeSpecial ] ]
 
-instance Arbitrary (InvokeDynamic Index) where
+instance Arbitrary (InvokeDynamic Low) where
   arbitrary = InvokeDynamic <$> arbitrary <*> arbitrary

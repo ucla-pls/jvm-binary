@@ -10,10 +10,10 @@ import Language.JVM.ConstantTest ()
 import Language.JVM.AttributeTest ()
 import Language.JVM.Constant
 
-prop_encode_and_decode :: Field Index -> Property
+prop_encode_and_decode :: Field Low -> Property
 prop_encode_and_decode = isoBinary
 
-instance Arbitrary (Field Index) where
+instance Arbitrary (Field Low) where
   arbitrary = Field
     <$> arbitrary
     <*> arbitrary

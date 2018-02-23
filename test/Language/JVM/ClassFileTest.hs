@@ -8,6 +8,7 @@ import qualified Data.IntMap as IM
 
 import Language.JVM.ClassFile
 import Language.JVM.ConstantPool
+import Language.JVM.Constant
 
 import Language.JVM.Utils
 import Language.JVM.UtilsTest ()
@@ -16,10 +17,10 @@ import Language.JVM.ConstantTest ()
 import Language.JVM.FieldTest ()
 import Language.JVM.MethodTest ()
 
-prop_encode_and_decode :: ClassFile Index -> Property
+prop_encode_and_decode :: ClassFile Low -> Property
 prop_encode_and_decode = isoBinary
 
-instance Arbitrary (ClassFile Index) where
+instance Arbitrary (ClassFile Low) where
   arbitrary = ClassFile
     <$> arbitrary
     <*> arbitrary

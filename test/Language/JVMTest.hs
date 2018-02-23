@@ -17,12 +17,11 @@ test_reading_classfile = testSomeFiles $ do
       cMagicNumber cls `shouldBe` 0xCAFEBABE
 
     it "can bootstrap the constant pool" $ \cls -> do
-      let cp = bootstrapDeref (cConstantPool cls)
+      let cp = bootstrapConstantPool (cConstantPool cls)
       cp `shouldSatisfy` isRight
 
     it "can untie the whole class file" $ \cls -> do
-      let cls' = untieClassFile cls
-      untieClassFile cls `shouldSatisfy` isRight
+      evolveClassFile cls `shouldSatisfy` isRight
 
     -- it "has a class name" $ \cls ->
     --   runWithPool (cThisClass cls) (cConstantPool cls) `shouldSatisfy` isRight

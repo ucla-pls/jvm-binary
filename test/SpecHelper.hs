@@ -2,10 +2,12 @@ module SpecHelper
   ( module Test.Tasty
   , module Test.Tasty.Hspec
   , module Test.Tasty.QuickCheck
+  , module Generic.Random
   , decode
   , encode
   , blReadFile
   , isoBinary
+  , isoStaged
   , testAllFiles
   , testSomeFiles
   ) where
@@ -17,11 +19,15 @@ import qualified Data.ByteString.Lazy as BL
 
 import System.FilePath
 import System.Directory
+import           Generic.Random
 
 import Control.Monad
 import Data.Binary
 import Data.Bits
 import qualified Data.List as List
+
+import Language.JVM.Stage
+import Language.JVM.ClassFileReader
 
 blReadFile :: FilePath -> IO BL.ByteString
 blReadFile = BL.readFile
@@ -55,6 +61,16 @@ isoBinary a =
   let bs = encode a
   in counterexample (List.intercalate " " (group 8 . concat . map toHex $ BL.unpack bs)) $
       decode bs === a
+
+isoStaged ::
+  (Staged a, Eq (a High), Show (a High))
+  => (a High) -> Property
+isoStaged a =
+  let (a', CPBuilder _ cp) = runConstantPoolBuilder (devolve a) cpbEmpty
+      v = do
+        cp' <- (bootstrapConstantPool cp)
+        runEvolve cp' (evolve a')
+  in v === Right a
 
 folderContents :: FilePath -> IO [ FilePath ]
 folderContents fp =
