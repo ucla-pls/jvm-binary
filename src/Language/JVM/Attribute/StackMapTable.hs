@@ -33,7 +33,7 @@ import           Language.JVM.Utils
 
 -- | An Exceptions attribute is a list of references into the
 -- constant pool.
-data StackMapTable r = StackMapTable
+newtype StackMapTable r = StackMapTable
   { stackMapTable :: SizedList16 (StackMapFrame r)
   }
 
@@ -171,6 +171,37 @@ instance Binary (VerificationTypeInfo Low) where
       VUninitializedThis -> putWord8 6
       VObject s -> do putWord8 7; put s
       VUninitialized s -> do putWord8 8; put s
+
+instance Staged StackMapTable where
+  stage f (StackMapTable ls) =
+    StackMapTable <$> mapM f ls
+
+instance Staged StackMapFrame where
+  stage f (StackMapFrame so ft) =
+    StackMapFrame so <$> f ft
+
+instance Staged StackMapFrameType where
+  stage f x =
+    case x of
+      SameFrame -> return $ SameFrame
+      SameLocals1StackItemFrame a -> SameLocals1StackItemFrame <$> f a
+      ChopFrame w -> return $ ChopFrame w
+      AppendFrame ls -> AppendFrame <$> mapM f ls
+      FullFrame bs as -> FullFrame <$> mapM f bs <*> mapM f as
+
+instance Staged VerificationTypeInfo where
+  stage f x =
+    case x of
+      VTop -> return $ VTop
+      VInteger -> return $ VInteger
+      VFloat -> return $ VFloat
+      VLong -> return $ VLong
+      VDouble -> return $ VDouble
+      VNull -> return $ VNull
+      VUninitializedThis -> return $ VUninitializedThis
+      VObject a -> VObject <$> f a
+      VUninitialized w -> return $ VUninitialized w
+
 
 $(deriveBaseWithBinary ''StackMapTable)
 $(deriveBase ''StackMapFrame)

@@ -7,11 +7,14 @@ Maintainer  : kalhuage@cs.ucla.edu
 This module contains the 'JType'.
 -}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric  #-}
 module Language.JVM.Type
   ( ClassName (..)
   , strCls
+
   , JType (..)
+  , jTypeToText
 
   , MethodDescriptor (..)
   , methodDescriptorFromText
@@ -89,12 +92,36 @@ parseJType = try $ do
     '[' -> JTArray <$> parseJType
     _ -> fail $ "Unknown char " ++ show s
 
+jTypeToText :: JType -> Text.Text
+jTypeToText tp =
+  Text.pack $ go tp ""
+  where
+    go x =
+      case x of
+        JTByte -> ('B':)
+        JTChar -> ('C':)
+        JTDouble -> ('D':)
+        JTFloat -> ('F':)
+        JTInt -> ('I':)
+        JTLong -> ('J':)
+        JTClass (ClassName cn) -> ((('L':Text.unpack cn) ++ ";") ++)
+        JTShort -> ('S':)
+        JTBoolean -> ('Z':)
+        JTArray tp' -> ('[':) . go tp'
+
 
 methodDescriptorToText :: MethodDescriptor -> Text.Text
-methodDescriptorToText = undefined
+methodDescriptorToText md =
+  Text.concat $
+    ["("] ++ map jTypeToText (methodDescriptorArguments md)
+    ++ [")", case methodDescriptorReturnType md of
+               Just x -> jTypeToText x
+               Nothing -> "V"
+           ]
 
 fieldDescriptorToText :: FieldDescriptor -> Text.Text
-fieldDescriptorToText = undefined
+fieldDescriptorToText (FieldDescriptor jtp) =
+  jTypeToText jtp
 
 -- | Parse a method descriptor
 parseMethodDescriptor :: Parser MethodDescriptor

@@ -4,8 +4,9 @@ Copyright   : (c) Christian Gram Kalhauge, 2017
 License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
 -}
-
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -42,12 +43,12 @@ module Language.JVM.Attribute.Code
   , ArrayType (..)
   , ExactArrayType (..)
 
-  -- * Renames 
+  -- * Renames
   , WordSize
   , LongOffset
   , Offset
-  , LocalAddress 
-  , IncrementAmount 
+  , LocalAddress
+  , IncrementAmount
   ) where
 
 import           GHC.Generics                (Generic)
@@ -57,6 +58,7 @@ import           Prelude                     hiding (fail)
 
 import           Numeric                     (showHex)
 
+import      Unsafe.Coerce
 import           Control.DeepSeq             (NFData)
 import           Control.Monad               hiding (fail)
 import           Control.Monad.Fail          (fail)
@@ -1008,15 +1010,6 @@ putByteCode n bc =
       putInt32be . fromIntegral $ V.length pairs
       V.mapM_ put pairs
 
-    -- 0xab -> do
-    --   offset' <- bytesRead
-    --   let skipAmount = (4 - offset' `mod` 4) `mod` 4
-    --   if skipAmount > 0 then skip $ fromIntegral skipAmount else return ()
-    --   dft <- getInt32be
-    --   npairs <- getInt32be
-    --   pairs <- V.replicateM (fromIntegral npairs) get
-    --   return $ LookupSwitch dft pairs
-
     Return ( Just LInt ) -> putWord8 0xac
     Return ( Just LLong ) -> putWord8 0xad
     Return ( Just LFloat ) -> putWord8 0xae
@@ -1040,22 +1033,6 @@ putByteCode n bc =
       put count
       putWord8 0
     Invoke InvkDynamic ref -> putWord8 0xba >> put ref >> putWord8 0 >> putWord8 0
-
-    -- 0xb9 -> do
-    --   ref <- get
-    --   count <- get
-    --   when (count == 0) $ fail "Should be not zero"
-    --   zero <- getWord8
-    --   when (zero /= 0) $ fail "Should be zero"
-    --   return $ Invoke (InvkInterface count) ref
-    -- 0xba -> do
-    --   ref <- get
-    --   count <- getWord8
-    --   when (count /= 0) $ fail "Should be zero"
-    --   zero <- getWord8
-    --   when (zero /= 0) $ fail "Should be zero"
-    --   return $ Invoke InvkDynamic ref
-
 
     New a -> putWord8 0xbb >> put a
     NewArray x -> do
@@ -1084,6 +1061,53 @@ putByteCode n bc =
     IfRef False One a -> putWord8 0xc6 >> put a
     IfRef True One a -> putWord8 0xc7 >> put a
 
+
+instance Staged Code where
+  stage f Code{..} = do
+    codeByteCode <- f codeByteCode
+    codeExceptionTable <- mapM f codeExceptionTable
+    codeAttributes <- mapM f codeAttributes
+    return $ Code {..}
+
+instance Staged ExceptionTable where
+  stage f ExceptionTable{..} = do
+    catchType <- f catchType
+    return $ ExceptionTable {..}
+
+instance Staged ByteCode where
+  stage f (ByteCode bc) = ByteCode <$> mapM f bc
+
+instance Staged ByteCodeInst where
+  stage f ByteCodeInst{..} = do
+    opcode <- f opcode
+    return $ ByteCodeInst {..}
+
+instance Staged ByteCodeOpr where
+  stage f x =
+    case x of
+      Push c -> Push <$> f c
+      Get fa r -> Get fa <$> f r
+      Put fa r -> Put fa <$> f r
+      Invoke fa r -> Invoke fa <$> f r
+      New r -> New <$> f r
+      NewArray r -> NewArray <$> f r
+      MultiNewArray r u -> MultiNewArray <$> f r <*> pure u
+      CheckCast r -> CheckCast <$> f r
+      InstanceOf r -> InstanceOf <$> f r
+      a -> return $ unsafeCoerce a
+
+instance Staged ExactArrayType where
+  stage f x =
+    case x of
+      EARef r -> EARef <$> f r
+      a -> return $ unsafeCoerce a
+
+instance Staged CConstant where
+  stage f x =
+    case x of
+      CHalfRef r -> CHalfRef <$> f r
+      CRef w r -> CRef w <$> f r
+      a -> return $ unsafeCoerce a
 
 $(deriveBase ''ByteCode)
 $(deriveBase ''ByteCodeInst)

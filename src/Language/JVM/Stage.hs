@@ -33,99 +33,77 @@ class Monad m => DevolveM m where
   unlink :: Referenceable r => r -> m Index
 
 class Staged s where
+  {-# MINIMAL stage | evolve, devolve #-}
+  stage :: Monad m => (forall s'. Staged s' => s' r -> m (s' r')) -> s r -> m (s r')
+  stage f a = f a
+
   evolve ::  EvolveM m => s Low -> m (s High)
+  evolve = stage evolve
+
   devolve :: DevolveM m => s High -> m (s Low)
+  devolve = stage devolve
 
 instance Staged Constant where
-  evolve c =
+  stage f c =
     case c of
       CString s -> pure $ CString s
       CInteger i -> pure $ CInteger i
       CFloat d -> pure $ CFloat d
       CLong l -> pure $ CLong l
       CDouble d -> pure $ CDouble d
-      CClassRef r -> CClassRef <$> evolve r
-      CStringRef r -> CStringRef <$> evolve r
-      CFieldRef r -> CFieldRef <$> evolve r
-      CMethodRef r -> CMethodRef <$> evolve r
-      CInterfaceMethodRef r -> CInterfaceMethodRef <$> evolve r
-      CNameAndType r1 r2 -> CNameAndType <$> evolve r1 <*> evolve r2
-      CMethodHandle mh -> CMethodHandle <$> evolve mh
-      CMethodType r -> CMethodType <$> evolve r
-      CInvokeDynamic i -> CInvokeDynamic <$> evolve i
-  devolve c =
-    case c of
-      CString s -> pure $ CString s
-      CInteger i -> pure $ CInteger i
-      CFloat d -> pure $ CFloat d
-      CLong l -> pure $ CLong l
-      CDouble d -> pure $ CDouble d
-      CClassRef r -> CClassRef <$> devolve r
-      CStringRef r -> CStringRef <$> devolve r
-      CFieldRef r -> CFieldRef <$> devolve r
-      CMethodRef r -> CMethodRef <$> devolve r
-      CInterfaceMethodRef r -> CInterfaceMethodRef <$> devolve r
-      CNameAndType r1 r2 -> CNameAndType <$> devolve r1 <*> devolve r2
-      CMethodHandle mh -> CMethodHandle <$> devolve mh
-      CMethodType r -> CMethodType <$> devolve r
-      CInvokeDynamic i -> CInvokeDynamic <$> devolve i
+      CClassRef r -> CClassRef <$> f r
+      CStringRef r -> CStringRef <$> f r
+      CFieldRef r -> CFieldRef <$> f r
+      CMethodRef r -> CMethodRef <$> f r
+      CInterfaceMethodRef r -> CInterfaceMethodRef <$> f r
+      CNameAndType r1 r2 -> CNameAndType <$> f r1 <*> f r2
+      CMethodHandle mh -> CMethodHandle <$> f mh
+      CMethodType r -> CMethodType <$> f r
+      CInvokeDynamic i -> CInvokeDynamic <$> f i
 
 instance Referenceable r => Staged (Ref r) where
+  stage _ _ = error "Cannot stage a reference"
+
   evolve (RefI ref) = do
     RefV <$> link ref
   devolve (RefV v) = do
     RefI <$> unlink v
 
 instance Referenceable (r High) => Staged (DeepRef r) where
+  stage _ _ = error "Cannot stage a deep reference"
+
   evolve (DeepRef (RefI ref)) = do
     DeepRef . RefV <$> link ref
   devolve (DeepRef (RefV v)) = do
     DeepRef . RefI <$> unlink v
 
 instance Staged InvokeDynamic where
-  evolve (InvokeDynamic w ref) =
-    InvokeDynamic w <$> evolve ref
-  devolve (InvokeDynamic w ref) =
-    InvokeDynamic w <$> devolve ref
+  stage f (InvokeDynamic w ref) =
+    InvokeDynamic w <$> f ref
 
 instance Staged MethodId where
-  evolve (MethodId n d) =
-    MethodId <$> evolve n <*> evolve d
-  devolve (MethodId n d) =
-    MethodId <$> devolve n <*> devolve d
+  stage f (MethodId n d) =
+    MethodId <$> f n <*> f d
 
 instance Referenceable (r High) => Staged (InClass r) where
-  evolve (InClass cn cid) = do
-    InClass <$> evolve cn <*> evolve cid
-  devolve (InClass cn cid) = do
-    InClass <$> devolve cn <*> devolve cid
+  stage f (InClass cn cid) = do
+    InClass <$> f cn <*> f cid
 
 instance Staged MethodHandle where
-  evolve m =
+  stage f m =
     case m of
-      MHField r -> MHField <$> evolve r
-      MHMethod r -> MHMethod <$> evolve r
-      MHInterface r -> MHInterface <$> evolve r
-  devolve m =
-    case m of
-      MHField r -> MHField <$> devolve r
-      MHMethod r -> MHMethod <$> devolve r
-      MHInterface r -> MHInterface <$> devolve r
+      MHField r -> MHField <$> f r
+      MHMethod r -> MHMethod <$> f r
+      MHInterface r -> MHInterface <$> f r
 
 instance Staged MethodHandleMethod where
-  evolve (MethodHandleMethod k ref) =
-    MethodHandleMethod k <$> evolve ref
-  devolve (MethodHandleMethod k ref) =
-    MethodHandleMethod k <$> devolve ref
+  stage f (MethodHandleMethod k ref) =
+    MethodHandleMethod k <$> f ref
 
 instance Staged MethodHandleField where
-  evolve (MethodHandleField k ref) =
-    MethodHandleField k <$> evolve ref
-  devolve (MethodHandleField k ref) =
-    MethodHandleField k <$> devolve ref
+  stage f (MethodHandleField k ref) =
+    MethodHandleField k <$> f ref
 
 instance Staged MethodHandleInterface where
-  evolve (MethodHandleInterface ref) =
-    MethodHandleInterface <$> evolve ref
-  devolve (MethodHandleInterface ref) =
-    MethodHandleInterface <$> devolve ref
+  stage f (MethodHandleInterface ref) =
+    MethodHandleInterface <$> f ref

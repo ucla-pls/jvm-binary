@@ -99,4 +99,5 @@ append c (ConstantPool cp) =
         (k, a):_ ->
           k + constantSize a
         _ -> 0
+
 $(deriveBase ''ConstantPool)

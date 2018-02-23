@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell    #-}
 {-|
 Module      : Language.JVM.Method
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -12,27 +12,28 @@ Maintainer  : kalhuage@cs.ucla.edu
 {-# LANGUAGE StandaloneDeriving #-}
 module Language.JVM.Method
   ( Method (..)
-
   , mAccessFlags
   , mName
   , mDescriptor
-  , mAttributes
 
   -- * Attributes
-  -- , mCode
-  -- , mExceptions'
-  -- , mExceptions
+  , MethodAttributes (..)
+  , mCode
+  , mExceptions'
+  , mExceptions
 
   ) where
 
-import           Data.Set (Set)
-import qualified Data.Text as Text
+import           Data.Monoid
+import           Data.Maybe
+import           Data.Set                (Set)
+import qualified Data.Text               as Text
 
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
--- import           Language.JVM.Attribute.Exceptions (exceptionIndexTable)
-import           Language.JVM.Stage
+import           Language.JVM.Attribute.Exceptions (exceptionIndexTable)
 import           Language.JVM.Constant
+import           Language.JVM.Stage
 import           Language.JVM.Utils
 
 -- | A Method in the class-file, as described
@@ -41,16 +42,12 @@ data Method r = Method
   { mAccessFlags'    :: BitSet16 MAccessFlag
   , mNameIndex       :: Ref Text.Text r
   , mDescriptorIndex :: Ref MethodDescriptor r
-  , mAttributes'     :: SizedList16 (Attribute r)
+  , mAttributes      :: Choice r (SizedList16 (Attribute r)) (MethodAttributes r)
   }
 
 -- | Unpack the BitSet and get the AccessFlags as a Set.
 mAccessFlags :: Method r -> Set MAccessFlag
 mAccessFlags = toSet . mAccessFlags'
-
--- | Unpack the SizedList and get the attributes as a List.
-mAttributes :: Method r -> [Attribute r]
-mAttributes = unSizedList . mAttributes'
 
 -- | Lookup the name of the method in the 'ConstantPool'.
 mName :: Method High -> Text.Text
@@ -64,45 +61,55 @@ mDescriptor = valueF mDescriptorIndex
 -- mCode = . choseValue . mAttributes'
 
 data MethodAttributes r = MethodAttributes
-  { maCode :: Maybe (Code r)
-  , maExceptions :: Maybe (Exceptions r)
-  , maAttributes :: [Attribute r]
+  { maCode       :: [Code r]
+  , maExceptions :: [Exceptions r]
+  , maOthers :: [Attribute r]
   }
 
--- -- | Fetch the 'Code' attribute, if any.
--- -- There can only be one code attribute in a method.
--- mCode :: Method -> PoolAccess (Maybe (Either String Code))
--- mCode = fmap firstOne . matching mAttributes
+-- | Fetch the 'Code' attribute, if any.
+-- There can only be one code attribute in a method.
+mCode :: Method High -> Maybe (Code High)
+mCode =
+  firstOne . maCode . mAttributes
 
--- -- | Fetch the 'Exceptions' attribute.
--- -- There can only be one exceptions attribute in a method.
--- mExceptions' :: Method -> PoolAccess (Maybe (Either String Exceptions))
--- mExceptions' = fmap firstOne . matching mAttributes
+-- | Fetch the 'Exceptions' attribute.
+-- There can only be one exceptions attribute in a method.
+mExceptions' :: Method High -> Maybe (Exceptions High)
+mExceptions' =
+  firstOne . maExceptions . mAttributes
 
--- -- | Fetches the 'Exceptions' attribute, but turns it into an list of exceptions.
--- -- If no exceptions field where found the empty list is returned
--- mExceptions :: Method -> PoolAccess (Either String [ClassName])
--- mExceptions m = do
---   exs <- mExceptions' m
---   case exs of
---     Just (Right a) ->
---       Right <$> mapM deref (exceptionIndexTable a)
---     Just (Left msg) ->
---       return $ Left msg
---     Nothing ->
---       return $ Right []
+-- | Fetches the 'Exceptions' attribute, but turns it into an list of exceptions.
+-- If no exceptions field where found the empty list is returned
+mExceptions :: Method High -> [ClassName]
+mExceptions =
+  map value . fromMaybe [] . fmap exceptionIndexTable . mExceptions'
 
 instance Staged Method where
   evolve (Method mf mn md mattr) = do
     mn' <- evolve mn
     md' <- evolve md
-    mattr' <- mapM evolve mattr
+    mattr' <- fromCollector <$> fromAttributes collect' mattr
     return $ Method mf mn' md' mattr'
+    where
+      fromCollector (a, b, c) =
+        MethodAttributes (appEndo a []) (appEndo b []) (appEndo c [])
+      collect' attr =
+        collect (mempty, mempty, Endo (attr:)) attr
+          [ toC $ \e -> (Endo (e:), mempty, mempty)
+          , toC $ \e -> (mempty, Endo (e:), mempty)
+          ]
 
   devolve (Method mf mn md mattr) = do
     mn' <- devolve mn
     md' <- devolve md
-    mattr' <- mapM devolve mattr
-    return $ Method mf mn' md' mattr'
+    mattr' <- fromMethodAttributes $ mattr
+    return $ Method mf mn' md' (SizedList mattr')
+    where
+      fromMethodAttributes (MethodAttributes a b c) = do
+        a' <- mapM toAttribute a
+        b' <- mapM toAttribute b
+        c' <- mapM devolve c
+        return (a' ++ b' ++ c')
 
+$(deriveBase ''MethodAttributes)
 $(deriveBaseWithBinary ''Method)

@@ -126,7 +126,7 @@ instance Binary (Ref a Low) where
 idx :: Ref a Low -> Word16
 idx (RefI w) = w
 
-newtype DeepRef v r = DeepRef (Ref (v r) r)
+newtype DeepRef v r = DeepRef { unDeep :: (Ref (v r) r) }
 
 deriving instance Show (DeepRef v Low)
 deriving instance NFData (DeepRef v Low)

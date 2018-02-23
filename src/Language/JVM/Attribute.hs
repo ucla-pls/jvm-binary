@@ -28,6 +28,8 @@ module Language.JVM.Attribute
 
   -- * Helpers
   , fromAttributes
+  , toC
+  , collect
   , Const
   -- , matching
   , firstOne
@@ -37,6 +39,7 @@ module Language.JVM.Attribute
 -- import           Data.Foldable
 import           Data.List as List
 import           Data.Bifunctor
+import           Control.Monad
 -- import           Data.Maybe
 import qualified Data.ByteString.Lazy                    as BL
 import           Data.Binary
@@ -44,8 +47,8 @@ import           Data.Binary
 import qualified Data.Text as Text
 
 import           Language.JVM.Stage
--- import           Language.JVM.Constant
-import           Language.JVM.Utils                      (trd)
+import           Language.JVM.Constant
+import           Language.JVM.Utils
 
 import           Language.JVM.Attribute.BootstrapMethods (BootstrapMethods)
 import Language.JVM.Attribute.Code (Code)
@@ -78,17 +81,34 @@ class (Binary (a Low), Staged a) => IsAttribute a where
       either attributeError evolve $ fromAttribute' as
     else Nothing
 
--- -- | Return a list of either parsed attributes or error messages from an object
--- -- given a function that object to a collection of attributes. The list only
--- -- contains matching attributes.
--- matching
---   :: (IsAttribute a, Traversable t)
---   => (b -> t Attribute)
---   -> b
---   -> PoolAccess [Either String a]
--- matching fn b = do
---   catMaybes . toList <$> sequence (fromAttribute' <$> fn b)
+  toAttribute' :: a Low -> Attribute High
+  toAttribute' a =
+    let name = unConst (attrName :: Const Text.Text (a Low))
+        bytes = encode a
+    in Attribute (RefV name) (SizedByteString . BL.toStrict $ bytes)
 
+  toAttribute :: DevolveM m => a High -> m (Attribute Low)
+  toAttribute a = do
+    a' <- devolve a
+    devolve $ toAttribute' a'
+
+  -- toAttribute :: DevolveM m => a High -> m (Attribute Low)
+  -- toAttribute
+
+toC :: (EvolveM m, IsAttribute a) => (a High -> c) -> Attribute High -> Maybe (m c)
+toC f attr =
+  case fromAttribute attr of
+    Just m -> Just $ f <$> m
+    Nothing -> Nothing
+
+collect :: (Monad m) => c -> Attribute High -> [Attribute High -> Maybe (m c)] -> m c
+collect c attr options =
+  case msum $ map ($ attr) options of
+    Just x -> x
+    Nothing -> return c
+
+-- | Given a 'Foldable' structure 'f', and a function that can calculate a
+-- monoid given an 'Attribute' calculate the monoid over all attributes.
 fromAttributes ::
   (Foldable f, EvolveM m, Monoid a)
   => (Attribute High -> m a)
@@ -106,28 +126,28 @@ readFromStrict :: Binary a => Attribute r -> Either String a
 readFromStrict =
     bimap trd trd . decodeOrFail . BL.fromStrict . aInfo
 
+
 -- # Attributes
 
 -- | 'ConstantValue' is an Attribute.
 instance IsAttribute ConstantValue where
   attrName = Const "ConstantValue"
 
--- -- | 'Code' is an Attribute.
--- instance IsAttribute Code where
---   attrName = Const "Code"
+-- | 'Code' is an Attribute.
+instance IsAttribute Code where
+  attrName = Const "Code"
 
+-- | 'Exceptions' is an Attribute.
+instance IsAttribute Exceptions where
+  attrName = Const "Exceptions"
 
--- -- | 'Exceptions' is an Attribute.
--- instance IsAttribute Exceptions where
---   attrName = Const "Exceptions"
+-- | 'StackMapTable' is an Attribute.
+instance IsAttribute StackMapTable where
+  attrName = Const "StackMapTable"
 
--- -- | 'StackMapTable' is an Attribute.
--- instance IsAttribute StackMapTable where
---   attrName = Const "StackMapTable"
-
--- -- | 'BootstrapMethods' is an Attribute.
--- instance IsAttribute BootstrapMethods where
---   attrName = Const "BootstrapMethods"
+-- | 'BootstrapMethods' is an Attribute.
+instance IsAttribute BootstrapMethods where
+  attrName = Const "BootstrapMethods"
 
 -- | Maybe return the first element of a list
 firstOne :: [a] -> Maybe a

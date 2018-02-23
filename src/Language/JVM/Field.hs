@@ -17,10 +17,11 @@ module Language.JVM.Field
   , fAccessFlags
   -- * Attributes
   , fConstantValue
+  , FieldAttributes (..)
   ) where
 
 
-
+import Data.Monoid
 import qualified Data.Set                as Set
 import qualified Data.Text               as Text
 
@@ -53,47 +54,37 @@ fDescriptor :: Field High -> FieldDescriptor
 fDescriptor = valueF fDescriptorIndex
 
 -- | Fetch the 'ConstantValue' attribute.
--- There can only one be one exceptions attribute on a field.
 fConstantValue :: Field High -> Maybe (ConstantValue High)
 fConstantValue =
-  faConstantValue . fAttributes
+  firstOne . faConstantValues . fAttributes
 
 data FieldAttributes r = FieldAttributes
-  { faConstantValue :: Maybe (ConstantValue r)
-  , faOthers        :: [ Attribute r ]
+  { faConstantValues :: [ ConstantValue r ]
+  , faOthers         :: [ Attribute r ]
   }
-
-instance Monoid (FieldAttributes r) where
-  mempty = FieldAttributes Nothing []
-  mappend (FieldAttributes ac ao) (FieldAttributes bc bo) =
-    case (ac, bc) of
-      (Just _, Just bx) ->
-        FieldAttributes ac (ao ++ bo)
-      (Just _, Nothing) ->
-        FieldAttributes ac (ao ++ bo)
-      _ ->
-        FieldAttributes bc (ao ++ bo)
-
-
-toFieldAttributes :: EvolveM m => Attribute High -> m (FieldAttributes High)
-toFieldAttributes attr =
-  case fromAttribute attr of
-    Just m ->
-      flip FieldAttributes [] . Just <$> m
-    Nothing ->
-      return $ FieldAttributes Nothing [attr]
 
 instance Staged Field where
   evolve field = do
     fi <- evolve (fNameIndex field)
     fd <- evolve (fDescriptorIndex field)
-    fattr <- fromAttributes toFieldAttributes $ fAttributes field
+    fattr <- fromCollector <$> fromAttributes collect' (fAttributes field)
     return $ Field (fAccessFlags' field) fi fd fattr
+    where
+      fromCollector (cv, others) =
+        FieldAttributes (appEndo cv []) (appEndo others [])
+      collect' attr =
+        collect (mempty, Endo(attr:)) attr
+          [ toC $ \x -> (Endo (x:), mempty) ]
+
   devolve field = do
     fi <- devolve (fNameIndex field)
     fd <- devolve (fDescriptorIndex field)
-    -- fattr <- mapM devolve (fAttributes field)
-    return $ Field (fAccessFlags' field) fi fd (SizedList [])
+    fattr <- fromFieldAttributes (fAttributes field)
+    return $ Field (fAccessFlags' field) fi fd (SizedList fattr)
+
+    where
+      fromFieldAttributes (FieldAttributes cvs attr) =
+        (++) <$> mapM toAttribute cvs <*> mapM devolve attr
 
 $(deriveBase ''FieldAttributes)
 $(deriveBaseWithBinary ''Field)

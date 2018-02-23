@@ -8,6 +8,19 @@ module Language.JVM.ClassFileReader
   , encodeClassFile
   , evolveClassFile
   , devolveClassFile
+  , devolveClassFile'
+
+  -- * Evolve
+  , Evolve
+  , runEvolve
+  , bootstrapConstantPool
+
+  -- * Builder
+  , ConstantPoolBuilder
+  , runConstantPoolBuilder
+  , CPBuilder (..)
+  , builderFromConstantPool
+  , cpbEmpty
   ) where
 
 import           Control.DeepSeq           (NFData)
@@ -15,7 +28,7 @@ import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
 import qualified Data.ByteString.Lazy      as BL
-import           Data.IntMap               as IM
+import qualified Data.IntMap               as IM
 import qualified Data.Map                  as Map
 import           Data.Monoid
 import           Data.Binary
@@ -58,7 +71,7 @@ devolveClassFile cf =
 -- want to throw away anything in the program
 devolveClassFile' :: ConstantPool Low -> ClassFile High -> ClassFile Low
 devolveClassFile' cp cf =
-  let (cf', cpb) = runConstantPoolBuilder (devolve cf) (cpbFromCp cp) in
+  let (cf', cpb) = runConstantPoolBuilder (devolve cf) (builderFromConstantPool cp) in
   cf' { cConstantPool = cpbConstantPool cpb }
 
 -- $deref
@@ -94,6 +107,9 @@ instance EvolveM Evolve where
     r' <- reader (access w)
     r <- either (throwError . CFEPoolAccessError) return r'
     fromConst (throwError . CFEInconsistentClassPool) r
+
+  attributeError msg = do
+    throwError (CFEConversionError msg)
 
 -- | Untie the constant pool, this requires a special operation as the constant pool
 -- might reference itself.
@@ -135,15 +151,21 @@ stateCPBuilder f cpb =
   let (a, cp') = f . cpbConstantPool $ cpb in
   (a, cpb { cpbConstantPool = cp'})
 
-newtype ContantPoolBuilder a =
-  ContantPoolBuilder (State CPBuilder a)
+builderFromConstantPool :: ConstantPool Low -> CPBuilder
+builderFromConstantPool cp =
+  CPBuilder (Map.fromList . map change . IM.toList $ unConstantPool cp) cp
+  where
+    change (a, b) = (b, fromIntegral a)
+
+newtype ConstantPoolBuilder a =
+  ConstantPoolBuilder (State CPBuilder a)
   deriving (Monad, MonadState CPBuilder, Functor, Applicative)
 
-runConstantPoolBuilder :: ContantPoolBuilder a -> CPBuilder -> (a, CPBuilder)
-runConstantPoolBuilder (ContantPoolBuilder m) a=
+runConstantPoolBuilder :: ConstantPoolBuilder a -> CPBuilder -> (a, CPBuilder)
+runConstantPoolBuilder (ConstantPoolBuilder m) a=
   runState m a
 
-instance DevolveM ContantPoolBuilder where
+instance DevolveM ConstantPoolBuilder where
   unlink r = do
     c <- toConst r
     c' <- devolve c

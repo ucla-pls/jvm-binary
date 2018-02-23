@@ -23,12 +23,16 @@ import           Language.JVM.Utils
 
 -- | An Exceptions attribute is a list of references into the
 -- constant pool.
-data Exceptions r = Exceptions
+newtype Exceptions r = Exceptions
   { exceptionIndexTable' :: SizedList16 (Ref ClassName r)
   }
 
 -- | Get the constant refs that points .
 exceptionIndexTable :: Exceptions r -> [(Ref ClassName r)]
 exceptionIndexTable = unSizedList . exceptionIndexTable'
+
+instance Staged Exceptions where
+  evolve (Exceptions t) = Exceptions <$> mapM evolve t
+  devolve (Exceptions t) = Exceptions <$> mapM devolve t
 
 $(deriveBaseWithBinary ''Exceptions)
