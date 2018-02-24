@@ -24,25 +24,24 @@ test_reading_classfile = testSomeFiles $ do
         cp :: Either ClassFileError (ConstantPool High)
         cp = bootstrapConstantPool (cConstantPool cls)
       cp `shouldSatisfy` isRight
-      -- let Right cp' = cp
-      -- forM_ (cMethods' cls) $ \m -> do
-      --   print . runEvolve cp' $ do
-      --     x <- evolve (mDescriptorIndex m)
-      --     n <- evolve (mNameIndex m)
-      --     return (n, x)
-      --   case (runEvolve cp' (evolve m)) of
-      --     Right m ->
-      --       print "works"
-      --     Left err -> do
-      --       print err
-      --       forM_ (mAttributes m) $ \a -> do
-      --         -- Assume code
-      --         case fromAttribute' a of
-      --           Right c -> do
-      --             forM_ (C.unByteCode . C.codeByteCode $ c) $ \i ->
-      --               putStr " -> " >> print i
-      --           Left x ->
-      --             print x
+      let Right cp' = cp
+      forM_ (cMethods' cls) $ \m -> do
+        case (runEvolve cp' (evolve m)) of
+          Right m -> return ()
+          Left err -> do
+            putStr (show err) >> putStr ": "
+            print . runEvolve cp' $ do
+              x <- evolve (mDescriptorIndex m)
+              n <- evolve (mNameIndex m)
+              return (n, x)
+            forM_ (mAttributes m) $ \a -> do
+              -- Assume code
+              case fromAttribute' a of
+                Right c -> do
+                  forM_ (C.unByteCode . C.codeByteCode $ c) $ \i ->
+                    putStr " -> " >> print i
+                Left x ->
+                  print x
 
     it "can untie the whole class file" $ \cls -> do
       evolveClassFile cls `shouldSatisfy` isRight

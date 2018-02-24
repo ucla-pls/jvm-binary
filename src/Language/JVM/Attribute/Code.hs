@@ -6,13 +6,15 @@ Maintainer  : kalhuage@cs.ucla.edu
 -}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell    #-}
 module Language.JVM.Attribute.Code
   ( Code (..)
+  , CodeAttributes (..)
 
   , ByteCode (..)
   , ExceptionTable (..)
@@ -51,29 +53,33 @@ module Language.JVM.Attribute.Code
   , IncrementAmount
   ) where
 
-import           GHC.Generics                (Generic)
+import           GHC.Generics                         (Generic)
 
-import           Prelude                     hiding (fail)
--- import qualified Prelude                     as P
+import           Prelude                              hiding (fail)
+import           Numeric                              (showHex)
 
-import           Numeric                     (showHex)
-
-import      Unsafe.Coerce
-import           Control.DeepSeq             (NFData)
-import           Control.Monad               hiding (fail)
-import           Control.Monad.Fail          (fail)
+import           Control.DeepSeq                      (NFData)
+import           Control.Monad                        hiding (fail)
+import           Control.Monad.Fail                   (fail)
+import           Unsafe.Coerce
 
 import           Data.Binary
-import           Data.Binary.Get             hiding (Get)
-import           Data.Binary.Put             hiding (Put)
-import qualified Data.ByteString.Lazy        as BL
+import           Data.Binary.Get                      hiding (Get)
+import           Data.Binary.Put                      hiding (Put)
+import qualified Data.ByteString.Lazy                 as BL
 import           Data.Int
-import qualified Data.Vector                 as V
+import           Data.Monoid
+import qualified Data.Vector                          as V
 
 import           Language.JVM.Attribute.Base
+import           Language.JVM.Attribute.StackMapTable
 import           Language.JVM.Constant
 import           Language.JVM.Stage
 import           Language.JVM.Utils
+
+-- | 'Code' is an Attribute.
+instance IsAttribute Code where
+  attrName = Const "Code"
 
 -- | Code contains the actual byte-code. The 'i' type parameter is added to
 -- allow indicate the two stages of the code file, before and after access to
@@ -83,8 +89,9 @@ data Code r = Code
   , codeMaxLocals      :: Word16
   , codeByteCode       :: (ByteCode r)
   , codeExceptionTable :: SizedList16 (ExceptionTable r)
-  , codeAttributes     :: SizedList16 (Attribute r)
+  , codeAttributes     :: Choice r (SizedList16 (Attribute r)) (CodeAttributes r)
   }
+
 
 newtype ByteCode i = ByteCode
   { unByteCode :: Choice i [ByteCodeInst i] [ByteCodeOpr i]
@@ -244,7 +251,7 @@ data CastOpr
 
 
 data SwitchTable = SwitchTable
-  { switchLow :: Int32
+  { switchLow     :: Int32
   , switchOffsets :: V.Vector (LongOffset)
   } deriving (Show, Ord, Eq, Generic, NFData)
 
@@ -776,14 +783,14 @@ putByteCode n bc =
 
     ArrayLoad t ->
       case t of
-        AInt -> putWord8 0x2e
-        ALong -> putWord8 0x2f
-        AFloat -> putWord8 0x30
+        AInt    -> putWord8 0x2e
+        ALong   -> putWord8 0x2f
+        AFloat  -> putWord8 0x30
         ADouble -> putWord8 0x31
-        ARef -> putWord8 0x32
-        AByte -> putWord8 0x33
-        AChar -> putWord8 0x34
-        AShort -> putWord8 0x35
+        ARef    -> putWord8 0x32
+        AByte   -> putWord8 0x33
+        AChar   -> putWord8 0x34
+        AShort  -> putWord8 0x35
 
     Store tp vl ->
       case tp of
@@ -1062,13 +1069,34 @@ putByteCode n bc =
     IfRef False One a -> putWord8 0xc6 >> put a
     IfRef True One a -> putWord8 0xc7 >> put a
 
+data CodeAttributes r = CodeAttributes
+  { caStackMapTable :: [ StackMapTable r ]
+  , caOthers        :: [ Attribute r ]
+  }
 
 instance Staged Code where
-  stage f Code{..} = do
-    codeByteCode <- f codeByteCode
-    codeExceptionTable <- mapM f codeExceptionTable
-    codeAttributes <- mapM f codeAttributes
+  evolve Code{..} = do
+    codeByteCode <- evolve codeByteCode
+    codeExceptionTable <- mapM evolve codeExceptionTable
+    codeAttributes <- fromCollector <$> fromAttributes collect' codeAttributes
     return $ Code {..}
+    where
+      fromCollector (a, b) =
+        CodeAttributes (appEndo a []) (appEndo b [])
+      collect' attr =
+        collect (mempty, Endo (attr:)) attr
+          [ toC $ \e -> (Endo (e:), mempty) ]
+  devolve Code{..} = do
+    codeByteCode <- devolve codeByteCode
+    codeExceptionTable <- mapM devolve codeExceptionTable
+    codeAttributes <- SizedList <$> fromCodeAttributes codeAttributes
+    return $ Code {..}
+    where
+      fromCodeAttributes (CodeAttributes a b) = do
+        a' <- mapM toAttribute a
+        b' <- mapM devolve b
+        return (a' ++ b')
+
 
 instance Staged ExceptionTable where
   stage f ExceptionTable{..} = do
@@ -1089,38 +1117,38 @@ instance Staged ByteCodeInst where
 instance Staged Invokation where
   stage f i =
     case i of
-      InvkSpecial r -> InvkSpecial <$> f r
-      InvkVirtual r -> InvkVirtual <$> f r
-      InvkStatic r -> InvkStatic <$> f r
+      InvkSpecial r     -> InvkSpecial <$> f r
+      InvkVirtual r     -> InvkVirtual <$> f r
+      InvkStatic r      -> InvkStatic <$> f r
       InvkInterface w r -> InvkInterface w <$> f r
-      InvkDynamic r -> InvkDynamic <$> f r
+      InvkDynamic r     -> InvkDynamic <$> f r
 
 instance Staged ByteCodeOpr where
   stage f x =
     case x of
-      Push c -> Push <$> f c
-      Get fa r -> Get fa <$> f r
-      Put fa r -> Put fa <$> f r
-      Invoke r -> Invoke <$> f r
-      New r -> New <$> f r
-      NewArray r -> NewArray <$> f r
+      Push c            -> Push <$> f c
+      Get fa r          -> Get fa <$> f r
+      Put fa r          -> Put fa <$> f r
+      Invoke r          -> Invoke <$> f r
+      New r             -> New <$> f r
+      NewArray r        -> NewArray <$> f r
       MultiNewArray r u -> MultiNewArray <$> f r <*> pure u
-      CheckCast r -> CheckCast <$> f r
-      InstanceOf r -> InstanceOf <$> f r
-      a -> return $ unsafeCoerce a
+      CheckCast r       -> CheckCast <$> f r
+      InstanceOf r      -> InstanceOf <$> f r
+      a                 -> return $ unsafeCoerce a
 
 instance Staged ExactArrayType where
   stage f x =
     case x of
       EARef r -> EARef <$> f r
-      a -> return $ unsafeCoerce a
+      a       -> return $ unsafeCoerce a
 
 instance Staged CConstant where
   stage f x =
     case x of
       CHalfRef r -> CHalfRef <$> f r
-      CRef w r -> CRef w <$> f r
-      a -> return $ unsafeCoerce a
+      CRef w r   -> CRef w <$> f r
+      a          -> return $ unsafeCoerce a
 
 $(deriveBase ''ByteCode)
 $(deriveBase ''ByteCodeInst)
@@ -1128,5 +1156,6 @@ $(deriveBase ''ByteCodeOpr)
 $(deriveBase ''Invokation)
 $(deriveBase ''CConstant)
 $(deriveBase ''ExactArrayType)
+$(deriveBase ''CodeAttributes)
 $(deriveBaseWithBinary ''Code)
 $(deriveBaseWithBinary ''ExceptionTable)

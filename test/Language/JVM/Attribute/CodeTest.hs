@@ -5,17 +5,15 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Language.JVM.Attribute.CodeTest where
 
--- -- import           Data.Int
 import qualified Data.Vector as V
 import           Generic.Random
 import           SpecHelper
 
 import           Language.JVM.AttributeTest  ()
+import           Language.JVM.Attribute.StackMapTableTest  ()
 import           Language.JVM.Attribute.Code
 import           Language.JVM.Constant
--- import           Language.JVM.ConstantTest
 import           Language.JVM.UtilsTest      ()
-import           Language.JVM.Utils
 
 prop_roundtrip_Code :: Code High -> Property
 prop_roundtrip_Code = isoRoundtrip
@@ -36,8 +34,11 @@ instance Arbitrary (Code High) where
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
-  shrink (Code ms ml bc _ _) =
-    [ Code ms ml bc' (SizedList []) (SizedList []) | bc' <- shrink bc ]
+  shrink (Code ms ml bc ac xs) =
+    Code ms ml <$> shrink bc <*> shrink ac <*> shrink xs
+
+instance Arbitrary (CodeAttributes High) where
+  arbitrary = genericArbitraryU
 
 instance Arbitrary (ByteCode High) where
   arbitrary =

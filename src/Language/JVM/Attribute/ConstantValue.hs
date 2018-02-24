@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell    #-}
 {-|
@@ -16,8 +17,14 @@ module Language.JVM.Attribute.ConstantValue
   ( ConstantValue (..)
   ) where
 
+import           Language.JVM.Attribute.Base
 import           Language.JVM.Constant
 import           Language.JVM.Stage
+
+-- | 'ConstantValue' is an Attribute.
+instance IsAttribute ConstantValue where
+  attrName = Const "ConstantValue"
+
 
 -- | A constant value is just a index into the constant pool.
 data ConstantValue r = ConstantValue

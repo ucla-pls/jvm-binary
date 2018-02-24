@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-|
 Module      : Language.JVM.Attribute.BootstrapMethods
@@ -23,8 +24,13 @@ module Language.JVM.Attribute.BootstrapMethods
   ) where
 
 import           Language.JVM.Constant
+import           Language.JVM.Attribute.Base
 import           Language.JVM.Stage
 import           Language.JVM.Utils
+
+-- | 'BootstrapMethods' is an Attribute.
+instance IsAttribute BootstrapMethods where
+  attrName = Const "BootstrapMethods"
 
 -- | Is a list of bootstrapped methods.
 newtype BootstrapMethods r = BootstrapMethods

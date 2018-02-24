@@ -57,9 +57,6 @@ mName = valueF mNameIndex
 mDescriptor :: Method High -> MethodDescriptor
 mDescriptor = valueF mDescriptorIndex
 
--- mCode :: (WithValue r) => Method r -> Maybe (Code r)
--- mCode = . choseValue . mAttributes'
-
 data MethodAttributes r = MethodAttributes
   { maCode       :: [Code r]
   , maExceptions :: [Exceptions r]

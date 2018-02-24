@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric   #-}
 {-# LANGUAGE DeriveAnyClass   #-}
 {-|
@@ -17,9 +18,15 @@ module Language.JVM.Attribute.Exceptions
   , exceptionIndexTable
   ) where
 
+import           Language.JVM.Attribute.Base
 import           Language.JVM.Stage
 import           Language.JVM.Constant
 import           Language.JVM.Utils
+
+
+-- | 'Exceptions' is an Attribute.
+instance IsAttribute Exceptions where
+  attrName = Const "Exceptions"
 
 -- | An Exceptions attribute is a list of references into the
 -- constant pool.

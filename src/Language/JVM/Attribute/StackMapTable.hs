@@ -3,6 +3,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveGeneric   #-}
 {-# LANGUAGE DeriveAnyClass   #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-|
 Module      : Language.JVM.Attribute.StackMapTable
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -30,6 +31,11 @@ import           Control.Monad (replicateM)
 import           Language.JVM.Constant
 import           Language.JVM.Stage
 import           Language.JVM.Utils
+import           Language.JVM.Attribute.Base
+
+-- | 'StackMapTable' is an Attribute.
+instance IsAttribute StackMapTable where
+  attrName = Const "StackMapTable"
 
 -- | An Exceptions attribute is a list of references into the
 -- constant pool.
