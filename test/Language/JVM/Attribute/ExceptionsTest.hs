@@ -8,8 +8,8 @@ import Language.JVM.Attribute.Exceptions
 import Language.JVM.Constant
 import Language.JVM.ConstantTest ()
 
-prop_Exceptions_roundtrip :: Exceptions High -> Property
-prop_Exceptions_roundtrip = isoRoundtrip
+prop_roundtrip_Exceptions :: Exceptions High -> Property
+prop_roundtrip_Exceptions = isoRoundtrip
 
 instance Arbitrary (Exceptions High) where
   arbitrary = genericArbitraryU

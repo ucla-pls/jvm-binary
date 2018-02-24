@@ -8,8 +8,8 @@ import Language.JVM.Attribute.BootstrapMethods
 import Language.JVM.Constant
 import Language.JVM.ConstantTest ()
 
-prop_BootstrapMethods_roundtrip :: BootstrapMethods High -> Property
-prop_BootstrapMethods_roundtrip = isoRoundtrip
+prop_roundtrip_BootstrapMethods :: BootstrapMethods High -> Property
+prop_roundtrip_BootstrapMethods = isoRoundtrip
 
 instance Arbitrary (BootstrapMethods High) where
   arbitrary = genericArbitraryU

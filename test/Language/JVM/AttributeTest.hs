@@ -12,8 +12,8 @@ import Language.JVM.UtilsTest ()
 
 import qualified Data.ByteString as BS
 
-prop_roundtrip :: Attribute High -> Property
-prop_roundtrip = isoRoundtrip
+prop_roundtrip_Attribute :: Attribute High -> Property
+prop_roundtrip_Attribute = isoRoundtrip
 
 instance Arbitrary (Attribute High) where
   arbitrary = do

@@ -19,8 +19,8 @@ import Language.JVM.ConstantTest ()
 import Language.JVM.FieldTest ()
 import Language.JVM.MethodTest ()
 
-prop_roundtrip :: ClassFile High -> Property
-prop_roundtrip = isoRoundtrip
+prop_roundtrip_ClassFile :: ClassFile High -> Property
+prop_roundtrip_ClassFile = isoRoundtrip
 
 instance Arbitrary (ClassAttributes High) where
   arbitrary = ClassAttributes <$> pure [] <*> pure []

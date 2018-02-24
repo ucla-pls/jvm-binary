@@ -13,8 +13,8 @@ import Language.JVM.Attribute.CodeTest ()
 import Language.JVM.Attribute.ExceptionsTest ()
 import Language.JVM.Constant
 
-prop_Method_roundtrip :: Method High -> Property
-prop_Method_roundtrip = isoRoundtrip
+prop_roundtrip_Method :: Method High -> Property
+prop_roundtrip_Method = isoRoundtrip
 
 instance Arbitrary (MethodAttributes High) where
   arbitrary =

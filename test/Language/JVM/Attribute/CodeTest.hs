@@ -17,8 +17,8 @@ import           Language.JVM.Constant
 import           Language.JVM.UtilsTest      ()
 import           Language.JVM.Utils
 
-prop_roundtrip :: Code High -> Property
-prop_roundtrip = isoRoundtrip
+prop_roundtrip_Code :: Code High -> Property
+prop_roundtrip_Code = isoRoundtrip
 
 prop_roundtrip_ByteCode :: ByteCode High -> Property
 prop_roundtrip_ByteCode = isoRoundtrip

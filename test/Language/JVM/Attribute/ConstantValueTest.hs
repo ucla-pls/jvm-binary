@@ -8,8 +8,8 @@ import Language.JVM.Attribute.ConstantValue
 import Language.JVM.Constant
 import Language.JVM.ConstantTest ()
 
-prop_ConstantValue_roundtrip :: ConstantValue High -> Property
-prop_ConstantValue_roundtrip = isoRoundtrip
+prop_roundtrip_ConstantValue :: ConstantValue High -> Property
+prop_roundtrip_ConstantValue = isoRoundtrip
 
 instance Arbitrary (ConstantValue High) where
   arbitrary = genericArbitraryU

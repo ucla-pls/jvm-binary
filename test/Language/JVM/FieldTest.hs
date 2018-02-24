@@ -11,8 +11,8 @@ import Language.JVM.AttributeTest ()
 import Language.JVM.Attribute.ConstantValueTest ()
 import Language.JVM.Constant
 
-prop_roundtrip :: Field High -> Property
-prop_roundtrip = isoRoundtrip
+prop_roundtrip_Field :: Field High -> Property
+prop_roundtrip_Field = isoRoundtrip
 
 instance Arbitrary (FieldAttributes High) where
   arbitrary =

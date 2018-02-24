@@ -19,8 +19,8 @@ import Language.JVM.TypeTest ()
 -- prop_Constant_encode_and_decode :: Constant Low -> Property
 -- prop_Constant_encode_and_decode = isoBinary
 
-prop_Constant_roundtrip :: Constant High -> Property
-prop_Constant_roundtrip = isoRoundtrip
+prop_roundtrip_Constant :: Constant High -> Property
+prop_roundtrip_Constant = isoRoundtrip
 
 instance Arbitrary Text.Text where
   arbitrary =

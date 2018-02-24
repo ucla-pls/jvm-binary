@@ -18,11 +18,11 @@ import           Language.JVM.Attribute.StackMapTable
 -- prop_encode_and_decode :: StackMapTable Low -> Property
 -- prop_encode_and_decode = isoBinary
 
-prop_roundtrip :: StackMapTable High -> Property
-prop_roundtrip = isoRoundtrip
+prop_roundtrip_StackMapTable :: StackMapTable High -> Property
+prop_roundtrip_StackMapTable = isoRoundtrip
 
-prop_StackMapFrame_roundtrip :: StackMapFrame High -> Property
-prop_StackMapFrame_roundtrip = isoRoundtrip
+prop_roundtrip_StackMapFrame :: StackMapFrame High -> Property
+prop_roundtrip_StackMapFrame = isoRoundtrip
 
 instance Arbitrary (StackMapTable High) where
   arbitrary = StackMapTable <$> arbitrary
