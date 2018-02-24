@@ -87,7 +87,7 @@ data Code r = Code
   }
 
 newtype ByteCode i = ByteCode
-  { unByteCode :: [ByteCodeInst i]
+  { unByteCode :: Choice i [ByteCodeInst i] [ByteCodeOpr i]
   }
 
 instance Binary (ByteCode Low) where
@@ -157,14 +157,13 @@ data ExactArrayType r
   = EABoolean | EAByte | EAChar | EAShort | EAInt | EALong
   | EAFloat | EADouble | EARef (Ref ClassName r)
 
-data Invokation
-  = InvkSpecial
-  | InvkVirtual
-  | InvkStatic
-  | InvkInterface Word8
+data Invokation r
+  = InvkSpecial (DeepRef (InClass MethodId) r)
+  | InvkVirtual (DeepRef (InClass MethodId) r)
+  | InvkStatic (DeepRef (InClass MethodId) r)
+  | InvkInterface Word8 (DeepRef (InterfaceMethod) r)
   -- ^ Should be a positive number
-  | InvkDynamic
-  deriving (Show, Ord, Eq, Generic, NFData)
+  | InvkDynamic (DeepRef (InClass MethodId) r)
 
 data FieldAccess
   = FldStatic
@@ -308,7 +307,7 @@ data ByteCodeOpr r
   | Get FieldAccess (DeepRef (InClass FieldId) r)
   | Put FieldAccess (DeepRef (InClass FieldId) r)
 
-  | Invoke Invokation (DeepRef (InClass MethodId) r)
+  | Invoke (Invokation r)
 
   | New (Ref ClassName r)
 
@@ -375,7 +374,7 @@ instance Binary (ByteCodeOpr Low) where
       0x10 -> Push . CByte <$> get
       0x11 -> Push . CShort <$> get
 
-      0x12 -> Push . CHalfRef <$> get
+      0x12 -> Push . CHalfRef . DeepRef . RefI . fromIntegral <$> getWord8
       0x13 -> Push . CRef One <$> get
       0x14 -> Push . CRef Two <$> get
 
@@ -601,23 +600,23 @@ instance Binary (ByteCodeOpr Low) where
       0xb4 -> Get FldField <$> get
       0xb5 -> Put FldField <$> get
 
-      0xb6 -> Invoke InvkVirtual <$> get
-      0xb7 -> Invoke InvkSpecial <$> get
-      0xb8 -> Invoke InvkStatic <$> get
+      0xb6 -> Invoke . InvkVirtual <$> get
+      0xb7 -> Invoke . InvkSpecial <$> get
+      0xb8 -> Invoke . InvkStatic <$> get
       0xb9 -> do
         ref <- get
         count <- get
         when (count == 0) $ fail "Should be not zero"
         zero <- getWord8
         when (zero /= 0) $ fail "Should be zero"
-        return $ Invoke (InvkInterface count) ref
+        return $ Invoke (InvkInterface count ref)
       0xba -> do
         ref <- get
         count <- getWord8
         when (count /= 0) $ fail "Should be zero"
         zero <- getWord8
         when (zero /= 0) $ fail "Should be zero"
-        return $ Invoke InvkDynamic ref
+        return $ Invoke (InvkDynamic ref)
       0xbb -> New <$> get
 
       0xbc -> do
@@ -706,7 +705,7 @@ putByteCode n bc =
     Push (CByte x) -> putWord8 0x10 >> put x
     Push (CShort x) -> putWord8 0x11 >> put x
 
-    Push (CHalfRef x) -> putWord8 0x12 >> put x
+    Push (CHalfRef (DeepRef (RefI x))) -> putWord8 0x12 >> (putWord8 . fromIntegral $ x)
     Push (CRef One r) -> putWord8 0x13 >> put r
     Push (CRef Two r) -> putWord8 0x14 >> put r
 
@@ -1023,16 +1022,19 @@ putByteCode n bc =
     Get FldField a -> putWord8 0xb4 >> put a
     Put FldField a -> putWord8 0xb5 >> put a
 
-    Invoke InvkVirtual a -> putWord8 0xb6 >> put a
-    Invoke InvkSpecial a -> putWord8 0xb7 >> put a
-    Invoke InvkStatic a -> putWord8 0xb8 >> put a
-    Invoke (InvkInterface count) ref -> do
-      when (count == 0) $ error "Should be not zero"
-      putWord8 0xb9
-      put ref
-      put count
-      putWord8 0
-    Invoke InvkDynamic ref -> putWord8 0xba >> put ref >> putWord8 0 >> putWord8 0
+    Invoke i ->
+      case i of
+        InvkVirtual a -> putWord8 0xb6 >> put a
+        InvkSpecial a -> putWord8 0xb7 >> put a
+        InvkStatic a -> putWord8 0xb8 >> put a
+        InvkInterface count a -> do
+          when (count == 0) $ error "Should be not zero"
+          putWord8 0xb9
+          put a
+          put count
+          putWord8 0
+        InvkDynamic a ->
+          putWord8 0xba >> put a >> putWord8 0 >> putWord8 0
 
     New a -> putWord8 0xbb >> put a
     NewArray x -> do
@@ -1055,7 +1057,6 @@ putByteCode n bc =
     Monitor True -> putWord8 0xc2
     Monitor False -> putWord8 0xc3
 
-
     MultiNewArray a b -> putWord8 0xc5 >> put a >> put b
 
     IfRef False One a -> putWord8 0xc6 >> put a
@@ -1075,12 +1076,24 @@ instance Staged ExceptionTable where
     return $ ExceptionTable {..}
 
 instance Staged ByteCode where
-  stage f (ByteCode bc) = ByteCode <$> mapM f bc
+  evolve (ByteCode bc) =
+    ByteCode <$> mapM (evolve . opcode) bc
+  devolve (ByteCode bc) =
+    ByteCode . calculateOffsets <$> mapM devolve bc
 
 instance Staged ByteCodeInst where
   stage f ByteCodeInst{..} = do
     opcode <- f opcode
     return $ ByteCodeInst {..}
+
+instance Staged Invokation where
+  stage f i =
+    case i of
+      InvkSpecial r -> InvkSpecial <$> f r
+      InvkVirtual r -> InvkVirtual <$> f r
+      InvkStatic r -> InvkStatic <$> f r
+      InvkInterface w r -> InvkInterface w <$> f r
+      InvkDynamic r -> InvkDynamic <$> f r
 
 instance Staged ByteCodeOpr where
   stage f x =
@@ -1088,7 +1101,7 @@ instance Staged ByteCodeOpr where
       Push c -> Push <$> f c
       Get fa r -> Get fa <$> f r
       Put fa r -> Put fa <$> f r
-      Invoke fa r -> Invoke fa <$> f r
+      Invoke r -> Invoke <$> f r
       New r -> New <$> f r
       NewArray r -> NewArray <$> f r
       MultiNewArray r u -> MultiNewArray <$> f r <*> pure u
@@ -1112,6 +1125,7 @@ instance Staged CConstant where
 $(deriveBase ''ByteCode)
 $(deriveBase ''ByteCodeInst)
 $(deriveBase ''ByteCodeOpr)
+$(deriveBase ''Invokation)
 $(deriveBase ''CConstant)
 $(deriveBase ''ExactArrayType)
 $(deriveBaseWithBinary ''Code)

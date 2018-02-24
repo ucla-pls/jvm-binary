@@ -48,6 +48,8 @@ module Language.JVM.Constant
   , FieldId (..)
   , InterfaceId (..)
 
+  , InterfaceMethod (..)
+
   , MethodDescriptor
   , FieldDescriptor
 
@@ -184,6 +186,9 @@ data FieldId r = FieldId
 data InterfaceId r = InterfaceId
   { interfaceMethodId :: !(InClass MethodId r)
   }
+
+newtype InterfaceMethod r =
+  InterfaceMethod (InClass MethodId r)
 
 -- | The union type over the different method handles.
 data MethodHandle r
@@ -415,7 +420,7 @@ instance Referenceable FieldDescriptor where
 instance Referenceable (InClass FieldId High) where
   fromConst _ (CFieldRef s) = do
     return $ s
-  fromConst err c = expected "FieldRef" err c
+  fromConst err c = expected "CFieldRef" err c
 
   toConst s =
     return $ CFieldRef s
@@ -423,10 +428,18 @@ instance Referenceable (InClass FieldId High) where
 instance Referenceable (InClass MethodId High) where
   fromConst _ (CMethodRef s) = do
     return $ s
-  fromConst err c = expected "MethodRef" err c
+  fromConst err c = expected "CMethodRef" err c
 
   toConst s =
     return $ CMethodRef s
+
+instance Referenceable (InterfaceMethod High) where
+  fromConst _ (CInterfaceMethodRef s) = do
+    return . InterfaceMethod $ s
+  fromConst err c = expected "CInterfaceMethodRef" err c
+
+  toConst (InterfaceMethod s) =
+    return $ CInterfaceMethodRef s
 
 
 expected :: String -> (String -> a) -> (Constant r) -> a
@@ -455,3 +468,4 @@ type AbsMethodId = InClass MethodId
 type AbsFieldId = InClass FieldId
 $(deriveBaseWithBinary ''AbsMethodId)
 $(deriveBaseWithBinary ''AbsFieldId)
+$(deriveBaseWithBinary ''InterfaceMethod)

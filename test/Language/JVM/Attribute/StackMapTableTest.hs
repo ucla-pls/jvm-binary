@@ -15,23 +15,23 @@ import           Language.JVM.Constant
 
 import           Language.JVM.Attribute.StackMapTable
 
-prop_encode_and_decode :: StackMapTable Low -> Property
-prop_encode_and_decode = isoBinary
+-- prop_encode_and_decode :: StackMapTable Low -> Property
+-- prop_encode_and_decode = isoBinary
 
--- prop_evolve_and_devolve :: StackMapTable High -> Property
--- prop_evolve_and_devolve = isoStaged
+prop_roundtrip :: StackMapTable High -> Property
+prop_roundtrip = isoRoundtrip
 
-prop_StackMapFrame_encode_and_decode :: StackMapFrame Low -> Property
-prop_StackMapFrame_encode_and_decode = isoBinary
+prop_StackMapFrame_roundtrip :: StackMapFrame High -> Property
+prop_StackMapFrame_roundtrip = isoRoundtrip
 
-instance Arbitrary (StackMapTable Low) where
+instance Arbitrary (StackMapTable High) where
   arbitrary = StackMapTable <$> arbitrary
 
-instance Arbitrary ( StackMapFrame Low) where
+instance Arbitrary ( StackMapFrame High) where
   arbitrary =
     StackMapFrame <$> arbitrary <*> arbitrary
 
-instance Arbitrary (StackMapFrameType Low) where
+instance Arbitrary (StackMapFrameType High) where
   arbitrary = oneof
     [ pure SameFrame
     , SameLocals1StackItemFrame <$> arbitrary
@@ -40,7 +40,7 @@ instance Arbitrary (StackMapFrameType Low) where
     , FullFrame <$> arbitrary <*> arbitrary
     ]
 
-instance Arbitrary (VerificationTypeInfo Low) where
+instance Arbitrary (VerificationTypeInfo High) where
   arbitrary = oneof
     [ pure VTop
     , pure VInteger

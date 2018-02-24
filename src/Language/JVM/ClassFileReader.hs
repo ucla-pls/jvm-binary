@@ -12,6 +12,7 @@ module Language.JVM.ClassFileReader
 
   -- * Evolve
   , Evolve
+  , ClassFileError
   , runEvolve
   , bootstrapConstantPool
 

@@ -43,6 +43,7 @@ tests:
     - tasty-hspec
     - tasty-discover
     - tasty-quickcheck
+    - QuickCheck
     - filepath
     - directory
     - text

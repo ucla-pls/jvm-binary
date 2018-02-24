@@ -7,7 +7,7 @@ module SpecHelper
   , encode
   , blReadFile
   , isoBinary
-  , isoStaged
+  , isoRoundtrip
   , testAllFiles
   , testSomeFiles
   ) where
@@ -15,7 +15,10 @@ module SpecHelper
 import Test.Tasty
 import Test.Tasty.Hspec
 import Test.Tasty.QuickCheck
+import qualified Test.QuickCheck.Property as P
 import qualified Data.ByteString.Lazy as BL
+
+import Data.Bifunctor
 
 import System.FilePath
 import System.Directory
@@ -26,6 +29,7 @@ import Data.Binary
 import Data.Bits
 import qualified Data.List as List
 
+import Language.JVM.Utils
 import Language.JVM.Stage
 import Language.JVM.ClassFileReader
 
@@ -62,15 +66,24 @@ isoBinary a =
   in counterexample (List.intercalate " " (group 8 . concat . map toHex $ BL.unpack bs)) $
       decode bs === a
 
-isoStaged ::
-  (Staged a, Eq (a High), Show (a High))
+-- | Test that a value can go from the Highest state to binary and back again
+-- without losing data.
+isoRoundtrip ::
+  (Staged a, Eq (a High), Show (a High), Binary (a Low))
   => (a High) -> Property
-isoStaged a =
-  let (a', CPBuilder _ cp) = runConstantPoolBuilder (devolve a) cpbEmpty
-      v = do
-        cp' <- (bootstrapConstantPool cp)
-        runEvolve cp' (evolve a')
-  in v === Right a
+isoRoundtrip a =
+  case roundtrip a of
+    Right (_, a') ->
+      a' === a
+    Left msg -> property $ P.failed { P.reason = msg }
+  where
+    roundtrip a1 = do
+      let (a', CPBuilder _ cp) = runConstantPoolBuilder (devolve a1) cpbEmpty
+      let bs = encode a'
+      a'' <- bimap trd trd $ decodeOrFail bs
+      cp' <- first show $ bootstrapConstantPool cp
+      a3 <- first show $ runEvolve cp' (evolve a'')
+      return (bs, a3)
 
 folderContents :: FilePath -> IO [ FilePath ]
 folderContents fp =

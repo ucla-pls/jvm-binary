@@ -8,12 +8,17 @@ import Language.JVM.Field
 import Language.JVM.UtilsTest ()
 import Language.JVM.ConstantTest ()
 import Language.JVM.AttributeTest ()
+import Language.JVM.Attribute.ConstantValueTest ()
 import Language.JVM.Constant
 
-prop_encode_and_decode :: Field Low -> Property
-prop_encode_and_decode = isoBinary
+prop_roundtrip :: Field High -> Property
+prop_roundtrip = isoRoundtrip
 
-instance Arbitrary (Field Low) where
+instance Arbitrary (FieldAttributes High) where
+  arbitrary =
+    FieldAttributes <$> arbitrary <*> pure []
+
+instance Arbitrary (Field High) where
   arbitrary = Field
     <$> arbitrary
     <*> arbitrary

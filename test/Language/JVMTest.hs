@@ -3,8 +3,9 @@ module Language.JVMTest where
 import SpecHelper
 
 import Data.Either
+import Data.Foldable
 import Language.JVM
-import Language.JVM.Attribute.Code ()
+import qualified Language.JVM.Attribute.Code as C
 
 test_reading_classfile :: IO [TestTree]
 test_reading_classfile = testSomeFiles $ do
@@ -17,8 +18,31 @@ test_reading_classfile = testSomeFiles $ do
       cMagicNumber cls `shouldBe` 0xCAFEBABE
 
     it "can bootstrap the constant pool" $ \cls -> do
-      let cp = bootstrapConstantPool (cConstantPool cls)
+      let
+        -- cls :: ClassFile Low
+        -- cls = cls_
+        cp :: Either ClassFileError (ConstantPool High)
+        cp = bootstrapConstantPool (cConstantPool cls)
       cp `shouldSatisfy` isRight
+      -- let Right cp' = cp
+      -- forM_ (cMethods' cls) $ \m -> do
+      --   print . runEvolve cp' $ do
+      --     x <- evolve (mDescriptorIndex m)
+      --     n <- evolve (mNameIndex m)
+      --     return (n, x)
+      --   case (runEvolve cp' (evolve m)) of
+      --     Right m ->
+      --       print "works"
+      --     Left err -> do
+      --       print err
+      --       forM_ (mAttributes m) $ \a -> do
+      --         -- Assume code
+      --         case fromAttribute' a of
+      --           Right c -> do
+      --             forM_ (C.unByteCode . C.codeByteCode $ c) $ \i ->
+      --               putStr " -> " >> print i
+      --           Left x ->
+      --             print x
 
     it "can untie the whole class file" $ \cls -> do
       evolveClassFile cls `shouldSatisfy` isRight

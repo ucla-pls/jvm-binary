@@ -12,10 +12,10 @@ import Language.JVM.UtilsTest ()
 
 import qualified Data.ByteString as BS
 
-prop_encode_and_decode :: Attribute Low -> Property
-prop_encode_and_decode = isoBinary
+prop_roundtrip :: Attribute High -> Property
+prop_roundtrip = isoRoundtrip
 
-instance Arbitrary (Attribute Low) where
+instance Arbitrary (Attribute High) where
   arbitrary = do
     _idx <- arbitrary
     len <- choose (0, 50)

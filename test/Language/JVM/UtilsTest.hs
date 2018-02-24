@@ -11,6 +11,8 @@ import Language.JVM.Utils
 instance Arbitrary a => Arbitrary (SizedList w a) where
   arbitrary =
     SizedList <$> arbitrary
+  shrink (SizedList c) =
+    SizedList <$> shrink c
 
 instance Arbitrary (SizedByteString w) where
   arbitrary = do
