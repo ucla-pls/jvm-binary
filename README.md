@@ -9,7 +9,27 @@ import `Language.JVM.Attribute.Code` qualified, like this:
 ```haskell
 import           Language.JVM
 import qualified Language.JVM.Attribute.Code as Code
+
+import qualified Data.ByteString.Lazy as BL
+
+main :: IO ()
+main = 
+  ecfl <- readClassFile <$> BL.readFile "test/data/project/Main.class" 
+  case ecfl of 
+    Right clf -> do
+      print (cThisClass clf)
+      print (cSuperClass clf)
+    Left msg -> 
+      print msg
 ```
+
+## Stages
+
+There are two stages in the current state of the repository. `Low` is closer
+to the class-file, while the `High` stage is easier to work with. The reason
+that we have the two stages is that the class-file representation has indices
+into the Constant Pool. The `High` stage eliminates all these problems.
+
 
 ## Todo's
 

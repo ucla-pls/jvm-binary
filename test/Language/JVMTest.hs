@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Language.JVMTest where
 
 import SpecHelper
@@ -6,6 +7,19 @@ import Data.Either
 import Data.Foldable
 import Language.JVM
 import qualified Language.JVM.Attribute.Code as C
+import qualified Data.ByteString.Lazy as BL
+
+
+spec_testing_example :: SpecWith ()
+spec_testing_example =
+  it "can read classfile from file" $ do
+    eclf <- readClassFile <$> BL.readFile "test/data/project/Main.class"
+    case eclf of
+      Right clf -> do
+        cThisClass clf `shouldBe` ClassName "Main"
+        cSuperClass clf `shouldBe` ClassName "java/lang/Object"
+      Left msg ->
+        fail $ show msg
 
 test_reading_classfile :: IO [TestTree]
 test_reading_classfile = testSomeFiles $ do

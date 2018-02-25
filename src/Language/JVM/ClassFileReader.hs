@@ -4,7 +4,11 @@
 {-# LANGUAGE MonoLocalBinds             #-}
 {-# LANGUAGE RankNTypes                 #-}
 module Language.JVM.ClassFileReader
-  ( decodeClassFile
+  ( readClassFile
+  , writeClassFile
+
+  -- * Finer granularity commands
+  , decodeClassFile
   , encodeClassFile
   , evolveClassFile
   , devolveClassFile
@@ -40,14 +44,14 @@ import           Language.JVM.Constant
 import           Language.JVM.ConstantPool as CP
 import           Language.JVM.Stage
 
--- | Create a indexed class file from a lazy 'BL.ByteString'
+-- | Decode a class file from a lazy 'BL.ByteString'
 decodeClassFile :: BL.ByteString -> Either ClassFileError (ClassFile Low)
 decodeClassFile bs = do
   case decodeOrFail bs of
     Right (_, _, cf) -> Right cf
     Left (_, _, msg) -> Left $ CFEUnreadableFile msg
 
--- | Create a lazy byte string from a indexed class file
+-- | Create a lazy byte string from a class file
 encodeClassFile :: ClassFile Low -> BL.ByteString
 encodeClassFile clf = do
   encode clf
@@ -74,6 +78,19 @@ devolveClassFile' :: ConstantPool Low -> ClassFile High -> ClassFile Low
 devolveClassFile' cp cf =
   let (cf', cpb) = runConstantPoolBuilder (devolve cf) (builderFromConstantPool cp) in
   cf' { cConstantPool = cpbConstantPool cpb }
+
+
+-- | Top level command that combines 'decode' and 'evolve'.
+readClassFile :: BL.ByteString -> Either ClassFileError (ClassFile High)
+readClassFile bs = do
+  clf <- decodeClassFile bs
+  evolveClassFile clf
+
+-- | Top level command that combines 'devolve' and 'encode'.
+writeClassFile :: ClassFile High -> BL.ByteString
+writeClassFile =
+  encodeClassFile . devolveClassFile
+
 
 -- $deref
 -- Dereffing is the flattening of the constant pool to get the values
