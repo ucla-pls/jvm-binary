@@ -10,6 +10,8 @@ module SpecHelper
   , isoRoundtrip
   , testAllFiles
   , testSomeFiles
+  , hexStringS
+  , hexString
   ) where
 
 import Test.Tasty
@@ -17,6 +19,7 @@ import Test.Tasty.Hspec
 import Test.Tasty.QuickCheck
 import qualified Test.QuickCheck.Property as P
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString as BS
 
 import Data.Bifunctor
 
@@ -60,10 +63,18 @@ testSomeFiles spec =
       , "test/data/project/Main.class"
       ]
 
+hexStringS :: BS.ByteString -> String
+hexStringS =
+  hexString . BL.fromStrict
+
+hexString :: BL.ByteString -> String
+hexString =
+  List.intercalate " " . group 8 . concat . map toHex . BL.unpack
+
 isoBinary :: (Binary a, Eq a, Show a) => a -> Property
 isoBinary a =
   let bs = encode a
-  in counterexample (List.intercalate " " (group 8 . concat . map toHex $ BL.unpack bs)) $
+  in counterexample (hexString bs) $
       decode bs === a
 
 -- | Test that a value can go from the Highest state to binary and back again

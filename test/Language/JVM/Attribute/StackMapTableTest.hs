@@ -6,6 +6,12 @@ module Language.JVM.Attribute.StackMapTableTest where
 
 import           SpecHelper
 
+import qualified Data.ByteString.Lazy as BL
+import Data.Either
+import Data.Binary
+import Data.Bifunctor
+import Language.JVM.Utils
+
 import           Language.JVM.AttributeTest           ()
 import           Language.JVM.ConstantTest            ()
 import           Language.JVM.UtilsTest               ()
@@ -17,6 +23,19 @@ import           Language.JVM.Attribute.StackMapTable
 
 -- prop_encode_and_decode :: StackMapTable Low -> Property
 -- prop_encode_and_decode = isoBinary
+
+spec_parses :: SpecWith ()
+spec_parses = do
+  describe "decoding" $ do
+    let
+      bs = BL.fromStrict "\NUL\ACK\253\NUL\t\SOH\SOH\253\NUL%\SOH\SOH\t\ETB\249\NUL\t\249\NUL\r"
+    -- 0006fd00 090101fd 00250101 0917f900 09f9000d
+    it ("can decode " ++ hexString bs) $ do
+      let
+        r :: Either String (StackMapTable Low)
+        r = bimap trd trd $ decodeOrFail bs
+
+      r `shouldSatisfy` isRight
 
 prop_roundtrip_StackMapTable :: StackMapTable High -> Property
 prop_roundtrip_StackMapTable = isoRoundtrip

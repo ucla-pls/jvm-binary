@@ -25,6 +25,8 @@ module Language.JVM.Attribute.StackMapTable
   ) where
 
 import           Data.Binary
+import           Data.Binary.Get
+import           Data.Binary.Put
 import           Numeric
 import           Control.Monad (replicateM)
 
@@ -44,7 +46,7 @@ newtype StackMapTable r = StackMapTable
   }
 
 -- | A delta offset
-type DeltaOffset = Word8
+type DeltaOffset = Word16
 
 -- | An stack map frame
 data StackMapFrame r = StackMapFrame
@@ -68,31 +70,31 @@ instance Binary (StackMapFrame Low) where
     let
       framegetter
         | 0 <= ft && ft <= 63
-        = return $ StackMapFrame ft SameFrame
+        = return $ StackMapFrame (fromIntegral ft) SameFrame
 
         | 64 <= ft && ft <= 127
-        = StackMapFrame (ft - 64) . SameLocals1StackItemFrame <$> get
+        = StackMapFrame (fromIntegral $ ft - 64) . SameLocals1StackItemFrame <$> get
 
         | 128 <= ft && ft <= 246
         = fail $ "Reserved for further use: '0x" ++ showHex ft "'"
 
         | ft == 247
-        = StackMapFrame <$> get <*> (SameLocals1StackItemFrame <$> get)
+        = StackMapFrame <$> getWord16be <*> (SameLocals1StackItemFrame <$> get)
 
         | 248 <= ft && ft <= 250
-        = StackMapFrame <$> get <*> pure (ChopFrame (251 - ft))
+        = StackMapFrame <$> getWord16be <*> pure (ChopFrame (251 - ft))
 
         | ft == 251
-        = StackMapFrame <$> get <*> pure SameFrame
+        = StackMapFrame <$> getWord16be <*> pure SameFrame
 
         | 252 <= ft && ft <= 254
         = do
-            offset <- get
+            offset <- getWord16be
             locals <- replicateM (fromIntegral $ ft - 251) get
             return $ StackMapFrame offset (AppendFrame locals)
 
         | ft == 255
-        = StackMapFrame <$> get <*> (FullFrame <$> get <*> get)
+        = StackMapFrame <$> getWord16be <*> (FullFrame <$> get <*> get)
 
         | otherwise
         = fail $ "Unknown frame type '0x" ++ showHex ft "'"
@@ -103,38 +105,38 @@ instance Binary (StackMapFrame Low) where
 
       SameFrame
         | off <= 63 ->
-            putWord8 off
+            putWord8 (fromIntegral off)
         | otherwise -> do
             putWord8 251
-            putWord8 off
+            putWord16be off
 
       SameLocals1StackItemFrame vt
         | off <= 63 -> do
-            putWord8 (64 + off)
+            putWord8 $ fromIntegral (64 + off)
             put vt
         | otherwise -> do
             putWord8 247
-            putWord8 off
+            putWord16be off
             put vt
 
       ChopFrame w
         | 0 < w && w <= 3 -> do
           putWord8 (251 - w)
-          putWord8 off
+          putWord16be off
         | otherwise ->
           fail $ "Can't write a cutoff value outside ]0,3], but was: " ++ show w
 
       AppendFrame vs
         | length vs <= 3 && 0 < length vs -> do
           putWord8 (fromIntegral $ 251 + length vs)
-          putWord8 off
+          putWord16be off
           mapM_ put vs
         | otherwise ->
           fail $ "The AppendFrame has to contain at least 1 and at most 3 elements: " ++ show vs
 
       FullFrame ls1 ls2 -> do
         putWord8 255
-        put off
+        putWord16be off
         put ls1
         put ls2
 

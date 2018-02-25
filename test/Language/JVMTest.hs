@@ -40,6 +40,15 @@ test_reading_classfile = testSomeFiles $ do
                 Right c -> do
                   forM_ (C.unByteCode . C.codeByteCode $ c) $ \i ->
                     putStr " -> " >> print i
+
+                  forM_ (C.codeAttributes c) $ \ca -> do
+                    print $ runEvolve cp' (evolve ca)
+                    putStrLn (hexStringS $ aInfo ca)
+                    case fromAttribute' ca :: Either String (StackMapTable Low) of
+                      Right x ->
+                        print x
+                      Left msg ->
+                        print msg
                 Left x ->
                   print x
 

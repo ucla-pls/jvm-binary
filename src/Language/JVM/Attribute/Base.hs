@@ -36,7 +36,6 @@ import           Language.JVM.Stage
 import           Language.JVM.Constant
 import           Language.JVM.Utils
 
-
 -- | Maybe return the first element of a list
 firstOne :: [a] -> Maybe a
 firstOne as = fst <$> List.uncons as
