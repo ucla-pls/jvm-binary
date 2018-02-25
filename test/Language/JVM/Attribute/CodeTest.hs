@@ -11,6 +11,7 @@ import           SpecHelper
 
 import           Language.JVM.AttributeTest  ()
 import           Language.JVM.Attribute.StackMapTableTest  ()
+import           Language.JVM.Attribute.LineNumberTableTest  ()
 import           Language.JVM.Attribute.Code
 import           Language.JVM.Constant
 import           Language.JVM.UtilsTest      ()

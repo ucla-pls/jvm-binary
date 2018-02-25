@@ -6,7 +6,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-|
 Module      : Language.JVM.Attribute.StackMapTable
-Copyright   : (c) Christian Gram Kalhauge, 2017
+Copyright   : (c) Christian Gram Kalhauge, 2018
 License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
 

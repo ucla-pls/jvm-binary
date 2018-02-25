@@ -73,6 +73,7 @@ import qualified Data.Vector                          as V
 
 import           Language.JVM.Attribute.Base
 import           Language.JVM.Attribute.StackMapTable
+import           Language.JVM.Attribute.LineNumberTable
 import           Language.JVM.Constant
 import           Language.JVM.Stage
 import           Language.JVM.Utils
@@ -1071,6 +1072,7 @@ putByteCode n bc =
 
 data CodeAttributes r = CodeAttributes
   { caStackMapTable :: [ StackMapTable r ]
+  , caLineNumberTable :: [ LineNumberTable r ]
   , caOthers        :: [ Attribute r ]
   }
 
@@ -1081,21 +1083,24 @@ instance Staged Code where
     codeAttributes <- fromCollector <$> fromAttributes collect' codeAttributes
     return $ Code {..}
     where
-      fromCollector (a, b) =
-        CodeAttributes (appEndo a []) (appEndo b [])
+      fromCollector (a, b, c) =
+        CodeAttributes (appEndo a []) (appEndo b []) (appEndo c [])
       collect' attr =
-        collect (mempty, Endo (attr:)) attr
-          [ toC $ \e -> (Endo (e:), mempty) ]
+        collect (mempty, mempty, Endo (attr:)) attr
+          [ toC $ \e -> (Endo (e:), mempty, mempty)
+          , toC $ \e -> (mempty, Endo (e:), mempty)
+          ]
   devolve Code{..} = do
     codeByteCode <- devolve codeByteCode
     codeExceptionTable <- mapM devolve codeExceptionTable
     codeAttributes <- SizedList <$> fromCodeAttributes codeAttributes
     return $ Code {..}
     where
-      fromCodeAttributes (CodeAttributes a b) = do
+      fromCodeAttributes (CodeAttributes a b c) = do
         a' <- mapM toAttribute a
-        b' <- mapM devolve b
-        return (a' ++ b')
+        b' <- mapM toAttribute b
+        c' <- mapM devolve c
+        return (a' ++ b' ++ c')
 
 
 instance Staged ExceptionTable where

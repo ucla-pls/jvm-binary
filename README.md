@@ -15,14 +15,8 @@ import qualified Language.JVM.Attribute.Code as Code
 
 - Add more Attributes as to the
 [docs](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7).
-The most notable and required are:
-
-  - LineNumberTable
-
 - Add lenses for better access of deep fields
 - Add documentation for Code
-- Add Code writing
-- Change Megaparsec to Attoparsec of improved performance.
 - Setup regular benchmarks
 
 ## Developing
