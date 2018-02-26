@@ -2,15 +2,15 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Language.JVM.AttributeTest where
 
-import SpecHelper
+import           SpecHelper
 
-import Language.JVM.Attribute (Attribute (..))
-import Language.JVM.ConstantTest ()
-import Language.JVM.Constant
-import Language.JVM.Utils
-import Language.JVM.UtilsTest ()
+import           Language.JVM
 
-import qualified Data.ByteString as BS
+import           Language.JVM.Attribute    (Attribute (..))
+import           Language.JVM.ConstantTest ()
+import           Language.JVM.UtilsTest    ()
+
+import qualified Data.ByteString           as BS
 
 prop_roundtrip_Attribute :: Attribute High -> Property
 prop_roundtrip_Attribute = isoRoundtrip

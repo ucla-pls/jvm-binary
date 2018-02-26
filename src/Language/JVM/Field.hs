@@ -28,7 +28,7 @@ import qualified Data.Text               as Text
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
 import           Language.JVM.Constant
-import           Language.JVM.Stage
+import           Language.JVM.Staged
 import           Language.JVM.Utils
 
 
@@ -43,7 +43,7 @@ data Field r = Field
 
 -- | Get the name of the field
 fName :: Field High -> Text.Text
-fName = valueF fNameIndex
+fName = value . fNameIndex
 
 -- | Get the set of access flags
 fAccessFlags :: Field r -> Set.Set FAccessFlag
@@ -51,7 +51,7 @@ fAccessFlags = toSet . fAccessFlags'
 
 -- | Get the descriptor of the field
 fDescriptor :: Field High -> FieldDescriptor
-fDescriptor = valueF fDescriptorIndex
+fDescriptor = value . fDescriptorIndex
 
 -- | Fetch the 'ConstantValue' attribute.
 fConstantValue :: Field High -> Maybe (ConstantValue High)

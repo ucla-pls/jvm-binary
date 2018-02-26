@@ -42,7 +42,7 @@ import           GHC.Generics              (Generic)
 import           Language.JVM.ClassFile
 import           Language.JVM.Constant
 import           Language.JVM.ConstantPool as CP
-import           Language.JVM.Stage
+import           Language.JVM.Staged
 
 -- | Decode a class file from a lazy 'BL.ByteString'
 decodeClassFile :: BL.ByteString -> Either ClassFileError (ClassFile Low)

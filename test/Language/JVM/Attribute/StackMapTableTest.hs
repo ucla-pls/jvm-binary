@@ -6,20 +6,17 @@ module Language.JVM.Attribute.StackMapTableTest where
 
 import           SpecHelper
 
-import qualified Data.ByteString.Lazy as BL
-import Data.Either
-import Data.Binary
-import Data.Bifunctor
-import Language.JVM.Utils
+import           Data.Bifunctor
+import           Data.Binary
+import qualified Data.ByteString.Lazy                 as BL
+import           Data.Either
+
+import           Language.JVM.Attribute.StackMapTable
+import           Language.JVM
 
 import           Language.JVM.AttributeTest           ()
 import           Language.JVM.ConstantTest            ()
-import           Language.JVM.UtilsTest               ()
-import           Language.JVM.TypeTest               ()
-
-import           Language.JVM.Constant
-
-import           Language.JVM.Attribute.StackMapTable
+import           Language.JVM.TypeTest                ()
 
 -- prop_encode_and_decode :: StackMapTable Low -> Property
 -- prop_encode_and_decode = isoBinary

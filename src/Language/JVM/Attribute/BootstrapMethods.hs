@@ -25,7 +25,7 @@ module Language.JVM.Attribute.BootstrapMethods
 
 import           Language.JVM.Constant
 import           Language.JVM.Attribute.Base
-import           Language.JVM.Stage
+import           Language.JVM.Staged
 import           Language.JVM.Utils
 
 -- | 'BootstrapMethods' is an Attribute.
@@ -49,7 +49,7 @@ data BootstrapMethod r = BootstrapMethod
 
 method :: BootstrapMethod High -> InClass MethodId High
 method =
-  valueF $ unDeep . methodIndex
+  value . unDeep . methodIndex
 
 -- | The arguments as a list
 argumentIndicies :: BootstrapMethod r -> [ DeepRef Constant r ]

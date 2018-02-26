@@ -1,8 +1,12 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-|
-Copyright   : (c) Christian Gram Kalhauge, 2017
+Copyright   : (c) Christian Gram Kalhauge, 2018
 License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
 
@@ -11,99 +15,70 @@ represents closest to the metal and 'High' represents closer to the conceptual
 representation.
 -}
 module Language.JVM.Stage
-  ( Staged (..)
+  ( Low
+  , High
 
-  -- * Monad Classes
-  , EvolveM (..)
-  , DevolveM (..)
-  -- * Re-exports
-  , DeepRef
-  , Ref
-  , module Language.JVM.TH
+  , Ref (..)
+
+  , Index
+  , idx
+  , value
+
+  , DeepRef (..)
+  , Choice
   ) where
 
-import Language.JVM.Constant
-import Language.JVM.TH
+import GHC.Generics
+import Control.DeepSeq
+import Data.Binary
 
-class Monad m => EvolveM m where
-  link :: Referenceable r => Index -> m r
-  attributeError :: String -> m r
+data Low
+data High
 
-class Monad m => DevolveM m where
-  unlink :: Referenceable r => r -> m Index
+data family Ref v r
+data instance Ref v High = RefV v
+data instance Ref v Low = RefI Word16
 
-class Staged s where
-  {-# MINIMAL stage | evolve, devolve #-}
-  stage :: Monad m => (forall s'. Staged s' => s' r -> m (s' r')) -> s r -> m (s r')
-  stage f a = f a
+deriving instance Show (Ref v Low)
+deriving instance NFData (Ref v Low)
+deriving instance Generic (Ref v Low)
+deriving instance Eq (Ref v Low)
 
-  evolve ::  EvolveM m => s Low -> m (s High)
-  evolve = stage evolve
+deriving instance Ord (Ref v Low)
 
-  devolve :: DevolveM m => s High -> m (s Low)
-  devolve = stage devolve
+deriving instance Show v => Show (Ref v High)
+deriving instance NFData v => NFData (Ref v High)
+deriving instance Generic (Ref v High)
+deriving instance Eq v => Eq (Ref v High)
 
-instance Staged Constant where
-  stage f c =
-    case c of
-      CString s -> pure $ CString s
-      CInteger i -> pure $ CInteger i
-      CFloat d -> pure $ CFloat d
-      CLong l -> pure $ CLong l
-      CDouble d -> pure $ CDouble d
-      CClassRef r -> CClassRef <$> f r
-      CStringRef r -> CStringRef <$> f r
-      CFieldRef r -> CFieldRef <$> f r
-      CMethodRef r -> CMethodRef <$> f r
-      CInterfaceMethodRef r -> CInterfaceMethodRef <$> f r
-      CNameAndType r1 r2 -> CNameAndType <$> f r1 <*> f r2
-      CMethodHandle mh -> CMethodHandle <$> f mh
-      CMethodType r -> CMethodType <$> f r
-      CInvokeDynamic i -> CInvokeDynamic <$> f i
 
-instance Referenceable r => Staged (Ref r) where
-  stage _ _ = error "Cannot stage a reference"
+type family Choice r a b
+type instance Choice High a b = b
+type instance Choice Low a b = a
 
-  evolve (RefI ref) = do
-    RefV <$> link ref
-  devolve (RefV v) = do
-    RefI <$> unlink v
+type Index = Word16
 
-instance Referenceable (r High) => Staged (DeepRef r) where
-  stage _ _ = error "Cannot stage a deep reference"
+value :: Ref v High -> v
+value (RefV v) = v
 
-  evolve (DeepRef (RefI ref)) = do
-    DeepRef . RefV <$> link ref
-  devolve (DeepRef (RefV v)) = do
-    DeepRef . RefI <$> unlink v
+instance Binary (Ref a Low) where
+  get = RefI <$> get
+  put = put . idx
 
-instance Staged InvokeDynamic where
-  stage f (InvokeDynamic w ref) =
-    InvokeDynamic w <$> f ref
+idx :: Ref a Low -> Word16
+idx (RefI w) = w
 
-instance Staged MethodId where
-  stage f (MethodId n d) =
-    MethodId <$> f n <*> f d
+newtype DeepRef v r = DeepRef { unDeep :: (Ref (v r) r) }
 
-instance Referenceable (r High) => Staged (InClass r) where
-  stage f (InClass cn cid) = do
-    InClass <$> f cn <*> f cid
+deriving instance Show (DeepRef v Low)
+deriving instance NFData (DeepRef v Low)
+deriving instance Generic (DeepRef v Low)
+deriving instance Eq (DeepRef v Low)
 
-instance Staged MethodHandle where
-  stage f m =
-    case m of
-      MHField r -> MHField <$> f r
-      MHMethod r -> MHMethod <$> f r
-      MHInterface r -> MHInterface <$> f r
+deriving instance Show (v High) => Show (DeepRef v High)
+deriving instance NFData (v High) => NFData (DeepRef v High)
+deriving instance Generic (DeepRef v High)
+deriving instance Eq (v High) => Eq (DeepRef v High)
 
-instance Staged MethodHandleMethod where
-  stage f (MethodHandleMethod k ref) =
-    MethodHandleMethod k <$> f ref
-
-instance Staged MethodHandleField where
-  stage f (MethodHandleField k ref) =
-    MethodHandleField k <$> f ref
-
-instance Staged MethodHandleInterface where
-  stage f (MethodHandleInterface ref) =
-    MethodHandleInterface <$> f ref
+deriving instance Ord (DeepRef v Low)
+deriving instance Binary (DeepRef v Low)

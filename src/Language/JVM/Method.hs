@@ -33,7 +33,7 @@ import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
 import           Language.JVM.Attribute.Exceptions (exceptionIndexTable)
 import           Language.JVM.Constant
-import           Language.JVM.Stage
+import           Language.JVM.Staged
 import           Language.JVM.Utils
 
 -- | A Method in the class-file, as described
@@ -51,11 +51,11 @@ mAccessFlags = toSet . mAccessFlags'
 
 -- | Lookup the name of the method in the 'ConstantPool'.
 mName :: Method High -> Text.Text
-mName = valueF mNameIndex
+mName = value . mNameIndex
 
 -- | Lookup the descriptor of the method in the 'ConstantPool'.
 mDescriptor :: Method High -> MethodDescriptor
-mDescriptor = valueF mDescriptorIndex
+mDescriptor = value .  mDescriptorIndex
 
 data MethodAttributes r = MethodAttributes
   { maCode       :: [Code r]

@@ -41,7 +41,7 @@ test_reading_classfile = testSomeFiles $ do
       let Right cp' = cp
       forM_ (cMethods' cls) $ \m -> do
         case (runEvolve cp' (evolve m)) of
-          Right m -> return ()
+          Right _ -> return ()
           Left err -> do
             putStr (show err) >> putStr ": "
             print . runEvolve cp' $ do

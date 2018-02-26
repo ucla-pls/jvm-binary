@@ -9,6 +9,7 @@ import qualified Data.IntMap as IM
 import qualified Data.Text as Text
 
 import Language.JVM.Constant
+import Language.JVM.Staged
 import Language.JVM.ConstantPool
 import Language.JVM.UtilsTest ()
 import Language.JVM.TypeTest ()
@@ -51,7 +52,7 @@ instance Arbitrary (ConstantPool High) where
         (n, e) : go (n + constantSize e) lst
       go _ [] = []
 
-instance Arbitrary (InterfaceMethod High) where
+instance Arbitrary (AbsInterfaceMethodId High) where
   arbitrary = genericArbitraryU
 
 instance Arbitrary (Constant High) where

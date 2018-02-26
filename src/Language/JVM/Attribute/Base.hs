@@ -32,8 +32,7 @@ import           Data.Binary
 import Data.Bifunctor
 import Control.Monad
 
-import           Language.JVM.Stage
-import           Language.JVM.Constant
+import           Language.JVM.Staged
 import           Language.JVM.Utils
 
 -- | Maybe return the first element of a list
@@ -55,7 +54,7 @@ aInfo = unSizedByteString . aInfo'
 -- | Extracts the name from the attribute, if it exists in the
 -- ConstantPool.
 aName :: Attribute High -> Text.Text
-aName = valueF aNameIndex
+aName = value . aNameIndex
 
 instance Staged Attribute where
   evolve (Attribute an ai) = do

@@ -19,7 +19,7 @@ module Language.JVM.Attribute.ConstantValue
 
 import           Language.JVM.Attribute.Base
 import           Language.JVM.Constant
-import           Language.JVM.Stage
+import           Language.JVM.Staged
 
 -- | 'ConstantValue' is an Attribute.
 instance IsAttribute ConstantValue where

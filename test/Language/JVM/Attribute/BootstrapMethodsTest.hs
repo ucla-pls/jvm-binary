@@ -2,11 +2,12 @@
 
 module Language.JVM.Attribute.BootstrapMethodsTest where
 
-import SpecHelper
+import           SpecHelper
 
-import Language.JVM.Attribute.BootstrapMethods
-import Language.JVM.Constant
-import Language.JVM.ConstantTest ()
+import           Language.JVM.ConstantTest               ()
+
+import           Language.JVM.Attribute.BootstrapMethods
+import           Language.JVM
 
 prop_roundtrip_BootstrapMethods :: BootstrapMethods High -> Property
 prop_roundtrip_BootstrapMethods = isoRoundtrip

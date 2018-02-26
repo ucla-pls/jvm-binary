@@ -19,7 +19,7 @@ module Language.JVM.Attribute.Exceptions
   ) where
 
 import           Language.JVM.Attribute.Base
-import           Language.JVM.Stage
+import           Language.JVM.Staged
 import           Language.JVM.Constant
 import           Language.JVM.Utils
 

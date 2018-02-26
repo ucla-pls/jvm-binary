@@ -75,7 +75,7 @@ import           Language.JVM.Attribute.Base
 import           Language.JVM.Attribute.StackMapTable
 import           Language.JVM.Attribute.LineNumberTable
 import           Language.JVM.Constant
-import           Language.JVM.Stage
+import           Language.JVM.Staged
 import           Language.JVM.Utils
 
 -- | 'Code' is an Attribute.
@@ -166,12 +166,12 @@ data ExactArrayType r
   | EAFloat | EADouble | EARef (Ref ClassName r)
 
 data Invokation r
-  = InvkSpecial (DeepRef (InClass MethodId) r)
-  | InvkVirtual (DeepRef (InClass MethodId) r)
-  | InvkStatic (DeepRef (InClass MethodId) r)
-  | InvkInterface Word8 (DeepRef (InterfaceMethod) r)
+  = InvkSpecial (DeepRef AbsMethodId r)
+  | InvkVirtual (DeepRef AbsMethodId r)
+  | InvkStatic (DeepRef AbsMethodId r)
+  | InvkInterface Word8 (DeepRef AbsInterfaceMethodId r)
   -- ^ Should be a positive number
-  | InvkDynamic (DeepRef (InClass MethodId) r)
+  | InvkDynamic (DeepRef AbsMethodId r)
 
 data FieldAccess
   = FldStatic

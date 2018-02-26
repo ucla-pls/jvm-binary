@@ -4,17 +4,16 @@
 
 module Language.JVM.Attribute.LineNumberTableTest where
 
+import qualified Data.IntMap                as IM
+
 import           SpecHelper
 
-import qualified Data.IntMap as IM
-import           Language.JVM.AttributeTest           ()
-import           Language.JVM.ConstantTest            ()
-import           Language.JVM.UtilsTest               ()
-import           Language.JVM.TypeTest               ()
+import           Language.JVM.AttributeTest ()
+import           Language.JVM.ConstantTest  ()
+import           Language.JVM.TypeTest      ()
+import           Language.JVM.UtilsTest     ()
 
-import           Language.JVM.Constant
-import           Language.JVM.Utils
-
+import           Language.JVM
 import           Language.JVM.Attribute.LineNumberTable
 
 prop_roundtrip_LineNumberTable :: LineNumberTable High -> Property

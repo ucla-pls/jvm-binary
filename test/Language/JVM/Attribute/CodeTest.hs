@@ -5,16 +5,18 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Language.JVM.Attribute.CodeTest where
 
-import qualified Data.Vector as V
+import qualified Data.Vector                                as V
 import           Generic.Random
+
 import           SpecHelper
 
-import           Language.JVM.AttributeTest  ()
-import           Language.JVM.Attribute.StackMapTableTest  ()
-import           Language.JVM.Attribute.LineNumberTableTest  ()
+import           Language.JVM.Attribute.LineNumberTableTest ()
+import           Language.JVM.Attribute.StackMapTableTest   ()
+import           Language.JVM.AttributeTest                 ()
+import           Language.JVM.UtilsTest                     ()
+
+import           Language.JVM
 import           Language.JVM.Attribute.Code
-import           Language.JVM.Constant
-import           Language.JVM.UtilsTest      ()
 
 prop_roundtrip_Code :: Code High -> Property
 prop_roundtrip_Code = isoRoundtrip

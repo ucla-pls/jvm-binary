@@ -36,10 +36,10 @@ import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
 import           Language.JVM.Attribute.BootstrapMethods
 import           Language.JVM.Constant
-import           Language.JVM.ConstantPool as CP
-import           Language.JVM.Field        (Field)
-import           Language.JVM.Method       (Method)
-import           Language.JVM.Stage
+import           Language.JVM.ConstantPool               as CP
+import           Language.JVM.Field                      (Field)
+import           Language.JVM.Method                     (Method)
+import           Language.JVM.Staged
 import           Language.JVM.Utils
 
 -- | A 'ClassFile' as described
@@ -86,11 +86,11 @@ cMethods = unSizedList . cMethods'
 
 -- | Lookup the this class in a ConstantPool
 cThisClass :: ClassFile High -> ClassName
-cThisClass = valueF cThisClassIndex
+cThisClass = value . cThisClassIndex
 
 -- | Lookup the super class in the ConstantPool
 cSuperClass :: ClassFile High -> ClassName
-cSuperClass = valueF cSuperClassIndex
+cSuperClass = value . cSuperClassIndex
 
 -- -- | Get a list of 'Attribute's of a ClassFile.
 -- cAttributes :: ClassFile r -> [Attribute r]

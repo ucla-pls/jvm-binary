@@ -1,23 +1,19 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Language.JVM.ClassFileTest where
 
-import SpecHelper
+import           SpecHelper
 
--- import qualified Data.IntMap as IM
+import           Language.JVM
 
-import Language.JVM.ClassFile
--- import Language.JVM.ConstantPool
-import Language.JVM.Constant
-
-import Language.JVM.Utils
-import Language.JVM.UtilsTest ()
-import Language.JVM.AttributeTest ()
-import Language.JVM.Attribute.BootstrapMethodsTest ()
-import Language.JVM.ConstantTest ()
-import Language.JVM.FieldTest ()
-import Language.JVM.MethodTest ()
+import           Language.JVM.Attribute.BootstrapMethodsTest ()
+import           Language.JVM.AttributeTest                  ()
+import           Language.JVM.ConstantTest                   ()
+import           Language.JVM.FieldTest                      ()
+import           Language.JVM.MethodTest                     ()
+import           Language.JVM.Utils
+import           Language.JVM.UtilsTest                      ()
 
 prop_roundtrip_ClassFile :: ClassFile High -> Property
 prop_roundtrip_ClassFile = isoRoundtrip

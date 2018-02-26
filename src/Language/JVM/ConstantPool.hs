@@ -37,6 +37,7 @@ import qualified Data.IntMap              as IM
 import           GHC.Generics             (Generic)
 
 import           Language.JVM.Constant
+import           Language.JVM.Stage
 import           Language.JVM.TH
 
 

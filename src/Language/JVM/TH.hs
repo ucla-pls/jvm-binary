@@ -6,8 +6,6 @@ module Language.JVM.TH
   ( deriveBase
   , deriveBases
   , deriveBaseWithBinary
-  , Low
-  , High
   ) where
 
 import Language.Haskell.TH
@@ -16,9 +14,7 @@ import GHC.Generics
 import Control.DeepSeq
 import Data.Binary
 
-
-data Low
-data High
+import Language.JVM.Stage
 
 -- | Derives the 'NFData', 'Show', 'Eq', and 'Generic'
 -- from something that is 'Staged'

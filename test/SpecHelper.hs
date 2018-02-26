@@ -33,7 +33,7 @@ import Data.Bits
 import qualified Data.List as List
 
 import Language.JVM.Utils
-import Language.JVM.Stage
+import Language.JVM.Staged
 import Language.JVM.ClassFileReader
 
 blReadFile :: FilePath -> IO BL.ByteString

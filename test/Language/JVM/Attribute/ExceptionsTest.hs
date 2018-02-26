@@ -2,11 +2,11 @@
 
 module Language.JVM.Attribute.ExceptionsTest where
 
-import SpecHelper
+import           SpecHelper
 
-import Language.JVM.Attribute.Exceptions
-import Language.JVM.Constant
-import Language.JVM.ConstantTest ()
+import           Language.JVM
+
+import           Language.JVM.ConstantTest         ()
 
 prop_roundtrip_Exceptions :: Exceptions High -> Property
 prop_roundtrip_Exceptions = isoRoundtrip

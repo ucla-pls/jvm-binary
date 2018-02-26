@@ -29,9 +29,8 @@ import           Data.Binary
 import qualified Data.IntMap as IM
 import           GHC.Generics                (Generic)
 import           Language.JVM.Attribute.Base
-import           Language.JVM.Constant
 import           Language.JVM.Utils
-import           Language.JVM.Stage
+import           Language.JVM.Staged
 
 -- | 'Signature' is an Attribute.
 instance IsAttribute LineNumberTable where

@@ -1,4 +1,9 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-|
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -9,51 +14,28 @@ This module contains the 'Constant' type and the 'ConstantPool'. These
 are essential for accessing data in the class-file.
 -}
 
-{-# LANGUAGE IncoherentInstances #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE RankNTypes    #-}
-{-# LANGUAGE DeriveAnyClass  #-}
-{-# LANGUAGE GADTs    #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE EmptyCase #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Language.JVM.Constant
   ( Constant (..)
   , constantSize
   , typeToStr
-
-  , Ref (..)
-  , DeepRef (..)
-  , Choice
-
-  , Index
-  , Low
-  , High
-  , idx
-  , valueF
-  , value
 
   , Referenceable (..)
 
     -- * Special constants
   , ClassName (..)
 
+  , InClass (..)
+
+  , AbsMethodId
+  , AbsFieldId
+  , AbsInterfaceMethodId (..)
+
   , MethodId (..)
   , FieldId (..)
-  , InterfaceId (..)
-
-  , InterfaceMethod (..)
 
   , MethodDescriptor
   , FieldDescriptor
 
-  , InClass (..)
 
   , MethodHandle (..)
   , MethodHandleField (..)
@@ -69,7 +51,6 @@ module Language.JVM.Constant
 
 import           Prelude            hiding (fail, lookup)
 import           Numeric (showHex)
--- import           Control.Monad.Fail (fail)
 import           Control.DeepSeq (NFData)
 import           GHC.Generics (Generic)
 import           Control.Monad.Reader
@@ -79,6 +60,7 @@ import qualified Data.Text          as Text
 import           Language.JVM.Utils
 import           Language.JVM.Type
 import           Language.JVM.TH
+import           Language.JVM.Stage
 
 -- import qualified Data.Text as Text
 import qualified Data.ByteString as BS
@@ -87,61 +69,6 @@ import qualified Data.Text.Encoding.Error as TE
 
 -- import Data.Functor.Classes
 
-data family Ref v r
-data instance Ref v High = RefV v
-data instance Ref v Low = RefI Word16
-
-deriving instance Show (Ref v Low)
-deriving instance NFData (Ref v Low)
-deriving instance Generic (Ref v Low)
-deriving instance Eq (Ref v Low)
-
-deriving instance Ord (Ref v Low)
-
-deriving instance Show v => Show (Ref v High)
-deriving instance NFData v => NFData (Ref v High)
-deriving instance Generic (Ref v High)
-deriving instance Eq v => Eq (Ref v High)
-
-
-type family Choice r a b
-type instance Choice High a b = b
-type instance Choice Low a b = a
-
-type Index = Word16
-
-value :: Ref v High -> v
-value (RefV v) = v
-
-valueF :: (a -> Ref v High) -> a -> v
-valueF f = value . f
-
-
--- data Choice r a b where
---   ChoiceLow :: a -> Choice Low a b
---   ChoiceHigh :: b -> Choice Low a b
-
-instance Binary (Ref a Low) where
-  get = RefI <$> get
-  put = put . idx
-
-idx :: Ref a Low -> Word16
-idx (RefI w) = w
-
-newtype DeepRef v r = DeepRef { unDeep :: (Ref (v r) r) }
-
-deriving instance Show (DeepRef v Low)
-deriving instance NFData (DeepRef v Low)
-deriving instance Generic (DeepRef v Low)
-deriving instance Eq (DeepRef v Low)
-
-deriving instance Show (v High) => Show (DeepRef v High)
-deriving instance NFData (v High) => NFData (DeepRef v High)
-deriving instance Generic (DeepRef v High)
-deriving instance Eq (v High) => Eq (DeepRef v High)
-
-deriving instance Ord (DeepRef v Low)
-deriving instance Binary (DeepRef v Low)
 
 -- | A constant is a multi word item in the 'ConstantPool'. Each of
 -- the constructors are pretty much self-explanatory from the types.
@@ -176,19 +103,22 @@ data MethodId r = MethodId
   , methodIdDescription :: !(Ref MethodDescriptor r)
   }
 
+-- | A method id in a class.
+type AbsMethodId = InClass MethodId
+
 -- | A field identifier
 data FieldId r = FieldId
   { fieldIdName :: !(Ref Text.Text r)
   , fieldIdDescription :: !(Ref FieldDescriptor r)
   } -- deriving (Show, Eq, Ord, Generic, NFData)
 
--- | An interface identifier, essentially a method id
-data InterfaceId r = InterfaceId
-  { interfaceMethodId :: !(InClass MethodId r)
-  }
+-- | A field id in a class
+type AbsFieldId = InClass FieldId
 
-newtype InterfaceMethod r =
-  InterfaceMethod (InClass MethodId r)
+-- | An interface method, which is a class in a method.
+newtype AbsInterfaceMethodId r = AbsInterfaceMethodId
+  { interfaceMethodId :: InClass MethodId r
+  }
 
 -- | The union type over the different method handles.
 data MethodHandle r
@@ -433,12 +363,12 @@ instance Referenceable (InClass MethodId High) where
   toConst s =
     return $ CMethodRef s
 
-instance Referenceable (InterfaceMethod High) where
+instance Referenceable (AbsInterfaceMethodId High) where
   fromConst _ (CInterfaceMethodRef s) = do
-    return . InterfaceMethod $ s
+    return . AbsInterfaceMethodId $ s
   fromConst err c = expected "CInterfaceMethodRef" err c
 
-  toConst (InterfaceMethod s) =
+  toConst (AbsInterfaceMethodId s) =
     return $ CInterfaceMethodRef s
 
 
@@ -461,11 +391,8 @@ $(deriveBase ''MethodHandleMethod)
 $(deriveBase ''MethodHandleInterface)
 $(deriveBaseWithBinary ''MethodId)
 $(deriveBaseWithBinary ''FieldId)
-$(deriveBaseWithBinary ''InterfaceId)
 $(deriveBaseWithBinary ''InvokeDynamic)
 
-type AbsMethodId = InClass MethodId
-type AbsFieldId = InClass FieldId
 $(deriveBaseWithBinary ''AbsMethodId)
 $(deriveBaseWithBinary ''AbsFieldId)
-$(deriveBaseWithBinary ''InterfaceMethod)
+$(deriveBaseWithBinary ''AbsInterfaceMethodId)

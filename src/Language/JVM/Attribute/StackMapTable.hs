@@ -31,7 +31,7 @@ import           Numeric
 import           Control.Monad (replicateM)
 
 import           Language.JVM.Constant
-import           Language.JVM.Stage
+import           Language.JVM.Staged
 import           Language.JVM.Utils
 import           Language.JVM.Attribute.Base
 
