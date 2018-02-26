@@ -7,41 +7,59 @@ import Language.JVM
 import Data.ByteString.Lazy as BL
 
 main :: IO ()
-main = defaultMain
+main = defaultMain $
   [ decodebm
-  ]
+  , encodebm
+  , evolvebm
+  , devolvebm
+  ] <*> [ ex2 ]
 
-decodebm :: Benchmark
-decodebm = bgroup "decode"
+decodebm :: FilePath -> Benchmark
+decodebm fp = bgroup ("decode " ++ fp)
   [ bench "lazy"
       (whnfIO $ decodeClassFile <$> BL.readFile ex2)
   , bench "strict"
       (nfIO $ decodeClassFile <$> BL.readFile ex2)
-  , env (do Right clf <- decodeClassFile <$> BL.readFile ex2; return clf) $ \ clf ->
-      bgroup "attributes"
-      [ bench "code" $ nf allCode clf
-      , bench "exception" $ nf allExceptions clf
-      , bench "constant" $ nf allConstants clf
-      ]
   ]
 
-  where
-    allCode :: ClassFile -> Either PoolAccessError [Maybe (Either String Code)]
-    allCode = fetchAll cMethods mCode
+encodebm :: FilePath -> Benchmark
+encodebm fp =
+  env (decodeClassFile' fp) $ \clf ->
+    bgroup ("encode " ++ fp)
+    [ bench "lazy"
+        (whnf encodeClassFile clf)
+    , bench "strict"
+        (nf encodeClassFile clf)
+    ]
 
-    allExceptions :: ClassFile -> Either PoolAccessError [Maybe (Either String Exceptions)]
-    allExceptions = fetchAll cMethods mExceptions
+evolvebm :: FilePath -> Benchmark
+evolvebm fp =
+  env (decodeClassFile' fp)$ \clf ->
+    bgroup ("evolve " ++ fp)
+    [ bench "strict"
+        (nf evolveClassFile clf)
+    ]
 
-    allConstants :: ClassFile -> Either PoolAccessError [Maybe (Either String ConstantValue)]
-    allConstants = fetchAll cFields fConstantValue
+devolvebm :: FilePath -> Benchmark
+devolvebm fp =
+  envPerBatch (readClassFile' fp) $ \clf ->
+    bgroup ("devolve " ++ fp)
+    [ bench "strict"
+        (nf devolveClassFile clf)
+    ]
 
-    fetchAll fin fget clf =
-      runWithPool (sequence $ fget <$> fin clf)
-        $ cConstantPool clf
+decodeClassFile' :: FilePath -> IO (ClassFile Low)
+decodeClassFile' fp = do
+  Right clf <- decodeClassFile <$> BL.readFile fp
+  return clf
 
+readClassFile' :: FilePath -> IO (ClassFile High)
+readClassFile' fp = do
+  Right clf <- readClassFile <$> BL.readFile fp
+  return clf
 
 ex1 :: String
-ex1 = "test-suite/data/project/Main.class"
+ex1 = "test/data/project/Main.class"
 
 ex2 :: String
-ex2 = "test-suite/data/java/util/zip/ZipOutputStream.class"
+ex2 = "test/data/java/util/zip/ZipOutputStream.class"
