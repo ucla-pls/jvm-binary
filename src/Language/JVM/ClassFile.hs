@@ -103,9 +103,9 @@ cBootstrapMethods' :: ClassFile High -> Maybe (BootstrapMethods High)
 cBootstrapMethods' =
   firstOne . caBootstrapMethods . cAttributes
 
-cBootstrapMethods :: ClassFile High -> Maybe [BootstrapMethod High]
+cBootstrapMethods :: ClassFile High -> [BootstrapMethod High]
 cBootstrapMethods =
-  fmap methods . cBootstrapMethods'
+  maybe [] methods . cBootstrapMethods'
 
 data ClassAttributes r = ClassAttributes
   { caBootstrapMethods :: [ BootstrapMethods r]
