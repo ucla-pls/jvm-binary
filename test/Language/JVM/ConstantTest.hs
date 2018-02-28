@@ -86,7 +86,7 @@ instance Arbitrary (MethodHandle High) where
   arbitrary =
     oneof
       [ MHField <$> ( MethodHandleField <$> arbitrary <*> arbitrary)
-      , MHMethod <$> ( MethodHandleMethod <$> arbitrary <*> arbitrary)
+      , MHMethod <$> arbitrary
       , MHInterface <$> ( MethodHandleInterface <$> arbitrary)
       ]
 
@@ -94,9 +94,12 @@ instance Arbitrary MethodHandleFieldKind where
   arbitrary =
     oneof [ pure x | x <- [ MHGetField, MHGetStatic, MHPutField, MHPutStatic ] ]
 
-instance Arbitrary MethodHandleMethodKind where
+instance Arbitrary (MethodHandleMethod High) where
   arbitrary =
-    oneof [ pure x | x <- [ MHInvokeVirtual , MHInvokeStatic , MHInvokeSpecial , MHNewInvokeSpecial ] ]
+    genericArbitraryU
+
+instance Arbitrary (AbsVariableMethodId High) where
+  arbitrary = genericArbitraryU
 
 instance Arbitrary (InvokeDynamic High) where
   arbitrary = InvokeDynamic <$> arbitrary <*> arbitrary

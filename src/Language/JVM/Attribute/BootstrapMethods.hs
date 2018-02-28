@@ -43,11 +43,11 @@ methods = unSizedList . methods'
 
 -- | A bootstraped methods.
 data BootstrapMethod r = BootstrapMethod
-  { methodIndex :: DeepRef (InClass MethodId) r
+  { methodIndex :: DeepRef MethodHandle r
   , argumentIndicies' :: SizedList16 (DeepRef Constant r)
   }
 
-method :: BootstrapMethod High -> InClass MethodId High
+method :: BootstrapMethod High -> MethodHandle High
 method =
   value . unDeep . methodIndex
 
@@ -61,7 +61,7 @@ arguments = map (value . unDeep) . argumentIndicies
 
 instance Staged BootstrapMethods where
   stage f (BootstrapMethods m) =
-    BootstrapMethods <$> mapM f m
+    label "BootstrapMethods" $ BootstrapMethods <$> mapM f m
 
 instance Staged BootstrapMethod where
   stage f (BootstrapMethod a m) =

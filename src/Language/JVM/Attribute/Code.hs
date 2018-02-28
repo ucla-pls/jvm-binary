@@ -64,7 +64,7 @@ import           Control.Monad.Fail                   (fail)
 import           Unsafe.Coerce
 
 import           Data.Binary
-import           Data.Binary.Get                      hiding (Get)
+import           Data.Binary.Get                      hiding (Get, label)
 import           Data.Binary.Put                      hiding (Put)
 import qualified Data.ByteString.Lazy                 as BL
 import           Data.Int
@@ -126,7 +126,7 @@ data ExceptionTable i = ExceptionTable
   -- ^ Exclusive program counter into 'code'
   , handler   :: ! Word16
   -- ^ A program counter into 'code' indicating the handler.
-  , catchType :: ! (Ref ClassName i)
+  , catchType :: ! (Ref (Maybe ClassName) i)
   }
 
 data ByteCodeInst i = ByteCodeInst
@@ -166,12 +166,14 @@ data ExactArrayType r
   | EAFloat | EADouble | EARef (Ref ClassName r)
 
 data Invokation r
-  = InvkSpecial (DeepRef AbsMethodId r)
+  = InvkSpecial (DeepRef AbsVariableMethodId r)
+  -- ^ Variable since 52.0
   | InvkVirtual (DeepRef AbsMethodId r)
-  | InvkStatic (DeepRef AbsMethodId r)
+  | InvkStatic (DeepRef AbsVariableMethodId r)
+  -- ^ Variable since 52.0
   | InvkInterface Word8 (DeepRef AbsInterfaceMethodId r)
   -- ^ Should be a positive number
-  | InvkDynamic (DeepRef AbsMethodId r)
+  | InvkDynamic (DeepRef InvokeDynamic r)
 
 data FieldAccess
   = FldStatic
@@ -1077,7 +1079,7 @@ data CodeAttributes r = CodeAttributes
   }
 
 instance Staged Code where
-  evolve Code{..} = do
+  evolve Code{..} = label "Code" $ do
     codeByteCode <- evolve codeByteCode
     codeExceptionTable <- mapM evolve codeExceptionTable
     codeAttributes <- fromCollector <$> fromAttributes collect' codeAttributes
@@ -1104,8 +1106,16 @@ instance Staged Code where
 
 
 instance Staged ExceptionTable where
-  stage f ExceptionTable{..} = do
-    catchType <- f catchType
+  evolve ExceptionTable{..} = label "ExceptionTable" $ do
+    catchType <- case idx catchType of
+      0 -> return $ RefV Nothing
+      n -> RefV . Just <$> link n
+    return $ ExceptionTable {..}
+
+  devolve ExceptionTable{..} = do
+    catchType <- case value catchType of
+      Just s -> RefI <$> unlink s
+      Nothing -> return $ RefI 0
     return $ ExceptionTable {..}
 
 instance Staged ByteCode where
@@ -1122,24 +1132,24 @@ instance Staged ByteCodeInst where
 instance Staged Invokation where
   stage f i =
     case i of
-      InvkSpecial r     -> InvkSpecial <$> f r
-      InvkVirtual r     -> InvkVirtual <$> f r
-      InvkStatic r      -> InvkStatic <$> f r
-      InvkInterface w r -> InvkInterface w <$> f r
-      InvkDynamic r     -> InvkDynamic <$> f r
+      InvkSpecial r     -> label "InvkSpecial" $ InvkSpecial <$> f r
+      InvkVirtual r     -> label "InvkVirtual" $ InvkVirtual <$> f r
+      InvkStatic r      -> label "InvkStatic" $ InvkStatic <$> f r
+      InvkInterface w r -> label "InvkInterface" $ InvkInterface w <$> f r
+      InvkDynamic r     -> label "InvkDynamic" $ InvkDynamic <$> f r
 
 instance Staged ByteCodeOpr where
   stage f x =
     case x of
-      Push c            -> Push <$> f c
-      Get fa r          -> Get fa <$> f r
-      Put fa r          -> Put fa <$> f r
-      Invoke r          -> Invoke <$> f r
-      New r             -> New <$> f r
-      NewArray r        -> NewArray <$> f r
-      MultiNewArray r u -> MultiNewArray <$> f r <*> pure u
-      CheckCast r       -> CheckCast <$> f r
-      InstanceOf r      -> InstanceOf <$> f r
+      Push c            -> label "Push" $ Push <$> f c
+      Get fa r          -> label "Get" $ Get fa <$> f r
+      Put fa r          -> label "Put" $ Put fa <$> f r
+      Invoke r          -> label "Invoke" $ Invoke <$> f r
+      New r             -> label "New" $ New <$> f r
+      NewArray r        -> label "NewArray" $ NewArray <$> f r
+      MultiNewArray r u -> label "MultiNewArray" $ MultiNewArray <$> f r <*> pure u
+      CheckCast r       -> label "CheckCast" $ CheckCast <$> f r
+      InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> f r
       a                 -> return $ unsafeCoerce a
 
 instance Staged ExactArrayType where

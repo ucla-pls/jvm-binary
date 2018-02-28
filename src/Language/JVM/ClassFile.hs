@@ -33,6 +33,8 @@ import           Data.Binary
 import           Data.Monoid
 import           Data.Set
 
+
+
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
 import           Language.JVM.Attribute.BootstrapMethods
@@ -114,12 +116,13 @@ data ClassAttributes r = ClassAttributes
   }
 
 instance Staged ClassFile where
-  evolve cf = do
+  evolve cf = label "ClassFile" $ do
     tci' <- evolve (cThisClassIndex cf)
     sci' <-
-      if value tci' /= ClassName "java/lang/Object" then
+      if value tci' /= ClassName "java/lang/Object"
+      then do
         evolve (cSuperClassIndex cf)
-      else
+      else do
         return $ RefV (ClassName "java/lang/Object")
     cii' <- mapM evolve $ cInterfaceIndicies' cf
     cf' <- mapM evolve $ cFields' cf

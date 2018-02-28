@@ -25,7 +25,7 @@ module Language.JVM.Attribute.StackMapTable
   ) where
 
 import           Data.Binary
-import           Data.Binary.Get
+import           Data.Binary.Get hiding (label)
 import           Data.Binary.Put
 import           Numeric
 import           Control.Monad (replicateM)
@@ -181,7 +181,7 @@ instance Binary (VerificationTypeInfo Low) where
       VUninitialized s -> do putWord8 8; put s
 
 instance Staged StackMapTable where
-  stage f (StackMapTable ls) =
+  stage f (StackMapTable ls) = label "StackMapTable" $
     StackMapTable <$> mapM f ls
 
 instance Staged StackMapFrame where

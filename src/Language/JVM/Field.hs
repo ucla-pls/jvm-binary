@@ -64,7 +64,7 @@ data FieldAttributes r = FieldAttributes
   }
 
 instance Staged Field where
-  evolve field = do
+  evolve field = label "Field" $ do
     fi <- evolve (fNameIndex field)
     fd <- evolve (fDescriptorIndex field)
     fattr <- fromCollector <$> fromAttributes collect' (fAttributes field)

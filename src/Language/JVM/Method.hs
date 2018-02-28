@@ -82,7 +82,7 @@ mExceptions =
   map value . fromMaybe [] . fmap exceptionIndexTable . mExceptions'
 
 instance Staged Method where
-  evolve (Method mf mn md mattr) = do
+  evolve (Method mf mn md mattr) = label "Method" $ do
     mn' <- evolve mn
     md' <- evolve md
     mattr' <- fromCollector <$> fromAttributes collect' mattr

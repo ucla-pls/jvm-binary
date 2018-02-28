@@ -99,35 +99,40 @@ writeClassFile =
 -- | An error while reading a class file is represented using
 -- this data structure
 data ClassFileError
-  = CFEPoolAccessError !PoolAccessError
-  | CFEInconsistentClassPool !String
-  | CFEConversionError !String
+  = CFEPoolAccessError !String !PoolAccessError
+  | CFEInconsistentClassPool !String !String
+  | CFEConversionError !String !String
   | CFEUnreadableFile !String
   deriving (Show, Eq, Generic)
 
 instance NFData ClassFileError
 
 newtype Evolve a =
-  Evolve (ReaderT (ConstantPool High) (Either ClassFileError) a)
+  Evolve (ReaderT (String, ConstantPool High) (Either ClassFileError) a)
   deriving
   ( Functor
   , Applicative
   , Monad
-  , MonadReader (ConstantPool High)
+  , MonadReader (String, ConstantPool High)
   , MonadError ClassFileError
   )
 
 runEvolve :: ConstantPool High -> Evolve a -> Either ClassFileError a
-runEvolve cp (Evolve m) = runReaderT m cp
+runEvolve cp (Evolve m) = runReaderT m ("", cp)
+
+instance LabelM Evolve where
+  label str (Evolve m) = do
+    Evolve . withReaderT (\(x, cp) -> (x ++ "/" ++ str, cp)) $ m
 
 instance EvolveM Evolve where
   link w = do
-    r' <- reader (access w)
-    r <- either (throwError . CFEPoolAccessError) return r'
-    fromConst (throwError . CFEInconsistentClassPool) r
+    (lvl, cp) <- ask
+    r <- either (throwError . CFEPoolAccessError lvl ) return $ access w cp
+    fromConst (throwError . CFEInconsistentClassPool lvl) r
 
   attributeError msg = do
-    throwError (CFEConversionError msg)
+    (lvl, _) <- ask
+    throwError (CFEConversionError lvl msg)
 
 -- | Untie the constant pool, this requires a special operation as the constant pool
 -- might reference itself.
@@ -136,9 +141,9 @@ bootstrapConstantPool reffed =
   case stage' (IM.empty, IM.toList $ unConstantPool reffed) of
     (cp, []) ->
       Right $ ConstantPool cp
-    (_, _:_) ->
-      Left (CFEInconsistentClassPool
-            "Could not load all constants in the constant pool")
+    (_, xs) ->
+      Left (CFEInconsistentClassPool "ConstantPool" $
+            "Could not load all constants in the constant pool: " ++ (show xs))
   where
     stage' (cp, mis) =
       if IM.null cp'
@@ -182,6 +187,8 @@ newtype ConstantPoolBuilder a =
 runConstantPoolBuilder :: ConstantPoolBuilder a -> CPBuilder -> (a, CPBuilder)
 runConstantPoolBuilder (ConstantPoolBuilder m) a=
   runState m a
+
+instance LabelM ConstantPoolBuilder
 
 instance DevolveM ConstantPoolBuilder where
   unlink r = do

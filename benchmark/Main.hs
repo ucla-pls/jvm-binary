@@ -42,7 +42,7 @@ evolvebm fp =
 
 devolvebm :: FilePath -> Benchmark
 devolvebm fp =
-  envPerBatch (readClassFile' fp) $ \clf ->
+  env (readClassFile' fp) $ \clf ->
     bgroup ("devolve " ++ fp)
     [ bench "strict"
         (nf devolveClassFile clf)

@@ -29,6 +29,7 @@ module Language.JVM.Constant
   , AbsMethodId
   , AbsFieldId
   , AbsInterfaceMethodId (..)
+  , AbsVariableMethodId (..)
 
   , MethodId (..)
   , FieldId (..)
@@ -41,7 +42,6 @@ module Language.JVM.Constant
   , MethodHandleField (..)
   , MethodHandleMethod (..)
   , MethodHandleInterface (..)
-  , MethodHandleMethodKind (..)
   , MethodHandleFieldKind (..)
   , InvokeDynamic (..)
 
@@ -120,6 +120,12 @@ newtype AbsInterfaceMethodId r = AbsInterfaceMethodId
   { interfaceMethodId :: InClass MethodId r
   }
 
+-- | In some cases we can both point to interface methods and
+-- regular methods.
+data AbsVariableMethodId r
+  = VInterfaceMethodId !(AbsInterfaceMethodId r)
+  | VMethodId !(AbsMethodId r)
+
 -- | The union type over the different method handles.
 data MethodHandle r
   = MHField !(MethodHandleField r)
@@ -129,7 +135,7 @@ data MethodHandle r
 
 data MethodHandleField r = MethodHandleField
   { methodHandleFieldKind :: !MethodHandleFieldKind
-  , methodHandleFieldRef :: !(DeepRef (InClass FieldId) r)
+  , methodHandleFieldRef :: !(DeepRef AbsFieldId r)
   }
 
 data MethodHandleFieldKind
@@ -139,26 +145,23 @@ data MethodHandleFieldKind
   | MHPutStatic
   deriving (Eq, Show, NFData, Generic, Ord)
 
-data MethodHandleMethod r = MethodHandleMethod
-  { methodHandleMethodKind :: !MethodHandleMethodKind
-  , methodHandleMethodRef :: !(DeepRef (InClass MethodId) r)
-  }
-
-data MethodHandleMethodKind
-  = MHInvokeVirtual
-  | MHInvokeStatic
-  | MHInvokeSpecial
-  | MHNewInvokeSpecial
-  deriving (Eq, Show, NFData, Generic, Ord)
+data MethodHandleMethod r
+  = MHInvokeVirtual !(DeepRef AbsMethodId r)
+  | MHInvokeStatic !(DeepRef AbsVariableMethodId r)
+  -- ^ Since version 52.0
+  | MHInvokeSpecial !(DeepRef AbsVariableMethodId r)
+  -- ^ Since version 52.0
+  | MHNewInvokeSpecial !(DeepRef AbsMethodId r)
 
 data MethodHandleInterface r = MethodHandleInterface
-  {  methodHandleInterfaceRef :: !(DeepRef (InClass MethodId) r)
+  {  methodHandleInterfaceRef :: !(DeepRef AbsInterfaceMethodId r)
   }
 
 data InvokeDynamic r = InvokeDynamic
   { invokeDynamicAttrIndex :: !Word16
   , invokeDynamicMethod :: !(DeepRef MethodId r)
   }
+
 
 -- | Hack that returns the name of a constant.
 typeToStr :: Constant r -> String
@@ -225,10 +228,10 @@ instance Binary (MethodHandle Low) where
       3 -> MHField . MethodHandleField MHPutField <$> get
       4 -> MHField . MethodHandleField MHPutStatic <$> get
 
-      5 -> MHMethod . MethodHandleMethod MHInvokeVirtual <$> get
-      6 -> MHMethod . MethodHandleMethod MHInvokeStatic <$> get
-      7 -> MHMethod . MethodHandleMethod MHInvokeSpecial<$> get
-      8 -> MHMethod . MethodHandleMethod MHNewInvokeSpecial <$> get
+      5 -> MHMethod . MHInvokeVirtual <$> get
+      6 -> MHMethod . MHInvokeStatic <$> get
+      7 -> MHMethod . MHInvokeSpecial<$> get
+      8 -> MHMethod . MHNewInvokeSpecial <$> get
 
       9 -> MHInterface . MethodHandleInterface <$> get
 
@@ -243,13 +246,12 @@ instance Binary (MethodHandle Low) where
         MHPutStatic -> 4
       put $ methodHandleFieldRef h
 
-    MHMethod h   -> do
-      putWord8 $ case methodHandleMethodKind h of
-        MHInvokeVirtual-> 5
-        MHInvokeStatic -> 6
-        MHInvokeSpecial -> 7
-        MHNewInvokeSpecial -> 8
-      put $ methodHandleMethodRef h
+    MHMethod h -> do
+      case h of
+        MHInvokeVirtual m -> putWord8 5 >> put m
+        MHInvokeStatic m -> putWord8 6 >> put m
+        MHInvokeSpecial m -> putWord8 7 >> put m
+        MHNewInvokeSpecial m -> putWord8 8 >> put m
 
     MHInterface h -> do
       putWord8  9
@@ -266,13 +268,6 @@ constantSize x =
     CDouble _ -> 2
     CLong _   -> 2
     _        -> 1
-
--- deriving instance NFData i => NFData1 (Index i)
--- deriving instance Generic i => Generic1 (Index i)
--- deriving instance NFData i => NFData1 (Deref i)
--- deriving instance Generic i => Generic1 (Deref i)
--- deriving instance NFData i => NFData1 (Value i)
--- deriving instance Generic i => Generic1 (Value i)
 
 -- | 'Referenceable' is something that can exist in the constant pool.
 class Referenceable a where
@@ -363,6 +358,22 @@ instance Referenceable (InClass MethodId High) where
   toConst s =
     return $ CMethodRef s
 
+instance Referenceable (InvokeDynamic High) where
+  fromConst _ (CInvokeDynamic c) = do
+    return $ c
+  fromConst err c = expected "CInvokeDynamic" err c
+
+  toConst s =
+    return $ CInvokeDynamic s
+
+instance Referenceable (MethodHandle High) where
+  fromConst _ (CMethodHandle c) = do
+    return $ c
+  fromConst err c = expected "CMethodHandle" err c
+
+  toConst s =
+    return $ CMethodHandle s
+
 instance Referenceable (AbsInterfaceMethodId High) where
   fromConst _ (CInterfaceMethodRef s) = do
     return . AbsInterfaceMethodId $ s
@@ -371,6 +382,20 @@ instance Referenceable (AbsInterfaceMethodId High) where
   toConst (AbsInterfaceMethodId s) =
     return $ CInterfaceMethodRef s
 
+instance Referenceable (AbsVariableMethodId High) where
+  fromConst _ (CInterfaceMethodRef s) = do
+    return . VInterfaceMethodId . AbsInterfaceMethodId $ s
+
+  fromConst _ (CMethodRef s) = do
+    return . VMethodId $ s
+
+  fromConst err c = expected "CInterfaceMethodRef or CMethodRef" err c
+
+  toConst (VInterfaceMethodId (AbsInterfaceMethodId s)) =
+    return $ CInterfaceMethodRef s
+
+  toConst (VMethodId s) =
+    return $ CMethodRef s
 
 expected :: String -> (String -> a) -> (Constant r) -> a
 expected name err c =
@@ -378,7 +403,7 @@ expected name err c =
 
 wrongType :: String -> Constant r -> String
 wrongType n c =
-  "Expected '" ++ n ++ "', but found'" ++ typeToStr c ++ "'."
+  "Expected '" ++ n ++ "', but found '" ++ typeToStr c ++ "'."
 
 badEncoding :: String -> BS.ByteString -> String
 badEncoding str bs =
@@ -396,3 +421,4 @@ $(deriveBaseWithBinary ''InvokeDynamic)
 $(deriveBaseWithBinary ''AbsMethodId)
 $(deriveBaseWithBinary ''AbsFieldId)
 $(deriveBaseWithBinary ''AbsInterfaceMethodId)
+$(deriveBaseWithBinary ''AbsVariableMethodId)
