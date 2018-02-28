@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell    #-}
 {-|
 Module      : Language.JVM.ClassFile
@@ -115,7 +116,11 @@ data ClassAttributes r = ClassAttributes
 instance Staged ClassFile where
   evolve cf = do
     tci' <- evolve (cThisClassIndex cf)
-    sci' <- evolve (cSuperClassIndex cf)
+    sci' <-
+      if value tci' /= ClassName "java/lang/Object" then
+        evolve (cSuperClassIndex cf)
+      else
+        return $ RefV (ClassName "java/lang/Object")
     cii' <- mapM evolve $ cInterfaceIndicies' cf
     cf' <- mapM evolve $ cFields' cf
     cm' <- mapM evolve $ cMethods' cf
@@ -138,7 +143,11 @@ instance Staged ClassFile where
 
   devolve cf = do
     tci' <- devolve (cThisClassIndex cf)
-    sci' <- devolve (cSuperClassIndex cf)
+    sci' <-
+      if cThisClass cf /= ClassName "java/lang/Object" then
+        devolve (cSuperClassIndex cf)
+      else
+        return $ RefI 0
     cii' <- mapM devolve $ cInterfaceIndicies' cf
     cf' <- mapM devolve $ cFields' cf
     cm' <- mapM devolve $ cMethods' cf
