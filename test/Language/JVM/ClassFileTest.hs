@@ -31,11 +31,13 @@ instance Arbitrary (ClassFile High) where
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
-    <*> (pure $ SizedList [])
-    <*> (pure $ SizedList [])
+    <*> (resize 2 arbitrary)
+    <*> (resize 2 arbitrary)
     <*> arbitrary
 
   shrink ClassFile{..} = do
     cInterfaceIndicies' <- shrink cInterfaceIndicies'
     cAttributes <- shrink cAttributes
+    cMethods' <- shrink cMethods'
+    cFields' <- shrink cFields'
     return $ClassFile {..}

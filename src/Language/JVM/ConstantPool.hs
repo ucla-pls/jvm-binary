@@ -99,6 +99,6 @@ append c (ConstantPool cp) =
       case IM.toDescList cp of
         (k, a):_ ->
           k + constantSize a
-        _ -> 0
+        _ -> 1
 
 $(deriveBase ''ConstantPool)

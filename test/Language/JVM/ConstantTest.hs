@@ -11,11 +11,18 @@ import qualified Data.Text as Text
 import Language.JVM.Constant
 import Language.JVM.Staged
 import Language.JVM.ConstantPool
+import Language.JVM.ClassFileReader
 import Language.JVM.UtilsTest ()
 import Language.JVM.TypeTest ()
 
--- prop_encode_and_decode :: ConstantPool Low -> Property
--- prop_encode_and_decode = isoBinary
+prop_encode_and_decode :: ConstantPool Low -> Property
+prop_encode_and_decode = isoBinary
+
+instance Arbitrary (ConstantPool Low) where
+  arbitrary = do
+    lst <- arbitrary :: Gen [Constant High]
+    let (a, x) = runConstantPoolBuilder (mapM devolve lst) cpbEmpty
+    return (cpbConstantPool x)
 
 -- prop_Constant_encode_and_decode :: Constant Low -> Property
 -- prop_Constant_encode_and_decode = isoBinary

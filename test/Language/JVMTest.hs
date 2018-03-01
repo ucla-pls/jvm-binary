@@ -69,6 +69,13 @@ test_reading_classfile = testSomeFiles $ do
     it "can untie the whole class file" $ \cls -> do
       evolveClassFile cls `shouldSatisfy` isRight
 
+    it "can encode/decode the class file" $ \cls -> do
+      decodeClassFile (encodeClassFile cls) `shouldSatisfy` isRight
+
+    it "can write/read the class file" $ \cls -> do
+      let Right x = (evolveClassFile cls)
+      readClassFile (writeClassFile x) `shouldSatisfy` isRight
+
     -- it "has a class name" $ \cls ->
     --   runWithPool (cThisClass cls) (cConstantPool cls) `shouldSatisfy` isRight
 
