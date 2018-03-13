@@ -19,6 +19,7 @@ module Language.JVM
   , module Language.JVM.Stage
   , module Language.JVM.Staged
   , module Language.JVM.Utils
+  , module Language.JVM.Type
   ) where
 
 import           Language.JVM.AccessFlag
@@ -32,3 +33,4 @@ import           Language.JVM.Method
 import           Language.JVM.Stage
 import           Language.JVM.Staged
 import           Language.JVM.Utils
+import           Language.JVM.Type
