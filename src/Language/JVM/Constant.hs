@@ -1,10 +1,10 @@
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-|
 Copyright   : (c) Christian Gram Kalhauge, 2017
 License     : MIT
@@ -45,27 +45,32 @@ module Language.JVM.Constant
   , MethodHandleFieldKind (..)
   , InvokeDynamic (..)
 
+  -- * re-exports
+  , High
+  , Low
   ) where
 
 -- TODO: Data.Binary.IEEE754?
 
-import           Prelude            hiding (fail, lookup)
-import           Numeric (showHex)
-import           Control.DeepSeq (NFData)
-import           GHC.Generics (Generic)
+import           Control.DeepSeq          (NFData)
 import           Control.Monad.Reader
 import           Data.Binary
-import qualified Data.Text          as Text
+import           Data.Binary.IEEE754
+import           Data.Int
+import qualified Data.Text                as Text
+import           GHC.Generics             (Generic)
+import           Numeric                  (showHex)
+import           Prelude                  hiding (fail, lookup)
 
-import           Language.JVM.Utils
-import           Language.JVM.Type
-import           Language.JVM.TH
 import           Language.JVM.Stage
+import           Language.JVM.TH
+import           Language.JVM.Type
+import           Language.JVM.Utils
+
+import qualified Data.Text.Encoding.Error as TE
 
 -- import qualified Data.Text as Text
-import qualified Data.ByteString as BS
-import qualified Data.Text.Encoding as TE
-import qualified Data.Text.Encoding.Error as TE
+import qualified Data.ByteString          as BS
 
 -- import Data.Functor.Classes
 
@@ -75,10 +80,10 @@ import qualified Data.Text.Encoding.Error as TE
 data Constant r
   = CString !SizedByteString16
 
-  | CInteger !Word32
-  | CFloat !Word32
-  | CLong !Word64
-  | CDouble !Word64
+  | CInteger !Int32
+  | CFloat !Float
+  | CLong !Int64
+  | CDouble !Double
   | CClassRef !(Ref Text.Text r)
   | CStringRef !(Ref Text.Text r)
   | CFieldRef !(InClass FieldId r)
@@ -94,12 +99,12 @@ data Constant r
 -- | Anything pointing inside a class
 data InClass a r = InClass
   { inClassName :: !(Ref ClassName r)
-  , inClassId :: !(DeepRef a r)
+  , inClassId   :: !(DeepRef a r)
   }
 
 -- | A method identifier
 data MethodId r = MethodId
-  { methodIdName :: !(Ref Text.Text r)
+  { methodIdName        :: !(Ref Text.Text r)
   , methodIdDescription :: !(Ref MethodDescriptor r)
   }
 
@@ -108,7 +113,7 @@ type AbsMethodId = InClass MethodId
 
 -- | A field identifier
 data FieldId r = FieldId
-  { fieldIdName :: !(Ref Text.Text r)
+  { fieldIdName        :: !(Ref Text.Text r)
   , fieldIdDescription :: !(Ref FieldDescriptor r)
   } -- deriving (Show, Eq, Ord, Generic, NFData)
 
@@ -135,7 +140,7 @@ data MethodHandle r
 
 data MethodHandleField r = MethodHandleField
   { methodHandleFieldKind :: !MethodHandleFieldKind
-  , methodHandleFieldRef :: !(DeepRef AbsFieldId r)
+  , methodHandleFieldRef  :: !(DeepRef AbsFieldId r)
   }
 
 data MethodHandleFieldKind
@@ -159,7 +164,7 @@ data MethodHandleInterface r = MethodHandleInterface
 
 data InvokeDynamic r = InvokeDynamic
   { invokeDynamicAttrIndex :: !Word16
-  , invokeDynamicMethod :: !(DeepRef MethodId r)
+  , invokeDynamicMethod    :: !(DeepRef MethodId r)
   }
 
 
@@ -167,20 +172,20 @@ data InvokeDynamic r = InvokeDynamic
 typeToStr :: Constant r -> String
 typeToStr c =
   case c of
-    CString _  -> "CString"
-    CInteger _  -> "CInteger"
-    CFloat _  -> "CFloat"
-    CLong _  -> "CLong"
-    CDouble _  -> "CDouble"
-    CClassRef _  -> "CClassRef"
-    CStringRef _  -> "CStringRef"
-    CFieldRef _  -> "CFieldRef"
-    CMethodRef _  -> "CMethodRef"
-    CInterfaceMethodRef _  -> "CInterfaceMethodRef"
-    CNameAndType _ _  -> "CNameAndType"
-    CMethodHandle _  -> "CMethodHandle"
-    CMethodType _  -> "CMethodType"
-    CInvokeDynamic _  -> "CInvokeDynamic"
+    CString _             -> "CString"
+    CInteger _            -> "CInteger"
+    CFloat _              -> "CFloat"
+    CLong _               -> "CLong"
+    CDouble _             -> "CDouble"
+    CClassRef _           -> "CClassRef"
+    CStringRef _          -> "CStringRef"
+    CFieldRef _           -> "CFieldRef"
+    CMethodRef _          -> "CMethodRef"
+    CInterfaceMethodRef _ -> "CInterfaceMethodRef"
+    CNameAndType _ _      -> "CNameAndType"
+    CMethodHandle _       -> "CMethodHandle"
+    CMethodType _         -> "CMethodType"
+    CInvokeDynamic _      -> "CInvokeDynamic"
 
 instance Binary (Constant Low) where
   get = do
@@ -188,9 +193,9 @@ instance Binary (Constant Low) where
     case ident of
       1  -> CString <$> get
       3  -> CInteger <$> get
-      4  -> CFloat <$> get
+      4  -> CFloat <$> getFloat32be
       5  -> CLong <$> get
-      6  -> CDouble <$> get
+      6  -> CDouble <$> getFloat64be
       7  -> CClassRef <$> get
       8  -> CStringRef <$> get
       9  -> CFieldRef <$> get
@@ -204,20 +209,20 @@ instance Binary (Constant Low) where
 
   put x =
     case x of
-      CString bs              -> do putWord8 1; put bs
-      CInteger i              -> do putWord8 3; put i
-      CFloat i                -> do putWord8 4; put i
-      CLong i                 -> do putWord8 5; put i
-      CDouble i               -> do putWord8 6; put i
-      CClassRef i             -> do putWord8 7; put i
-      CStringRef i            -> do putWord8 8; put i
-      CFieldRef i             -> do putWord8 9; put i
-      CMethodRef i            -> do putWord8 10; put i
-      CInterfaceMethodRef i   -> do putWord8 11; put i
-      CNameAndType i j        -> do putWord8 12; put i; put j
-      CMethodHandle h         -> do putWord8 15; put h
-      CMethodType i           -> do putWord8 16; put i;
-      CInvokeDynamic i        -> do putWord8 18; put i
+      CString bs            -> do putWord8 1; put bs
+      CInteger i            -> do putWord8 3; put i
+      CFloat i              -> do putWord8 4; putFloat32be i
+      CLong i               -> do putWord8 5; put i
+      CDouble i             -> do putWord8 6; putFloat64be i
+      CClassRef i           -> do putWord8 7; put i
+      CStringRef i          -> do putWord8 8; put i
+      CFieldRef i           -> do putWord8 9; put i
+      CMethodRef i          -> do putWord8 10; put i
+      CInterfaceMethodRef i -> do putWord8 11; put i
+      CNameAndType i j      -> do putWord8 12; put i; put j
+      CMethodHandle h       -> do putWord8 15; put h
+      CMethodType i         -> do putWord8 16; put i;
+      CInvokeDynamic i      -> do putWord8 18; put i
 
 instance Binary (MethodHandle Low) where
   get = do
@@ -240,17 +245,17 @@ instance Binary (MethodHandle Low) where
   put x = case x of
     MHField h -> do
       putWord8 $ case methodHandleFieldKind h of
-        MHGetField -> 1
+        MHGetField  -> 1
         MHGetStatic -> 2
-        MHPutField -> 3
+        MHPutField  -> 3
         MHPutStatic -> 4
       put $ methodHandleFieldRef h
 
     MHMethod h -> do
       case h of
-        MHInvokeVirtual m -> putWord8 5 >> put m
-        MHInvokeStatic m -> putWord8 6 >> put m
-        MHInvokeSpecial m -> putWord8 7 >> put m
+        MHInvokeVirtual m    -> putWord8 5 >> put m
+        MHInvokeStatic m     -> putWord8 6 >> put m
+        MHInvokeSpecial m    -> putWord8 7 >> put m
         MHNewInvokeSpecial m -> putWord8 8 >> put m
 
     MHInterface h -> do
@@ -267,7 +272,7 @@ constantSize x =
   case x of
     CDouble _ -> 2
     CLong _   -> 2
-    _        -> 1
+    _         -> 1
 
 -- | 'Referenceable' is something that can exist in the constant pool.
 class Referenceable a where
@@ -303,19 +308,20 @@ instance Referenceable (FieldId High) where
   toConst (FieldId rn (RefV md)) =
     return $ CNameAndType rn (RefV $ fieldDescriptorToText md)
 
+-- TODO: Find good encoding of string.
 instance Referenceable Text.Text where
   fromConst err c =
     case c of
       CString str ->
-        case TE.decodeUtf8' . unSizedByteString $ str of
+        case sizedByteStringToText str of
           Left (TE.DecodeError msg _) ->
             err $ badEncoding msg (unSizedByteString str)
           Left _ -> error "This is deprecated in the api"
           Right txt -> return txt
       a -> err $ wrongType "String" a
 
-  toConst txt =
-    return $ CString (SizedByteString $ TE.encodeUtf8 txt)
+  toConst =
+    return . CString . sizedByteStringFromText
 
 instance Referenceable ClassName where
   fromConst _ (CClassRef (RefV r)) =

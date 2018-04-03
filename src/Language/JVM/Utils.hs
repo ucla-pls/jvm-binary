@@ -7,9 +7,9 @@ Maintainer  : kalhuage@cs.ucla.edu
 This module contains utilities missing not in other libraries.
 -}
 
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 module Language.JVM.Utils
   ( -- * Sized Data Structures
@@ -25,6 +25,8 @@ module Language.JVM.Utils
   , SizedList16
   , SizedByteString32
   , SizedByteString16
+  , sizedByteStringFromText
+  , sizedByteStringToText
 
     -- * Bit Set
     --
@@ -44,13 +46,18 @@ import           Data.Binary
 import           Data.Binary.Get
 import           Data.Binary.Put
 import           Data.Bits
-import           Data.List       as List
-import           Data.Set        as Set
+import           Data.List                as List
+import           Data.Set                 as Set
 
-import           Control.DeepSeq (NFData)
+import           Control.DeepSeq          (NFData)
 import           Control.Monad
 
-import qualified Data.ByteString as BS
+import qualified Data.Text                as Text
+
+import qualified Data.Text.Encoding       as TE
+import qualified Data.Text.Encoding.Error as TE
+
+import qualified Data.ByteString          as BS
 
 
 -- $SizedDataStructures
@@ -103,6 +110,20 @@ instance (Binary w, Integral w) => Binary (SizedByteString w) where
   put sbs@(SizedByteString bs) = do
     put (byteStringSize sbs)
     putByteString bs
+
+-- | Convert a Sized bytestring to Utf8 Text.
+sizedByteStringToText ::
+     SizedByteString w
+  -> Either TE.UnicodeException Text.Text
+sizedByteStringToText =
+  TE.decodeUtf8' . unSizedByteString
+
+-- | Convert a Sized bytestring from Utf8 Text.
+sizedByteStringFromText ::
+     Text.Text
+  -> SizedByteString w
+sizedByteStringFromText =
+  SizedByteString . TE.encodeUtf8
 
 -- $BitSet
 -- A bit set is a set where each element is represented a bit in a word. This

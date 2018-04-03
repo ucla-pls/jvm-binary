@@ -29,6 +29,7 @@ dependencies:
 - deriving-compat
 - attoparsec
 - mtl
+- data-binary-ieee754
 - template-haskell
 
 library:

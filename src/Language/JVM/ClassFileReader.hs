@@ -154,7 +154,8 @@ bootstrapConstantPool reffed =
     grow cp (k,a) =
       case runEvolve (ConstantPool cp) $ evolve a of
         Right c -> (IM.singleton k c, Endo id)
-        Left _  -> (IM.empty, Endo ((k,a):))
+        Left (CFEPoolAccessError _ _)  -> (IM.empty, Endo ((k,a):))
+        Left msg -> error (show msg)
 
 -- $build
 
@@ -179,6 +180,7 @@ builderFromConstantPool cp =
   CPBuilder (Map.fromList . map change . IM.toList $ unConstantPool cp) cp
   where
     change (a, b) = (b, fromIntegral a)
+
 
 newtype ConstantPoolBuilder a =
   ConstantPoolBuilder (State CPBuilder a)

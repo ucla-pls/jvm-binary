@@ -35,7 +35,6 @@ data MAccessFlag
   | MSynthetic
   deriving (Ord, Show, Eq, NFData, Generic)
 
-
 -- | The 'Enumish' mapping of the 'MAccessFlag'
 mflags :: [(Int, MAccessFlag)]
 mflags =
