@@ -9,6 +9,7 @@ This module contains utilities missing not in other libraries.
 
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 
 module Language.JVM.Utils
@@ -48,6 +49,7 @@ import           Data.Binary.Put
 import           Data.Bits
 import           Data.List                as List
 import           Data.Set                 as Set
+import           Data.String
 
 import           Control.DeepSeq          (NFData)
 import           Control.Monad
@@ -96,7 +98,7 @@ instance (Binary w, Integral w, Binary a) => Binary (SizedList w a) where
 -- | A byte string with a size w.
 newtype SizedByteString w = SizedByteString
   { unSizedByteString :: BS.ByteString
-  } deriving (Show, Eq, NFData, Ord)
+  } deriving (Show, Eq, NFData, Ord, IsString)
 
 -- | Get the size of a SizedByteString
 byteStringSize :: (Num w) => SizedByteString w -> w
@@ -115,15 +117,24 @@ instance (Binary w, Integral w) => Binary (SizedByteString w) where
 sizedByteStringToText ::
      SizedByteString w
   -> Either TE.UnicodeException Text.Text
-sizedByteStringToText =
-  TE.decodeUtf8' . unSizedByteString
+sizedByteStringToText bs =
+  case TE.decodeUtf8' . unSizedByteString $ bs of
+    Left a
+     | bs == "\192\128" ->
+       Right (Text.pack ['\0'])
+     | otherwise -> Left a
+    Right x ->
+      Right x
 
 -- | Convert a Sized bytestring from Utf8 Text.
 sizedByteStringFromText ::
      Text.Text
   -> SizedByteString w
-sizedByteStringFromText =
-  SizedByteString . TE.encodeUtf8
+sizedByteStringFromText t
+  | t == '\0' =
+    SizedByteString "\192\128"
+  | otherwise =
+    SizedByteString . TE.encodeUtf8 $ t
 
 -- $BitSet
 -- A bit set is a set where each element is represented a bit in a word. This
