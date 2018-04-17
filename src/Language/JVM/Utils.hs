@@ -131,7 +131,7 @@ sizedByteStringFromText ::
      Text.Text
   -> SizedByteString w
 sizedByteStringFromText t
-  | t == '\0' =
+  | t == "\0" =
     SizedByteString "\192\128"
   | otherwise =
     SizedByteString . TE.encodeUtf8 $ t
