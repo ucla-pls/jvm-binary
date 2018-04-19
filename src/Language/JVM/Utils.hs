@@ -61,6 +61,8 @@ import qualified Data.Text.Encoding.Error as TE
 
 import qualified Data.ByteString          as BS
 
+import           Debug.Trace
+
 
 -- $SizedDataStructures
 -- These data structures enables binary reading and writing of lists and
@@ -118,13 +120,14 @@ sizedByteStringToText ::
      SizedByteString w
   -> Either TE.UnicodeException Text.Text
 sizedByteStringToText bs =
-  case TE.decodeUtf8' . unSizedByteString $ bs of
-    Left a
-     | bs == "\192\128" ->
-       Right (Text.pack ['\0'])
-     | otherwise -> Left a
-    Right x ->
-      Right x
+  Right . TE.decodeUtf8With (\msg x -> traceShow x Nothing) . unSizedByteString $ bs
+  -- case TE.decodeUtf8With (const error) . unSizedByteString $ bs of
+  --   Left a
+  --    | bs == "\192\128" ->
+  --      Right (Text.pack ['\0'])
+  --    | otherwise -> Left a
+  --   Right x ->
+  --     Right x
 
 -- | Convert a Sized bytestring from Utf8 Text.
 sizedByteStringFromText ::

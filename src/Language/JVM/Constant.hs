@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -32,7 +33,9 @@ module Language.JVM.Constant
   , AbsVariableMethodId (..)
 
   , MethodId (..)
+  , methodIdToText
   , FieldId (..)
+  , fieldIdToText
 
   , MethodDescriptor
   , FieldDescriptor
@@ -105,7 +108,7 @@ data InClass a r = InClass
 -- | A method identifier
 data MethodId r = MethodId
   { methodIdName        :: !(Ref Text.Text r)
-  , methodIdDescription :: !(Ref MethodDescriptor r)
+  , methodIdDescriptor  :: !(Ref MethodDescriptor r)
   }
 
 -- | A method id in a class.
@@ -114,7 +117,7 @@ type AbsMethodId = InClass MethodId
 -- | A field identifier
 data FieldId r = FieldId
   { fieldIdName        :: !(Ref Text.Text r)
-  , fieldIdDescription :: !(Ref FieldDescriptor r)
+  , fieldIdDescriptor  :: !(Ref FieldDescriptor r)
   } -- deriving (Show, Eq, Ord, Generic, NFData)
 
 -- | A field id in a class
@@ -124,6 +127,20 @@ type AbsFieldId = InClass FieldId
 newtype AbsInterfaceMethodId r = AbsInterfaceMethodId
   { interfaceMethodId :: InClass MethodId r
   }
+
+fieldIdToText :: FieldId High -> Text.Text
+fieldIdToText fid =
+  Text.concat
+  [ value $ fieldIdName fid, ":"
+  , fieldDescriptorToText . value $ fieldIdDescriptor fid
+  ]
+
+methodIdToText :: MethodId High -> Text.Text
+methodIdToText fid =
+  Text.concat
+  [ value $ methodIdName fid, ":"
+  , methodDescriptorToText . value $ methodIdDescriptor fid
+  ]
 
 -- | In some cases we can both point to interface methods and
 -- regular methods.

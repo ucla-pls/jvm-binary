@@ -138,24 +138,27 @@ instance EvolveM Evolve where
 -- might reference itself.
 bootstrapConstantPool :: ConstantPool Low -> Either ClassFileError (ConstantPool High)
 bootstrapConstantPool reffed =
-  case stage' (IM.empty, IM.toList $ unConstantPool reffed) of
-    (cp, []) ->
+  case stage' IM.empty (IM.toList $ unConstantPool reffed) of
+    Right cp ->
       Right $ ConstantPool cp
-    (_, xs) ->
-      Left (CFEInconsistentClassPool "ConstantPool" $
-            "Could not load all constants in the constant pool: " ++ (show xs))
+    Left xs ->
+      Left . CFEInconsistentClassPool "ConstantPool"
+           $ "Could not load all constants in the constant pool: " ++ (show xs)
   where
-    stage' (cp, mis) =
-      if IM.null cp'
-      then (cp, mis)
-      else stage' (cp `IM.union` cp', appEndo mis' [])
-      where (cp', mis') = foldMap (grow cp) mis
+    stage' cp mis =
+      let (cp', mis') = foldMap (grow cp) mis in
+      case appEndo mis' [] of
+        [] | IM.null cp' -> Right cp
+        xs
+          | IM.null cp' ->
+            Left xs
+          | otherwise ->
+            stage' (cp `IM.union` cp') (map snd xs)
 
     grow cp (k,a) =
       case runEvolve (ConstantPool cp) $ evolve a of
         Right c -> (IM.singleton k c, Endo id)
-        Left (CFEPoolAccessError _ _)  -> (IM.empty, Endo ((k,a):))
-        Left msg -> error (show msg)
+        Left msg  -> (IM.empty, Endo ((msg, (k,a)):))
 
 -- $build
 

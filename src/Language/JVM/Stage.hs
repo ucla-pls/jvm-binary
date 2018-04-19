@@ -60,6 +60,7 @@ type Index = Word16
 
 value :: Ref v High -> v
 value (RefV v) = v
+{-# INLINE value #-}
 
 instance Binary (Ref a Low) where
   get = RefI <$> get
@@ -67,6 +68,8 @@ instance Binary (Ref a Low) where
 
 idx :: Ref a Low -> Word16
 idx (RefI w) = w
+{-# INLINE idx #-}
+
 
 newtype DeepRef v r = DeepRef { unDeep :: (Ref (v r) r) }
 
