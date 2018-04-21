@@ -62,6 +62,8 @@ testSomeFiles spec =
       [ "test/data/java/util/zip/ZipOutputStream.class"
       , "test/data/project/Main.class"
       , "test/data/com/sun/istack/internal/localization/Localizable.class"
+      , "test/data/SQLite.class"
+      , "test/data/Emitter.class"
       ]
 
 hexStringS :: BS.ByteString -> String

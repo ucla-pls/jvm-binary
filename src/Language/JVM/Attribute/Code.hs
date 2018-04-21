@@ -17,6 +17,7 @@ module Language.JVM.Attribute.Code
   , CodeAttributes (..)
 
   , ByteCode (..)
+  , codeByteCodeOprs
   , ExceptionTable (..)
 
   , ByteCodeInst (..)
@@ -70,6 +71,7 @@ import qualified Data.ByteString.Lazy                 as BL
 import           Data.Int
 import           Data.Monoid
 import qualified Data.Vector                          as V
+import           Debug.Trace
 
 import           Language.JVM.Attribute.Base
 import           Language.JVM.Attribute.StackMapTable
@@ -93,6 +95,9 @@ data Code r = Code
   , codeAttributes     :: Choice r (SizedList16 (Attribute r)) (CodeAttributes r)
   }
 
+codeByteCodeOprs :: Code High -> [ByteCodeOpr High]
+codeByteCodeOprs =
+  unByteCode . codeByteCode
 
 newtype ByteCode i = ByteCode
   { unByteCode :: Choice i [ByteCodeInst i] [ByteCodeOpr i]
@@ -210,7 +215,6 @@ data CConstant r
   | CByte Int8
   | CShort Int16
 
-  | CHalfRef (DeepRef Constant r)
   | CRef WordSize (DeepRef Constant r)
 
 data BinOpr
@@ -384,7 +388,7 @@ instance Binary (ByteCodeOpr Low) where
       0x10 -> Push . CByte <$> get
       0x11 -> Push . CShort <$> get
 
-      0x12 -> Push . CHalfRef . DeepRef . RefI . fromIntegral <$> getWord8
+      0x12 -> Push . CRef One . DeepRef . RefI . fromIntegral <$> getWord8
       0x13 -> Push . CRef One <$> get
       0x14 -> Push . CRef Two <$> get
 
@@ -715,8 +719,12 @@ putByteCode n bc =
     Push (CByte x) -> putWord8 0x10 >> put x
     Push (CShort x) -> putWord8 0x11 >> put x
 
-    Push (CHalfRef (DeepRef (RefI x))) -> putWord8 0x12 >> (putWord8 . fromIntegral $ x)
-    Push (CRef One r) -> putWord8 0x13 >> put r
+    -- Push (CHalfRef (DeepRef (RefI x)))
+    --   | x <= 0xff -> putWord8 0x12 >> (putWord8 . fromIntegral $ x)
+    --   | otherwise -> putWord8 0x13 >> put r
+    Push (CRef One (DeepRef (RefI x)))
+      | x <= 0xff -> putWord8 0x12 >> (putWord8 . fromIntegral $ x)
+      | otherwise -> putWord8 0x13 >> put x
     Push (CRef Two r) -> putWord8 0x14 >> put r
 
     -- 0x15 -> Load LInt . fromIntegral <$> getWord8
@@ -1125,7 +1133,7 @@ instance Staged ByteCode where
     ByteCode . calculateOffsets <$> mapM devolve bc
 
 instance Staged ByteCodeInst where
-  stage f ByteCodeInst{..} = do
+  stage f ByteCodeInst{..} = label (show offset) $ do
     opcode <- f opcode
     return $ ByteCodeInst {..}
 
@@ -1161,8 +1169,8 @@ instance Staged ExactArrayType where
 instance Staged CConstant where
   stage f x =
     case x of
-      CHalfRef r -> CHalfRef <$> f r
-      CRef w r   -> CRef w <$> f r
+      -- CHalfRef r -> label "HalfRef" $ CHalfRef <$> f r
+      CRef w r   -> label "Ref" $ CRef w <$> f r
       a          -> return $ unsafeCoerce a
 
 $(deriveBase ''ByteCode)

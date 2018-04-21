@@ -66,15 +66,26 @@ test_reading_classfile = testSomeFiles $ do
                 Left x ->
                   print x
 
+    it "can encode/decode the class file" $ \cls -> do
+      let e = encodeClassFile cls
+      decodeClassFile e `shouldBe` Right cls
+
     it "can untie the whole class file" $ \cls -> do
       evolveClassFile cls `shouldSatisfy` isRight
 
-    it "can encode/decode the class file" $ \cls -> do
-      decodeClassFile (encodeClassFile cls) `shouldSatisfy` isRight
-
-    it "can write/read the class file" $ \cls -> do
-      let Right x = (evolveClassFile cls)
-      readClassFile (writeClassFile x) `shouldSatisfy` isRight
+    it "can do full read - write - read process" $ \cls -> do
+      let
+        Right x = (evolveClassFile cls)
+        y' = readClassFile (writeClassFile x)
+      y' `shouldSatisfy` isRight
+      let Right y = y'
+      cAccessFlags' y `shouldBe` cAccessFlags' x
+      cThisClassIndex y `shouldBe` cThisClassIndex x
+      cSuperClassIndex y `shouldBe` cSuperClassIndex x
+      cInterfaceIndicies' y `shouldBe` cInterfaceIndicies' x
+      cFields' y `shouldBe` cFields' x
+      forM_ (zip (cMethods y) (cMethods x)) $ \ (ym, xm) -> do
+        ym `shouldMatchMethod` xm
 
     -- it "has a class name" $ \cls ->
     --   runWithPool (cThisClass cls) (cConstantPool cls) `shouldSatisfy` isRight
@@ -85,3 +96,14 @@ test_reading_classfile = testSomeFiles $ do
     --     Right rs ->
     --       forM_ (catMaybes rs) $ \code ->
     --         code `shouldSatisfy` isRight
+
+shouldMatchMethod ym xm = do
+  mAccessFlags ym `shouldBe` mAccessFlags xm
+  mName ym `shouldBe` mName xm
+  mDescriptor ym `shouldBe` mDescriptor xm
+  mExceptions ym `shouldMatchList` mExceptions xm
+  case (mCode ym, mCode xm) of
+    (Just yc, Just xc) -> do
+      forM_ (zip (C.codeByteCodeOprs yc) (C.codeByteCodeOprs xc)) $ \(yb,yc) -> do
+        yb `shouldBe` yc
+    _ -> mCode ym `shouldBe` mCode xm

@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Language.JVM.UtilsTest where
 
 import SpecHelper
@@ -7,6 +8,12 @@ import qualified Data.ByteString as BS
 
 import Data.Set as Set
 import Language.JVM.Utils
+
+
+spec_parse_zero_text :: SpecWith ()
+spec_parse_zero_text =
+  it "can read zero" $ do
+    sizedByteStringToText "\192\128" `shouldBe` Right "\0"
 
 instance Arbitrary a => Arbitrary (SizedList w a) where
   arbitrary =

@@ -120,7 +120,9 @@ sizedByteStringToText ::
      SizedByteString w
   -> Either TE.UnicodeException Text.Text
 sizedByteStringToText bs =
-  Right . TE.decodeUtf8With (\msg x -> traceShow x Nothing) . unSizedByteString $ bs
+  Right . TE.decodeUtf8With
+     (\msg x -> traceShow (msg, x) Nothing)
+     . unSizedByteString $ bs
   -- case TE.decodeUtf8With (const error) . unSizedByteString $ bs of
   --   Left a
   --    | bs == "\192\128" ->
