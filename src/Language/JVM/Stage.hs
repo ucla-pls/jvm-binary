@@ -25,6 +25,8 @@ module Language.JVM.Stage
   , value
 
   , DeepRef (..)
+  , deepValue
+  , deepRef
   , Choice
   ) where
 
@@ -62,6 +64,10 @@ value :: Ref v High -> v
 value (RefV v) = v
 {-# INLINE value #-}
 
+deepValue :: DeepRef v High -> v High
+deepValue (DeepRef (RefV v)) = v
+{-# INLINE deepValue #-}
+
 instance Binary (Ref a Low) where
   get = RefI <$> get
   put = put . idx
@@ -70,8 +76,10 @@ idx :: Ref a Low -> Word16
 idx (RefI w) = w
 {-# INLINE idx #-}
 
-
 newtype DeepRef v r = DeepRef { unDeep :: (Ref (v r) r) }
+
+deepRef :: v High -> DeepRef v High
+deepRef v = DeepRef (RefV v)
 
 deriving instance Show (DeepRef v Low)
 deriving instance NFData (DeepRef v Low)

@@ -88,11 +88,11 @@ instance IsAttribute Code where
 -- allow indicate the two stages of the code file, before and after access to
 -- the 'ConstantPool'. i should be either 'Ref' or 'Deref'.
 data Code r = Code
-  { codeMaxStack       :: Word16
-  , codeMaxLocals      :: Word16
-  , codeByteCode       :: (ByteCode r)
-  , codeExceptionTable :: SizedList16 (ExceptionTable r)
-  , codeAttributes     :: Choice r (SizedList16 (Attribute r)) (CodeAttributes r)
+  { codeMaxStack       :: !(Word16)
+  , codeMaxLocals      :: !(Word16)
+  , codeByteCode       :: !((ByteCode r))
+  , codeExceptionTable :: !(SizedList16 (ExceptionTable r))
+  , codeAttributes     :: !(Choice r (SizedList16 (Attribute r)) (CodeAttributes r))
   }
 
 codeByteCodeOprs :: Code High -> [ByteCodeOpr High]
