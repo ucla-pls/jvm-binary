@@ -9,11 +9,19 @@ import qualified Data.ByteString as BS
 import Data.Set as Set
 import Language.JVM.Utils
 
-
 spec_parse_zero_text :: SpecWith ()
-spec_parse_zero_text =
+spec_parse_zero_text = do
   it "can read zero" $ do
     sizedByteStringToText "\192\128" `shouldBe` Right "\0"
+
+  it "can read zero padded with text" $ do
+    sizedByteStringToText "Some text \192\128 a x" `shouldBe` Right "Some text \0 a x"
+
+  it "can convert a zero back again" $ do
+    sizedByteStringFromText "\0" `shouldBe` "\192\128"
+
+  it "can convert a padded zero back again" $ do
+    sizedByteStringFromText "Some text \0 a x" `shouldBe` "Some text \192\128 a x"
 
 instance Arbitrary a => Arbitrary (SizedList w a) where
   arbitrary =
