@@ -48,8 +48,10 @@ import           Language.JVM.Staged
 decodeClassFile :: BL.ByteString -> Either ClassFileError (ClassFile Low)
 decodeClassFile bs = do
   case decodeOrFail bs of
-    Right (_, _, cf) -> Right cf
-    Left (_, _, msg) -> Left $ CFEUnreadableFile msg
+    Right (_, _, cf) ->
+      Right cf
+    Left (_, off, msg) ->
+      Left $ CFEUnreadableFile ((show off) ++ ": " ++ msg)
 
 -- | Create a lazy byte string from a class file
 encodeClassFile :: ClassFile Low -> BL.ByteString
@@ -170,14 +172,6 @@ data CPBuilder = CPBuilder
 cpbEmpty :: CPBuilder
 cpbEmpty = CPBuilder Map.empty CP.empty
 
-stateCPBuilder
-  :: (ConstantPool Low -> (a, ConstantPool Low))
-  -> CPBuilder
-  -> (a, CPBuilder)
-stateCPBuilder f cpb =
-  let (a, cp') = f . cpbConstantPool $ cpb in
-  (a, cpb { cpbConstantPool = cp'})
-
 builderFromConstantPool :: ConstantPool Low -> CPBuilder
 builderFromConstantPool cp =
   CPBuilder (Map.fromList . map change . IM.toList $ unConstantPool cp) cp
@@ -203,5 +197,15 @@ instance DevolveM ConstantPoolBuilder where
     case mw of
       Just w -> return w
       Nothing -> do
-        w <- state . stateCPBuilder $ append c'
+        w <- state . stateCPBuilder $ c'
         return w
+
+stateCPBuilder
+  :: Constant Low
+  -> CPBuilder
+  -> (Word16, CPBuilder)
+stateCPBuilder c' cpb =
+  let (w, cp') = append c' . cpbConstantPool $ cpb in
+  (w, cpb { cpbConstantPool = cp'
+          , cpbMapper = Map.insert c' w . cpbMapper $ cpb
+          })

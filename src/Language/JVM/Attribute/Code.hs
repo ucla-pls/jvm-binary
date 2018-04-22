@@ -71,7 +71,7 @@ import qualified Data.ByteString.Lazy                 as BL
 import           Data.Int
 import           Data.Monoid
 import qualified Data.Vector                          as V
-import           Debug.Trace
+-- import           Debug.Trace
 
 import           Language.JVM.Attribute.Base
 import           Language.JVM.Attribute.StackMapTable

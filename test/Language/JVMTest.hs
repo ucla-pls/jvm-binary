@@ -4,10 +4,15 @@ module Language.JVMTest where
 import SpecHelper
 
 import Data.Either
+import qualified Data.IntMap as IM
+import qualified Data.List as L
+
 import Data.Foldable
 import Language.JVM
 import qualified Language.JVM.Attribute.Code as C
 import qualified Data.ByteString.Lazy as BL
+
+import Data.Binary
 
 
 spec_testing_example :: SpecWith ()
@@ -70,13 +75,20 @@ test_reading_classfile = testSomeFiles $ do
       let e = encodeClassFile cls
       decodeClassFile e `shouldBe` Right cls
 
-    it "can untie the whole class file" $ \cls -> do
-      evolveClassFile cls `shouldSatisfy` isRight
+    it "can evolve the whole class file" $ \cls -> do
+      let me = evolveClassFile cls
+      me `shouldSatisfy` isRight
+
+    it "has same or smaller constant pool" $ \cls -> do
+      let Right x = evolveClassFile cls
+      let d = devolveClassFile x
+      -- forM_ (L.sort . IM.elems . unConstantPool $ cConstantPool d) print
+      (IM.size . unConstantPool $ cConstantPool d) `shouldSatisfy`
+         (<= (IM.size . unConstantPool $ cConstantPool cls))
 
     it "can do full read - write - read process" $ \cls -> do
-      let
-        Right x = (evolveClassFile cls)
-        y' = readClassFile (writeClassFile x)
+      let Right x = evolveClassFile cls
+      let y' = readClassFile (writeClassFile x)
       y' `shouldSatisfy` isRight
       let Right y = y'
       cAccessFlags' y `shouldBe` cAccessFlags' x

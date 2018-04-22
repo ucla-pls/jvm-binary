@@ -31,6 +31,7 @@ module Language.JVM.ConstantPool
 import           Control.DeepSeq          (NFData)
 import           Control.Monad.Except
 import           Data.Binary
+-- import           Debug.Trace
 import           Data.Binary.Get
 import           Data.Binary.Put
 import qualified Data.IntMap              as IM
@@ -54,7 +55,7 @@ newtype ConstantPool r = ConstantPool
 
 instance Binary (ConstantPool Low) where
   get = do
-    len <- fromIntegral <$> getInt16be
+    len <- fromIntegral <$> getWord16be
     list <- go len 1
     return . ConstantPool $ IM.fromList list
     where

@@ -82,7 +82,6 @@ import qualified Data.ByteString          as BS
 -- the constructors are pretty much self-explanatory from the types.
 data Constant r
   = CString !SizedByteString16
-
   | CInteger !Int32
   | CFloat !Float
   | CLong !Int64
