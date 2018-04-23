@@ -20,6 +20,7 @@ module Language.JVM.ClassFile
   , cInterfaces
   , cFields
   , cMethods
+  , cSignature
 
   , cThisClass
   , cSuperClass
@@ -33,11 +34,10 @@ import           Data.Binary
 import           Data.Monoid
 import           Data.Set
 
-
-
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
 import           Language.JVM.Attribute.BootstrapMethods
+import           Language.JVM.Attribute.Signature
 import           Language.JVM.Constant
 import           Language.JVM.ConstantPool               as CP
 import           Language.JVM.Field                      (Field)
@@ -110,8 +110,13 @@ cBootstrapMethods :: ClassFile High -> [BootstrapMethod High]
 cBootstrapMethods =
   maybe [] methods . cBootstrapMethods'
 
+cSignature :: ClassFile High -> Maybe (Signature High)
+cSignature =
+  firstOne . caSignature . cAttributes
+
 data ClassAttributes r = ClassAttributes
   { caBootstrapMethods :: [ BootstrapMethods r]
+  , caSignature        :: [ Signature r ]
   , caOthers           :: [ Attribute r ]
   }
 
@@ -138,11 +143,12 @@ instance Staged ClassFile where
       , cAttributes         = ca'
       }
     where
-      fromCollector (a, b) =
-        ClassAttributes (appEndo a []) (appEndo b [])
+      fromCollector (a, b, c) =
+        ClassAttributes (appEndo a []) (appEndo b []) (appEndo c [])
       collect' attr =
-        collect (mempty, Endo (attr:)) attr
-          [ toC $ \e -> (Endo (e:), mempty) ]
+        collect (mempty, mempty, Endo (attr:)) attr
+          [ toC $ \e -> (Endo (e:), mempty, mempty)
+          , toC $ \e -> (mempty, Endo (e:), mempty)]
 
   devolve cf = do
     tci' <- devolve (cThisClassIndex cf)
@@ -166,10 +172,11 @@ instance Staged ClassFile where
       , cAttributes         = SizedList ca'
       }
     where
-      fromClassAttributes (ClassAttributes cm at) = do
+      fromClassAttributes (ClassAttributes cm cs at) = do
         cm' <- mapM toAttribute cm
+        cs' <- mapM toAttribute cs
         at' <- mapM devolve at
-        return (cm' ++ at')
+        return (cm' ++ cs' ++ at')
 
 
 $(deriveBase ''ClassAttributes)

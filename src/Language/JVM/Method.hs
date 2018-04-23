@@ -21,6 +21,7 @@ module Language.JVM.Method
   , mCode
   , mExceptions'
   , mExceptions
+  , mSignature
 
   ) where
 
@@ -60,6 +61,7 @@ mDescriptor = value .  mDescriptorIndex
 data MethodAttributes r = MethodAttributes
   { maCode       :: [Code r]
   , maExceptions :: [Exceptions r]
+  , maSignatures :: [Signature r]
   , maOthers :: [Attribute r]
   }
 
@@ -81,6 +83,11 @@ mExceptions :: Method High -> [ClassName]
 mExceptions =
   map value . fromMaybe [] . fmap exceptionIndexTable . mExceptions'
 
+-- | Fetches the 'Signature' attribute, if any.
+mSignature :: Method High -> Maybe (Signature High)
+mSignature =
+  firstOne . maSignatures . mAttributes
+
 instance Staged Method where
   evolve (Method mf mn md mattr) = do
     mn' <- evolve mn
@@ -88,12 +95,13 @@ instance Staged Method where
     mattr' <- fromCollector <$> fromAttributes collect' mattr
     return $ Method mf mn' md' mattr'
     where
-      fromCollector (a, b, c) =
-        MethodAttributes (appEndo a []) (appEndo b []) (appEndo c [])
+      fromCollector (a, b, c, d) =
+        MethodAttributes (appEndo a []) (appEndo b []) (appEndo c []) (appEndo d [])
       collect' attr =
-        collect (mempty, mempty, Endo (attr:)) attr
-          [ toC $ \e -> (Endo (e:), mempty, mempty)
-          , toC $ \e -> (mempty, Endo (e:), mempty)
+        collect (mempty, mempty, mempty, Endo (attr:)) attr
+          [ toC $ \e -> (Endo (e:), mempty, mempty, mempty)
+          , toC $ \e -> (mempty, Endo (e:), mempty, mempty)
+          , toC $ \e -> (mempty, mempty, Endo (e:), mempty)
           ]
 
   devolve (Method mf mn md mattr) = do
@@ -102,11 +110,12 @@ instance Staged Method where
     mattr' <- fromMethodAttributes $ mattr
     return $ Method mf mn' md' (SizedList mattr')
     where
-      fromMethodAttributes (MethodAttributes a b c) = do
+      fromMethodAttributes (MethodAttributes a b c d) = do
         a' <- mapM toAttribute a
         b' <- mapM toAttribute b
-        c' <- mapM devolve c
-        return (a' ++ b' ++ c')
+        c' <- mapM toAttribute c
+        d' <- mapM devolve d
+        return (a' ++ b' ++ c' ++ d')
 
 $(deriveBase ''MethodAttributes)
 $(deriveBaseWithBinary ''Method)
