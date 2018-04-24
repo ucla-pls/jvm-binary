@@ -7,7 +7,13 @@ import SpecHelper
 import qualified Data.ByteString as BS
 
 import Data.Set as Set
+import qualified Data.Text.Encoding as TE
+import qualified Data.Text as Text
 import Language.JVM.Utils
+
+prop_test_our_zero_decoder :: Text.Text -> Bool
+prop_test_our_zero_decoder a =
+   tryDecode (TE.encodeUtf8 a) == Right a
 
 spec_parse_zero_text :: SpecWith ()
 spec_parse_zero_text = do
@@ -22,6 +28,12 @@ spec_parse_zero_text = do
 
   it "can convert a padded zero back again" $ do
     sizedByteStringFromText "Some text \0 a x" `shouldBe` "Some text \192\128 a x"
+
+  it "works on wierd strings" $ do
+    tryDecode (TE.encodeUtf8 "\0  asd ßåæ∂ø∆œ˜˜¬å˚¬") `shouldBe` Right "\0  asd ßåæ∂ø∆œ˜˜¬å˚¬"
+
+  it "works on chinese characters" $ do
+      tryDecode (TE.encodeUtf8 "试一试中文") `shouldBe` Right "试一试中文"
 
 instance Arbitrary a => Arbitrary (SizedList w a) where
   arbitrary =

@@ -37,6 +37,7 @@ instance Arbitrary Text.Text where
     , "test"
     , "number"
     , "stuff"
+    , "\0  asd ßåæ∂ø∆œ˜˜¬å˚¬"
     ]
 
 instance Arbitrary a => Arbitrary (Ref a High) where

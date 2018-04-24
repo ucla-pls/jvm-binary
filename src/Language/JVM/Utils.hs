@@ -29,6 +29,8 @@ module Language.JVM.Utils
   , sizedByteStringFromText
   , sizedByteStringToText
 
+  , tryDecode
+
     -- * Bit Set
     --
     -- $BitSet
@@ -115,31 +117,45 @@ instance (Binary w, Integral w) => Binary (SizedByteString w) where
     put (byteStringSize sbs)
     putByteString bs
 
+replaceJavaZeroWithNormalZero :: BS.ByteString -> BS.ByteString
+replaceJavaZeroWithNormalZero = go
+  where
+    go bs =
+      case BS.breakSubstring "\192\128" bs of
+        (h, "") -> h
+        (h, t) -> h `BS.append` "\0" `BS.append` go (BS.drop 2 t)
+
+replaceNormalZeroWithJavaZero::BS.ByteString -> BS.ByteString
+replaceNormalZeroWithJavaZero = go
+  where
+      go bs =
+        case BS.breakSubstring "\0" bs of
+          (h, "") -> h
+          (h, t) -> h `BS.append` "\192\128" `BS.append` go (BS.drop 1 t)
+
 -- | Convert a Sized bytestring to Utf8 Text.
 sizedByteStringToText ::
      SizedByteString w
   -> Either TE.UnicodeException Text.Text
-sizedByteStringToText bs =
-  Right . TE.decodeUtf8With
-     (\msg x -> Nothing) -- traceShow (msg, x) Nothing)
-     . unSizedByteString $ bs
-  -- case TE.decodeUtf8With (const error) . unSizedByteString $ bs of
-  --   Left a
-  --    | bs == "\192\128" ->
-  --      Right (Text.pack ['\0'])
-  --    | otherwise -> Left a
-  --   Right x ->
-  --     Right x
+sizedByteStringToText (SizedByteString bs) =
+  let rst = TE.decodeUtf8' bs
+    in case rst of 
+      Right txt -> Right txt
+      Left _ ->
+        case tryDecode bs of 
+          Right txt -> Right txt
+          Left errorMsgAfterReplace -> Left errorMsgAfterReplace
+
+tryDecode :: BS.ByteString -> Either TE.UnicodeException Text.Text
+tryDecode =  TE.decodeUtf8' . replaceJavaZeroWithNormalZero
+
 
 -- | Convert a Sized bytestring from Utf8 Text.
 sizedByteStringFromText ::
      Text.Text
   -> SizedByteString w
 sizedByteStringFromText t
-  | t == "\0" =
-    SizedByteString "\192\128"
-  | otherwise =
-    SizedByteString . TE.encodeUtf8 $ t
+  = SizedByteString . replaceNormalZeroWithJavaZero . TE.encodeUtf8 $ t
 
 -- $BitSet
 -- A bit set is a set where each element is represented a bit in a word. This
