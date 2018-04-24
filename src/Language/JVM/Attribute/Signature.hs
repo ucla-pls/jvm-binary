@@ -11,8 +11,8 @@ License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
 
 Based on the Signature Attribute,
-as documented [here](http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.9),
-and the signature syntax defined [here](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.3.4).
+as documented [here](http://docs.oracle.com/javase/specs/jvms/se9/html/jvms-4.html#jvms-4.7.9),
+and the signature syntax defined [here](https://docs.oracle.com/javase/specs/jvms/se9/html/jvms-4.html#jvms-4.7.9.1).
 -}
 
 module Language.JVM.Attribute.Signature
