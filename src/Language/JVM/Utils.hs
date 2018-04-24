@@ -117,20 +117,19 @@ instance (Binary w, Integral w) => Binary (SizedByteString w) where
     put (byteStringSize sbs)
     putByteString bs
 
-replaceJavaZeroWithNormalZero :: [Word8] -> [Word8]
-replaceJavaZeroWithNormalZero [] = []
-replaceJavaZeroWithNormalZero [h] = [h]
-replaceJavaZeroWithNormalZero (h1:h2:t) =
-  case (h1, h2) of
-    (192, 128) -> 0:(replaceJavaZeroWithNormalZero t)
-    _ -> h1:(replaceJavaZeroWithNormalZero $ h2:t)
+replaceJavaZeroWithNormalZero :: BS.ByteString -> BS.ByteString
+replaceJavaZeroWithNormalZero bs =
+  let (h, t) = BS.breakSubstring "\192\128" bs in
+      case t of
+      "" -> h
+      _ ->  h `BS.append` (BS.singleton 0) `BS.append` (replaceJavaZeroWithNormalZero $ BS.drop 2 t)
 
-replaceNormalZeroWithJavaZero::[Word8] -> [Word8]
-replaceNormalZeroWithJavaZero [] = []
-replaceNormalZeroWithJavaZero (h:t) =
-  case h of
-    0 -> 192:128:(replaceNormalZeroWithJavaZero t)
-    _ -> h:(replaceNormalZeroWithJavaZero t)
+replaceNormalZeroWithJavaZero::BS.ByteString -> BS.ByteString
+replaceNormalZeroWithJavaZero bs =
+  let (h, t) = BS.breakSubstring "\0" bs in
+        case t of
+        "" -> h
+        _ -> h `BS.append` "\192\128" `BS.append` (replaceJavaZeroWithNormalZero $ BS.drop 1 t)
 
 -- | Convert a Sized bytestring to Utf8 Text.
 sizedByteStringToText ::
@@ -146,7 +145,7 @@ sizedByteStringToText (SizedByteString bs) =
           Left errorMsgAfterReplace -> Left errorMsgAfterReplace
 
 tryDecode :: BS.ByteString -> Either TE.UnicodeException Text.Text
-tryDecode =  TE.decodeUtf8' . BS.pack . replaceJavaZeroWithNormalZero . BS.unpack
+tryDecode =  TE.decodeUtf8' . replaceJavaZeroWithNormalZero
 
 
 -- | Convert a Sized bytestring from Utf8 Text.
@@ -154,10 +153,7 @@ sizedByteStringFromText ::
      Text.Text
   -> SizedByteString w
 sizedByteStringFromText t
-  = SizedByteString . tryEncode . TE.encodeUtf8 $ t
-      where
-        tryEncode :: BS.ByteString -> BS.ByteString
-        tryEncode =  BS.pack . replaceNormalZeroWithJavaZero . BS.unpack
+  = SizedByteString . replaceNormalZeroWithJavaZero . TE.encodeUtf8 $ t
 
 -- $BitSet
 -- A bit set is a set where each element is represented a bit in a word. This

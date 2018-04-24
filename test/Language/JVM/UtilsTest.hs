@@ -32,6 +32,9 @@ spec_parse_zero_text = do
   it "works on wierd strings" $ do
     tryDecode (TE.encodeUtf8 "\0  asd ßåæ∂ø∆œ˜˜¬å˚¬") `shouldBe` Right "\0  asd ßåæ∂ø∆œ˜˜¬å˚¬"
 
+  it "works on chinese characters" $ do
+      tryDecode (TE.encodeUtf8 "试一试中文") `shouldBe` Right "试一试中文"
+
 instance Arbitrary a => Arbitrary (SizedList w a) where
   arbitrary =
     SizedList <$> arbitrary
