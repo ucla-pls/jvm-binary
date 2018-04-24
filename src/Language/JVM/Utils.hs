@@ -29,6 +29,8 @@ module Language.JVM.Utils
   , sizedByteStringFromText
   , sizedByteStringToText
 
+  , tryDecode
+
     -- * Bit Set
     --
     -- $BitSet
@@ -115,31 +117,48 @@ instance (Binary w, Integral w) => Binary (SizedByteString w) where
     put (byteStringSize sbs)
     putByteString bs
 
+replaceJavaZeroWithNormalZero :: [Word8] -> [Word8]
+replaceJavaZeroWithNormalZero [] = []
+replaceJavaZeroWithNormalZero [h] = [h]
+replaceJavaZeroWithNormalZero (h1:h2:t) =
+  case (h1, h2) of
+    (192, 128) -> 0:(replaceJavaZeroWithNormalZero t)
+    _ -> h1:(replaceJavaZeroWithNormalZero $ h2:t)
+
+
+replaceNormalZeroWithJavaZero::[Word8] -> [Word8]
+replaceNormalZeroWithJavaZero [] = []
+replaceNormalZeroWithJavaZero (h:t) =
+  case h of
+    0 -> 192:128:(replaceNormalZeroWithJavaZero t)
+    _ -> h:(replaceNormalZeroWithJavaZero t)
+
 -- | Convert a Sized bytestring to Utf8 Text.
 sizedByteStringToText ::
      SizedByteString w
   -> Either TE.UnicodeException Text.Text
-sizedByteStringToText bs =
-  Right . TE.decodeUtf8With
-     (\msg x -> Nothing) -- traceShow (msg, x) Nothing)
-     . unSizedByteString $ bs
-  -- case TE.decodeUtf8With (const error) . unSizedByteString $ bs of
-  --   Left a
-  --    | bs == "\192\128" ->
-  --      Right (Text.pack ['\0'])
-  --    | otherwise -> Left a
-  --   Right x ->
-  --     Right x
+sizedByteStringToText (SizedByteString bs) =
+  let rst = TE.decodeUtf8' bs
+    in case rst of 
+      Right txt -> Right txt
+      Left _ ->
+        case tryDecode bs of 
+          Right txt -> Right txt
+          Left errorMsgAfterReplace -> Left errorMsgAfterReplace
+
+tryDecode :: BS.ByteString -> Either TE.UnicodeException Text.Text
+tryDecode =  TE.decodeUtf8' . BS.pack . replaceJavaZeroWithNormalZero . BS.unpack
+
 
 -- | Convert a Sized bytestring from Utf8 Text.
 sizedByteStringFromText ::
      Text.Text
   -> SizedByteString w
 sizedByteStringFromText t
-  | t == "\0" =
-    SizedByteString "\192\128"
-  | otherwise =
-    SizedByteString . TE.encodeUtf8 $ t
+  = SizedByteString . tryEncode . TE.encodeUtf8 $ t
+      where
+        tryEncode :: BS.ByteString -> BS.ByteString
+        tryEncode =  BS.pack . replaceNormalZeroWithJavaZero . BS.unpack
 
 -- $BitSet
 -- A bit set is a set where each element is represented a bit in a word. This
