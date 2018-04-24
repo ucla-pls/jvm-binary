@@ -64,6 +64,7 @@ testSomeFiles spec =
       , "test/data/com/sun/istack/internal/localization/Localizable.class"
       , "test/data/SQLite.class"
       , "test/data/Emitter.class"
+      , "test/data/EventExecutorGroup.class"
       ]
 
 hexStringS :: BS.ByteString -> String
