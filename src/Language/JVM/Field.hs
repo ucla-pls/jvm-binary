@@ -17,6 +17,7 @@ module Language.JVM.Field
   , fAccessFlags
   -- * Attributes
   , fConstantValue
+  , fSignature
   , FieldAttributes (..)
   ) where
 
@@ -58,8 +59,14 @@ fConstantValue :: Field High -> Maybe (ConstantValue High)
 fConstantValue =
   firstOne . faConstantValues . fAttributes
 
+-- | Fetches the 'Signature' attribute, if any.
+fSignature :: Field High -> Maybe (Signature High)
+fSignature =
+  firstOne . faSignatures . fAttributes
+
 data FieldAttributes r = FieldAttributes
   { faConstantValues :: [ ConstantValue r ]
+  , faSignatures     :: [ Signature r ]
   , faOthers         :: [ Attribute r ]
   }
 
@@ -70,11 +77,12 @@ instance Staged Field where
     fattr <- fromCollector <$> fromAttributes collect' (fAttributes field)
     return $ Field (fAccessFlags' field) fi fd fattr
     where
-      fromCollector (cv, others) =
-        FieldAttributes (appEndo cv []) (appEndo others [])
+      fromCollector (cv, sig, others) =
+        FieldAttributes (appEndo cv []) (appEndo sig []) (appEndo others [])
       collect' attr =
-        collect (mempty, Endo(attr:)) attr
-          [ toC $ \x -> (Endo (x:), mempty) ]
+        collect (mempty, mempty, Endo(attr:)) attr
+          [ toC $ \x -> (Endo (x:), mempty, mempty)
+          , toC $ \x -> (mempty, Endo (x:), mempty) ]
 
   devolve field = do
     fi <- devolve (fNameIndex field)
@@ -83,8 +91,11 @@ instance Staged Field where
     return $ Field (fAccessFlags' field) fi fd (SizedList fattr)
 
     where
-      fromFieldAttributes (FieldAttributes cvs attr) =
-        (++) <$> mapM toAttribute cvs <*> mapM devolve attr
+      fromFieldAttributes (FieldAttributes cvs fsg attr) =
+        (\a b c -> a ++ b ++ c)
+        <$> mapM toAttribute cvs
+        <*> mapM toAttribute fsg
+        <*> mapM devolve attr
 
 $(deriveBase ''FieldAttributes)
 $(deriveBaseWithBinary ''Field)

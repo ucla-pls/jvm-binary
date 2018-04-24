@@ -18,9 +18,9 @@ prop_roundtrip_Method = isoRoundtrip
 
 instance Arbitrary (MethodAttributes High) where
   arbitrary =
-    MethodAttributes <$> pure [] <*> arbitrary <*> pure []
-  shrink (MethodAttributes a b c)  =
-    MethodAttributes <$> shrink a <*> shrink b <*> pure c
+    MethodAttributes <$> pure [] <*> arbitrary <*> pure [] <*> pure []
+  shrink (MethodAttributes a b c d )  =
+    MethodAttributes <$> shrink a <*> shrink b <*> pure c <*> pure d
 
 instance Arbitrary (Method High) where
   arbitrary =

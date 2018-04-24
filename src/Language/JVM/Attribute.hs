@@ -22,6 +22,7 @@ module Language.JVM.Attribute
   , Exceptions
   , LineNumberTable
   , StackMapTable
+  , Signature
   ) where
 
 import           Language.JVM.Attribute.Base
@@ -30,4 +31,5 @@ import           Language.JVM.Attribute.Code             (Code)
 import           Language.JVM.Attribute.ConstantValue    (ConstantValue)
 import           Language.JVM.Attribute.Exceptions       (Exceptions)
 import           Language.JVM.Attribute.LineNumberTable  (LineNumberTable)
+import           Language.JVM.Attribute.Signature        (Signature)
 import           Language.JVM.Attribute.StackMapTable    (StackMapTable)

@@ -16,6 +16,8 @@ module Language.JVM.Type
   , JType (..)
   , jTypeToText
 
+  , JBaseType (..)
+
   , MethodDescriptor (..)
   , methodDescriptorFromText
   , methodDescriptorToText
@@ -45,17 +47,21 @@ newtype ClassName = ClassName
 strCls :: String -> ClassName
 strCls = ClassName . Text.pack
 
--- | A Jvm primitive type
-data JType
+data JBaseType
   = JTByte
   | JTChar
   | JTDouble
   | JTFloat
   | JTInt
   | JTLong
-  | JTClass ClassName
   | JTShort
   | JTBoolean
+  deriving (Show, Eq, Ord, Generic, NFData)
+
+-- | A Jvm primitive type
+data JType
+  = JTBase JBaseType
+  | JTClass ClassName
   | JTArray JType
   deriving (Show, Eq, Ord, Generic, NFData)
 
@@ -77,18 +83,18 @@ parseJType :: Parser JType
 parseJType = try $ do
   s <- anyChar
   case s :: Char of
-    'B' -> return JTByte
-    'C' -> return JTChar
-    'D' -> return JTDouble
-    'F' -> return JTFloat
-    'I' -> return JTInt
-    'J' -> return JTLong
+    'B' -> return $JTBase JTByte
+    'C' -> return $JTBase JTChar
+    'D' -> return $JTBase JTDouble
+    'F' -> return $JTBase JTFloat
+    'I' -> return $JTBase JTInt
+    'J' -> return $JTBase JTLong
     'L' -> do
       txt <- takeWhile (/= ';')
       _ <- char ';'
       return $ JTClass (ClassName txt)
-    'S' -> return JTShort
-    'Z' -> return JTBoolean
+    'S' -> return $ JTBase JTShort
+    'Z' -> return $ JTBase JTBoolean
     '[' -> JTArray <$> parseJType
     _ -> fail $ "Unknown char " ++ show s
 
@@ -98,15 +104,15 @@ jTypeToText tp =
   where
     go x =
       case x of
-        JTByte -> ('B':)
-        JTChar -> ('C':)
-        JTDouble -> ('D':)
-        JTFloat -> ('F':)
-        JTInt -> ('I':)
-        JTLong -> ('J':)
+        JTBase JTByte -> ('B':)
+        JTBase JTChar -> ('C':)
+        JTBase JTDouble -> ('D':)
+        JTBase JTFloat -> ('F':)
+        JTBase JTInt -> ('I':)
+        JTBase JTLong -> ('J':)
         JTClass (ClassName cn) -> ((('L':Text.unpack cn) ++ ";") ++)
-        JTShort -> ('S':)
-        JTBoolean -> ('Z':)
+        JTBase JTShort -> ('S':)
+        JTBase JTBoolean -> ('Z':)
         JTArray tp' -> ('[':) . go tp'
 
 

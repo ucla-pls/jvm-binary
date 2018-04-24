@@ -125,7 +125,6 @@ replaceJavaZeroWithNormalZero (h1:h2:t) =
     (192, 128) -> 0:(replaceJavaZeroWithNormalZero t)
     _ -> h1:(replaceJavaZeroWithNormalZero $ h2:t)
 
-
 replaceNormalZeroWithJavaZero::[Word8] -> [Word8]
 replaceNormalZeroWithJavaZero [] = []
 replaceNormalZeroWithJavaZero (h:t) =
@@ -183,16 +182,27 @@ newtype BitSet w a = BitSet
   { toSet :: Set.Set a
   } deriving (Ord, Show, Eq, NFData)
 
-instance (Bits w, Binary w, Enumish a) => Binary (BitSet w a) where
+
+bitSetToWord :: (Enumish a, Bits w) => BitSet w a -> w
+bitSetToWord =
+  toWord . Set.toList . toSet
+
+toWord :: (Enumish a, Bits w) => [a] -> w
+toWord =
+  List.foldl' (\a -> setBit a . fromEnumish) zeroBits
+
+instance (Show w, Bits w, Binary w, Enumish a) => Binary (BitSet w a) where
   get = do
     word <- get :: Get w
-    return . BitSet $ Set.fromList [ x | (i, x) <- inOrder, testBit word i ]
+    let
+      test = toWord [ x | (_, x) <- inOrder :: [(Int, a)]]
+      tested = (complement test .&. word )
+    if tested == zeroBits then
+      return . BitSet $ Set.fromList [ x | (i, x) <- inOrder, testBit word i ]
+    else
+      fail $ "Read bad word " ++ show word ++ " - " ++ show tested
 
-  put (BitSet f) = do
-    let word =
-          List.foldl' setBit zeroBits
-            (List.map fromEnumish $ Set.toList f) :: w
-    put word
+  put = put . bitSetToWord
 
 -- | A sized list using a 16 bit word as length
 type SizedList16 = SizedList Word16

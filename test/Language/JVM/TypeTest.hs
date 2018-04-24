@@ -34,6 +34,9 @@ instance Arbitrary ClassName where
 instance Arbitrary JType where
   arbitrary = genericArbitrary uniform
 
+instance Arbitrary JBaseType where
+  arbitrary = genericArbitrary uniform
+
 instance Arbitrary MethodDescriptor where
   arbitrary = genericArbitrary uniform
 

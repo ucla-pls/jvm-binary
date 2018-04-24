@@ -60,10 +60,12 @@ data CAccessFlag
   = CPublic
   | CFinal
   | CSuper
+  | CInterface
   | CAbstract
   | CSynthetic
   | CAnnotation
   | CEnum
+  | CModule
   deriving (Ord, Show, Eq, NFData, Generic)
 
 -- | The 'Enumish' mapping of the 'CAccessFlag'
@@ -72,10 +74,12 @@ cflags =
   [ (0, CPublic)
   , (4, CFinal)
   , (5, CSuper)
+  , (9, CInterface)
   , (10, CAbstract)
   , (12, CSynthetic)
   , (13, CAnnotation)
   , (14, CEnum)
+  , (15, CModule)
   ]
 
 instance Enumish CAccessFlag where
@@ -88,8 +92,6 @@ data FAccessFlag
   | FProtected
   | FStatic
   | FFinal
-  | FSynchronized
-  | FUnused6
   | FVolatile
   | FTransient
   | FSynthetic
@@ -104,11 +106,9 @@ fflags =
   , (2,  FProtected)
   , (3,  FStatic)
   , (4,  FFinal)
-  , (5,  FSynchronized)
-  , (6,  FUnused6)
-  , (7,  FVolatile)
-  , (8,  FTransient)
-  , (13, FSynthetic)
+  , (6,  FVolatile)
+  , (7,  FTransient)
+  , (12, FSynthetic)
   , (14, FEnum)
   ]
 
