@@ -118,18 +118,20 @@ instance (Binary w, Integral w) => Binary (SizedByteString w) where
     putByteString bs
 
 replaceJavaZeroWithNormalZero :: BS.ByteString -> BS.ByteString
-replaceJavaZeroWithNormalZero bs =
-  let (h, t) = BS.breakSubstring "\192\128" bs in
-      case t of
-      "" -> h
-      _ ->  h `BS.append` (BS.singleton 0) `BS.append` (replaceJavaZeroWithNormalZero $ BS.drop 2 t)
+replaceJavaZeroWithNormalZero = go
+  where
+    go bs =
+      case BS.breakSubstring "\192\128" bs of
+        (h, "") -> h
+        (h, t) -> h `BS.append` "\0" `BS.append` go (BS.drop 2 t)
 
 replaceNormalZeroWithJavaZero::BS.ByteString -> BS.ByteString
-replaceNormalZeroWithJavaZero bs =
-  let (h, t) = BS.breakSubstring "\0" bs in
-        case t of
-        "" -> h
-        _ -> h `BS.append` "\192\128" `BS.append` (replaceJavaZeroWithNormalZero $ BS.drop 1 t)
+replaceNormalZeroWithJavaZero = go
+  where
+      go bs =
+        case BS.breakSubstring "\0" bs of
+          (h, "") -> h
+          (h, t) -> h `BS.append` "\192\128" `BS.append` go (BS.drop 1 t)
 
 -- | Convert a Sized bytestring to Utf8 Text.
 sizedByteStringToText ::
