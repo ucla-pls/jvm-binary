@@ -18,6 +18,7 @@ and the signature syntax defined [here](https://docs.oracle.com/javase/specs/jvm
 module Language.JVM.Attribute.Signature
   ( Signature (..)
   , signatureToText
+  , signatureFromText
   ) where
 
 -- import           Control.DeepSeq             (NFData)
@@ -34,6 +35,12 @@ instance IsAttribute Signature where
 
 data Signature a =
   Signature (Ref Text.Text a)
+
+signatureToText :: Signature High -> Text.Text
+signatureToText (Signature (RefV s)) = s
+
+signatureFromText :: Text.Text -> Signature High
+signatureFromText s = (Signature (RefV s))
 
 data ClassSignature = ClassSignature
   { csTypeParameters :: [TypeParameter]
@@ -79,9 +86,6 @@ data JavaTypeSignature
 
 data Wildcard =
   WPlus | WMinus
-
-signatureToText :: Signature High -> Text.Text
-signatureToText (Signature (RefV s)) = s
 
 
 instance Staged Signature where
