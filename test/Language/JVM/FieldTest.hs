@@ -16,7 +16,7 @@ prop_roundtrip_Field = isoRoundtrip
 
 instance Arbitrary (FieldAttributes High) where
   arbitrary =
-    FieldAttributes <$> arbitrary <*> pure []
+    FieldAttributes <$> arbitrary <*> pure [] <*> pure []
 
 instance Arbitrary (Field High) where
   arbitrary = Field

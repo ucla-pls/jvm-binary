@@ -37,7 +37,7 @@ import           Data.Set
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
 import           Language.JVM.Attribute.BootstrapMethods
-import           Language.JVM.Attribute.Signature
+-- import           Language.JVM.Attribute.Signature
 import           Language.JVM.Constant
 import           Language.JVM.ConstantPool               as CP
 import           Language.JVM.Field                      (Field)

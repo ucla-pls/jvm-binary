@@ -60,6 +60,7 @@ data CAccessFlag
   = CPublic
   | CFinal
   | CSuper
+  | CInterface
   | CAbstract
   | CSynthetic
   | CAnnotation
@@ -72,7 +73,8 @@ cflags =
   [ (0, CPublic)
   , (4, CFinal)
   , (5, CSuper)
-  , (10, CAbstract)
+  , (10, CInterface)
+  , (11, CAbstract)
   , (12, CSynthetic)
   , (13, CAnnotation)
   , (14, CEnum)
