@@ -27,7 +27,7 @@ spec_testing_example =
         fail $ show msg
 
 test_reading_classfile :: IO [TestTree]
-test_reading_classfile = testSomeFiles $ do
+test_reading_classfile = testAllFiles $ do
   it "can parse the bytestring" $ \bs -> do
     decodeClassFile bs `shouldSatisfy` isRight
 

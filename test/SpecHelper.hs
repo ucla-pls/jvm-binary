@@ -9,7 +9,6 @@ module SpecHelper
   , isoBinary
   , isoRoundtrip
   , testAllFiles
-  , testSomeFiles
   , hexStringS
   , hexString
   ) where
@@ -54,18 +53,19 @@ testAllFiles spec = do
     isClass p = takeExtension p == ".class"
 
 
-testSomeFiles :: SpecWith BL.ByteString -> IO [TestTree]
-testSomeFiles spec =
-  forM files $ \file -> testSpec file (beforeAll (blReadFile file) spec)
-  where
-    files =
-      [ "test/data/java/util/zip/ZipOutputStream.class"
-      , "test/data/project/Main.class"
-      , "test/data/com/sun/istack/internal/localization/Localizable.class"
-      , "test/data/SQLite.class"
-      , "test/data/Emitter.class"
-      , "test/data/EventExecutorGroup.class"
-      ]
+-- testSomeFiles :: SpecWith BL.ByteString -> IO [TestTree]
+-- testSomeFiles spec =
+--   forM files $ \file -> testSpec file (beforeAll (blReadFile file) spec)
+--   where
+--     files =
+--       [ "test/data/java/util/zip/ZipOutputStream.class"
+--       , "test/data/project/Main.class"
+--       , "test/data/com/sun/istack/internal/localization/Localizable.class"
+--       , "test/data/SQLite.class"
+--       , "test/data/Emitter.class"
+--       , "test/data/EventExecutorGroup.class"
+--       , "test/data/NioEventLoopGroup.class"
+--       ]
 
 hexStringS :: BS.ByteString -> String
 hexStringS =

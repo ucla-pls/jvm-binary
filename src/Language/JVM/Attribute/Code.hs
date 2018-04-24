@@ -8,17 +8,18 @@ Maintainer  : kalhuage@cs.ucla.edu
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell    #-}
 module Language.JVM.Attribute.Code
   ( Code (..)
   , CodeAttributes (..)
+  , ExceptionTable (..)
+  , codeStackMapTable
 
   , ByteCode (..)
   , codeByteCodeOprs
-  , ExceptionTable (..)
 
   , ByteCodeInst (..)
   , ByteCodeOpr (..)
@@ -54,28 +55,28 @@ module Language.JVM.Attribute.Code
   , IncrementAmount
   ) where
 
-import           GHC.Generics                         (Generic)
+import           GHC.Generics                           (Generic)
 
-import           Prelude                              hiding (fail)
-import           Numeric                              (showHex)
+import           Numeric                                (showHex)
+import           Prelude                                hiding (fail)
 
-import           Control.DeepSeq                      (NFData)
-import           Control.Monad                        hiding (fail)
-import           Control.Monad.Fail                   (fail)
+import           Control.DeepSeq                        (NFData)
+import           Control.Monad                          hiding (fail)
+import           Control.Monad.Fail                     (fail)
 import           Unsafe.Coerce
 
 import           Data.Binary
-import           Data.Binary.Get                      hiding (Get, label)
-import           Data.Binary.Put                      hiding (Put)
-import qualified Data.ByteString.Lazy                 as BL
+import           Data.Binary.Get                        hiding (Get, label)
+import           Data.Binary.Put                        hiding (Put)
+import qualified Data.ByteString.Lazy                   as BL
 import           Data.Int
 import           Data.Monoid
-import qualified Data.Vector                          as V
+import qualified Data.Vector                            as V
 -- import           Debug.Trace
 
 import           Language.JVM.Attribute.Base
-import           Language.JVM.Attribute.StackMapTable
 import           Language.JVM.Attribute.LineNumberTable
+import           Language.JVM.Attribute.StackMapTable
 import           Language.JVM.Constant
 import           Language.JVM.Staged
 import           Language.JVM.Utils
@@ -95,9 +96,16 @@ data Code r = Code
   , codeAttributes     :: !(Choice r (SizedList16 (Attribute r)) (CodeAttributes r))
   }
 
+-- | Extracts a list of bytecode operation
 codeByteCodeOprs :: Code High -> [ByteCodeOpr High]
 codeByteCodeOprs =
   unByteCode . codeByteCode
+
+-- | Returns the StackMapTable attribute if any
+codeStackMapTable :: Code High -> Maybe (StackMapTable High)
+codeStackMapTable =
+  firstOne . caStackMapTable . codeAttributes
+
 
 newtype ByteCode i = ByteCode
   { unByteCode :: Choice i [ByteCodeInst i] [ByteCodeOpr i]
@@ -1081,10 +1089,11 @@ putByteCode n bc =
     IfRef True One a -> putWord8 0xc7 >> put a
 
 data CodeAttributes r = CodeAttributes
-  { caStackMapTable :: [ StackMapTable r ]
+  { caStackMapTable   :: [ StackMapTable r ]
   , caLineNumberTable :: [ LineNumberTable r ]
-  , caOthers        :: [ Attribute r ]
+  , caOthers          :: [ Attribute r ]
   }
+
 
 instance Staged Code where
   evolve Code{..} = label "Code" $ do
@@ -1122,7 +1131,7 @@ instance Staged ExceptionTable where
 
   devolve ExceptionTable{..} = do
     catchType <- case value catchType of
-      Just s -> RefI <$> unlink s
+      Just s  -> RefI <$> unlink s
       Nothing -> return $ RefI 0
     return $ ExceptionTable {..}
 
@@ -1170,8 +1179,8 @@ instance Staged CConstant where
   stage f x =
     case x of
       -- CHalfRef r -> label "HalfRef" $ CHalfRef <$> f r
-      CRef w r   -> label "Ref" $ CRef w <$> f r
-      a          -> return $ unsafeCoerce a
+      CRef w r -> label "Ref" $ CRef w <$> f r
+      a        -> return $ unsafeCoerce a
 
 $(deriveBase ''ByteCode)
 $(deriveBase ''ByteCodeInst)
