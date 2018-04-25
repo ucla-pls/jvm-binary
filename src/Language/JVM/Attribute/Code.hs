@@ -20,6 +20,7 @@ module Language.JVM.Attribute.Code
 
   , ByteCode (..)
   , codeByteCodeOprs
+  , codeByteCodeInsts
 
   , ByteCodeInst (..)
   , ByteCodeOpr (..)
@@ -99,6 +100,11 @@ data Code r = Code
 -- | Extracts a list of bytecode operation
 codeByteCodeOprs :: Code High -> [ByteCodeOpr High]
 codeByteCodeOprs =
+  unByteCode . codeByteCode
+
+-- | Extracts a list of bytecode instructions
+codeByteCodeInsts :: Code Low -> [ByteCodeInst Low]
+codeByteCodeInsts =
   unByteCode . codeByteCode
 
 -- | Returns the StackMapTable attribute if any
@@ -223,7 +229,7 @@ data CConstant r
   | CByte Int8
   | CShort Int16
 
-  | CRef WordSize (DeepRef Constant r)
+  | CRef (Maybe WordSize) (DeepRef Constant r)
 
 data BinOpr
   = Add
@@ -396,9 +402,9 @@ instance Binary (ByteCodeOpr Low) where
       0x10 -> Push . CByte <$> get
       0x11 -> Push . CShort <$> get
 
-      0x12 -> Push . CRef One . DeepRef . RefI . fromIntegral <$> getWord8
-      0x13 -> Push . CRef One <$> get
-      0x14 -> Push . CRef Two <$> get
+      0x12 -> Push . CRef Nothing . DeepRef . RefI . fromIntegral <$> getWord8
+      0x13 -> Push . CRef (Just One) <$> get
+      0x14 -> Push . CRef (Just Two) <$> get
 
       0x15 -> Load LInt . fromIntegral <$> getWord8
       0x16 -> Load LLong . fromIntegral <$> getWord8
@@ -727,19 +733,14 @@ putByteCode n bc =
     Push (CByte x) -> putWord8 0x10 >> put x
     Push (CShort x) -> putWord8 0x11 >> put x
 
-    -- Push (CHalfRef (DeepRef (RefI x)))
-    --   | x <= 0xff -> putWord8 0x12 >> (putWord8 . fromIntegral $ x)
-    --   | otherwise -> putWord8 0x13 >> put r
-    Push (CRef One (DeepRef (RefI x)))
+    Push (CRef (Just One) (DeepRef (RefI x))) ->
+      putWord8 0x13 >> put x
+    -- In this case force the wide
+    Push (CRef Nothing (DeepRef (RefI x)))
       | x <= 0xff -> putWord8 0x12 >> (putWord8 . fromIntegral $ x)
       | otherwise -> putWord8 0x13 >> put x
-    Push (CRef Two r) -> putWord8 0x14 >> put r
-
-    -- 0x15 -> Load LInt . fromIntegral <$> getWord8
-    -- 0x16 -> Load LLong . fromIntegral <$> getWord8
-    -- 0x17 -> Load LFloat . fromIntegral <$> getWord8
-    -- 0x18 -> Load LDouble . fromIntegral <$> getWord8
-    -- 0x19 -> Load LRef . fromIntegral <$> getWord8
+    -- Here there is no direct restrictions
+    Push (CRef (Just Two) r) -> putWord8 0x14 >> put r
 
     Load tp vl ->
       case tp of
@@ -941,7 +942,7 @@ putByteCode n bc =
     BitOpr XOr Two -> putWord8 0x83
 
     IncrLocal s1 s2 ->
-      if s1 > maxWord8 || abs s2 > maxInt8 then
+      if s1 > maxWord8 || s2 > fromIntegral (maxBound :: Int8) || s2 < fromIntegral (minBound :: Int8) then
         putWord8 0xc4 >> putWord8 0x84 >> put s1 >> put s2
       else
         putWord8 0x84 >> putWord8 (fromIntegral s1) >> putInt8 (fromIntegral s2)

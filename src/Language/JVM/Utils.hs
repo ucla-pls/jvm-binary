@@ -192,13 +192,7 @@ toWord =
 instance (Show w, Bits w, Binary w, Enumish a) => Binary (BitSet w a) where
   get = do
     word <- get :: Get w
-    let
-      test = toWord [ x | (_, x) <- inOrder :: [(Int, a)]]
-      tested = (complement test .&. word )
-    if tested == zeroBits then
-      return . BitSet $ Set.fromList [ x | (i, x) <- inOrder, testBit word i ]
-    else
-      fail $ "Read bad word " ++ show word ++ " - " ++ show tested
+    return . BitSet $ Set.fromList [ x | (i, x) <- inOrder, testBit word i ]
 
   put = put . bitSetToWord
 

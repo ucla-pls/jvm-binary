@@ -49,6 +49,7 @@ tests:
     - directory
     - text
     - generic-random
+    - hspec-expectations-pretty-diff
     ghc-options:
     - -rtsopts
     - -threaded

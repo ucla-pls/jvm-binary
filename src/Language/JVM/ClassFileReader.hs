@@ -7,6 +7,8 @@ module Language.JVM.ClassFileReader
   ( readClassFile
   , writeClassFile
 
+  , writeClassFile'
+
   -- * Finer granularity commands
   , decodeClassFile
   , encodeClassFile
@@ -92,6 +94,12 @@ readClassFile bs = do
 writeClassFile :: ClassFile High -> BL.ByteString
 writeClassFile =
   encodeClassFile . devolveClassFile
+
+-- | Top level command that combines 'devolve' and 'encode', but tries
+-- to retain exact syntax of a previous run using the class pool.
+writeClassFile' :: ConstantPool Low -> ClassFile High -> BL.ByteString
+writeClassFile' cp =
+  encodeClassFile . devolveClassFile' cp
 
 
 -- $deref

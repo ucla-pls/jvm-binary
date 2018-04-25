@@ -1,6 +1,6 @@
 module SpecHelper
   ( module Test.Tasty
-  , module Test.Tasty.Hspec
+  , module Test.Hspec.Expectations.Pretty
   , module Test.Tasty.QuickCheck
   , module Generic.Random
   , decode
@@ -11,7 +11,13 @@ module SpecHelper
   , testAllFiles
   , hexStringS
   , hexString
+  , Spec
+  , SpecWith
+  , it
+  , describe
   ) where
+
+import Test.Hspec.Expectations.Pretty
 
 import Test.Tasty
 import Test.Tasty.Hspec
@@ -45,10 +51,12 @@ toHex x =
   ]
   where alpha = "0123456789abcdef"
 
-testAllFiles :: SpecWith BL.ByteString -> IO [TestTree]
+testAllFiles :: (BL.ByteString -> Spec) -> IO [TestTree]
 testAllFiles spec = do
   files <- filter isClass <$> recursiveContents "test/data"
-  forM files $ \file -> testSpec file (beforeAll (blReadFile file) spec)
+  forM files $ \file -> do
+    bs <- blReadFile file
+    testSpec file $ spec bs
   where
     isClass p = takeExtension p == ".class"
 
