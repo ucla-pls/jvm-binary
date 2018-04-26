@@ -7,6 +7,7 @@ import SpecHelper
 
 import qualified Data.IntMap as IM
 import qualified Data.Text as Text
+import qualified Data.ByteString as BS
 
 import Language.JVM.Constant
 import Language.JVM.Staged
@@ -31,6 +32,16 @@ prop_roundtrip_Constant :: Constant High -> Property
 prop_roundtrip_Constant = isoRoundtrip
 
 instance Arbitrary Text.Text where
+  arbitrary =
+    elements
+    [ "Package"
+    , "test"
+    , "number"
+    , "stuff"
+    , "\0  asd ßåæ∂ø∆œ˜˜¬å˚¬"
+    ]
+
+instance Arbitrary BS.ByteString where
   arbitrary =
     elements
     [ "Package"

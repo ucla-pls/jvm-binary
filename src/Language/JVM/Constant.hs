@@ -87,7 +87,7 @@ data Constant r
   | CLong !Int64
   | CDouble !Double
   | CClassRef !(Ref Text.Text r)
-  | CStringRef !(Ref Text.Text r)
+  | CStringRef !(Ref BS.ByteString r)
   | CFieldRef !(InClass FieldId r)
   | CMethodRef !(InClass MethodId r)
   | CInterfaceMethodRef !(InClass MethodId r)
@@ -338,6 +338,15 @@ instance Referenceable Text.Text where
 
   toConst =
     return . CString . sizedByteStringFromText
+
+instance Referenceable BS.ByteString where
+  fromConst err c =
+    case c of
+      CString str -> return $ unSizedByteString str
+      a -> err $ wrongType "String" a
+  toConst =
+    return . CString . SizedByteString
+
 
 instance Referenceable ClassName where
   fromConst _ (CClassRef (RefV r)) =

@@ -139,16 +139,12 @@ sizedByteStringToText ::
   -> Either TE.UnicodeException Text.Text
 sizedByteStringToText (SizedByteString bs) =
   let rst = TE.decodeUtf8' bs
-    in case rst of 
+    in case rst of
       Right txt -> Right txt
-      Left _ ->
-        case tryDecode bs of 
-          Right txt -> Right txt
-          Left errorMsgAfterReplace -> Left errorMsgAfterReplace
+      Left _ -> tryDecode bs
 
 tryDecode :: BS.ByteString -> Either TE.UnicodeException Text.Text
 tryDecode =  TE.decodeUtf8' . replaceJavaZeroWithNormalZero
-
 
 -- | Convert a Sized bytestring from Utf8 Text.
 sizedByteStringFromText ::
