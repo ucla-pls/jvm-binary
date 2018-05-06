@@ -1,9 +1,10 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DeriveGeneric   #-}
-{-# LANGUAGE DeriveAnyClass   #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
 {-|
 Module      : Language.JVM.Attribute.StackMapTable
 Copyright   : (c) Christian Gram Kalhauge, 2018
@@ -24,34 +25,36 @@ module Language.JVM.Attribute.StackMapTable
   , VerificationTypeInfo (..)
   ) where
 
+import           Control.Monad               (replicateM)
 import           Data.Binary
-import           Data.Binary.Get hiding (label)
+import           Data.Binary.Get             hiding (label)
 import           Data.Binary.Put
+import           Data.Foldable
 import           Numeric
-import           Control.Monad (replicateM)
 
+import           Language.JVM.Attribute.Base
+import           Language.JVM.ByteCode
 import           Language.JVM.Constant
 import           Language.JVM.Staged
 import           Language.JVM.Utils
-import           Language.JVM.Attribute.Base
 
 -- | 'StackMapTable' is an Attribute.
-instance IsAttribute StackMapTable where
+instance IsAttribute (StackMapTable Low) where
   attrName = Const "StackMapTable"
 
 -- | An Exceptions attribute is a list of references into the
 -- constant pool.
 newtype StackMapTable r = StackMapTable
-  { stackMapTable :: SizedList16 (StackMapFrame r)
+  { stackMapTable :: Choice r (SizedList16 (StackMapFrame Low)) [StackMapFrame High]
   }
 
 -- | A delta offset
-type DeltaOffset = Word16
+type DeltaOffset i = Choice i Word16 Int
 
 -- | An stack map frame
 data StackMapFrame r = StackMapFrame
-  { deltaOffset :: DeltaOffset
-  , frameType :: StackMapFrameType r
+  { deltaOffset :: DeltaOffset r
+  , frameType   :: StackMapFrameType r
   }
 
 -- | An stack map frame type
@@ -89,9 +92,9 @@ instance Binary (StackMapFrame Low) where
 
         | 252 <= ft && ft <= 254
         = do
-            offset <- getWord16be
+            offset' <- getWord16be
             locals <- replicateM (fromIntegral $ ft - 251) get
-            return $ StackMapFrame offset (AppendFrame locals)
+            return $ StackMapFrame offset' (AppendFrame locals)
 
         | ft == 255
         = StackMapFrame <$> getWord16be <*> (FullFrame <$> get <*> get)
@@ -170,45 +173,58 @@ instance Binary (VerificationTypeInfo Low) where
 
   put a = do
     case a of
-      VTop -> putWord8 0
-      VInteger -> putWord8 1
-      VFloat -> putWord8 2
-      VLong -> putWord8 3
-      VDouble -> putWord8 4
-      VNull -> putWord8 5
+      VTop               -> putWord8 0
+      VInteger           -> putWord8 1
+      VFloat             -> putWord8 2
+      VLong              -> putWord8 3
+      VDouble            -> putWord8 4
+      VNull              -> putWord8 5
       VUninitializedThis -> putWord8 6
-      VObject s -> do putWord8 7; put s
-      VUninitialized s -> do putWord8 8; put s
+      VObject s          -> do putWord8 7; put s
+      VUninitialized s   -> do putWord8 8; put s
 
-instance Staged StackMapTable where
-  stage f (StackMapTable ls) = label "StackMapTable" $
-    StackMapTable <$> mapM f ls
+instance ByteCodeStaged StackMapTable where
+  evolveBC f (StackMapTable ls) =
+    label "StackMapTable" $
+    StackMapTable . reverse . snd <$> foldl' acc (return (0, [])) ls
+    where
+      acc a (StackMapFrame off frm) = do
+        (bco, lst) <- a
+        x <- f bco
+        frm' <- evolve frm
+        return (bco + off + 1, StackMapFrame x frm' : lst)
 
-instance Staged StackMapFrame where
-  stage f (StackMapFrame so ft) =
-    StackMapFrame so <$> f ft
+  devolveBC f (StackMapTable ls) =
+    label "StackMapTable" $
+    StackMapTable . SizedList . reverse . snd <$> foldl' acc (return (0 :: Word16, [])) ls
+    where
+      acc a (StackMapFrame x frm) = do
+        (index, lst) <- a
+        bco <- f x
+        frm' <- devolve frm
+        return (bco, StackMapFrame (bco - index - 1) frm' : lst)
 
 instance Staged StackMapFrameType where
   stage f x =
     case x of
-      SameFrame -> return $ SameFrame
+      SameFrame                   -> return $ SameFrame
       SameLocals1StackItemFrame a -> SameLocals1StackItemFrame <$> f a
-      ChopFrame w -> return $ ChopFrame w
-      AppendFrame ls -> AppendFrame <$> mapM f ls
-      FullFrame bs as -> FullFrame <$> mapM f bs <*> mapM f as
+      ChopFrame w                 -> return $ ChopFrame w
+      AppendFrame ls              -> AppendFrame <$> mapM f ls
+      FullFrame bs as             -> FullFrame <$> mapM f bs <*> mapM f as
 
 instance Staged VerificationTypeInfo where
   stage f x =
     case x of
-      VTop -> return $ VTop
-      VInteger -> return $ VInteger
-      VFloat -> return $ VFloat
-      VLong -> return $ VLong
-      VDouble -> return $ VDouble
-      VNull -> return $ VNull
-      VUninitializedThis -> return $ VUninitializedThis
-      VObject a -> VObject <$> f a
-      VUninitialized w -> return $ VUninitialized w
+      VTop               -> return VTop
+      VInteger           -> return VInteger
+      VFloat             -> return VFloat
+      VLong              -> return VLong
+      VDouble            -> return VDouble
+      VNull              -> return VNull
+      VUninitializedThis -> return VUninitializedThis
+      VObject a          -> VObject <$> f a
+      VUninitialized w   -> return $ VUninitialized w
 
 
 $(deriveBaseWithBinary ''StackMapTable)

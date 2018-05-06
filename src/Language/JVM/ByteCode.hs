@@ -1,10 +1,12 @@
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE TupleSections      #-}
 {-|
 Module      : Language.JVM.ByteCode
 Copyright   : (c) Christian Gram Kalhauge, 2018
@@ -14,9 +16,26 @@ Maintainer  : kalhuage@cs.ucla.edu
 module Language.JVM.ByteCode
   ( ByteCode (..)
 
+  -- * evolve and devolve
+  , evolveByteCode
+  , devolveByteCode
+  , evolveOffset
+  , devolveOffset
+
+  , ByteCodeStaged (..)
+
+  -- * Managing offsets
   , ByteCodeInst (..)
+  , ByteCodeRef
+  , ByteCodeOffset
+  , ByteCodeIndex
+  , OffsetMap
+  , indexOffset
+  , offsetIndex
+  , offsetMap
+
+  -- * ByteCode Operations
   , ByteCodeOpr (..)
-  , calculateOffsets
 
   , CConstant (..)
   , OneOrTwo (..)
@@ -27,8 +46,8 @@ module Language.JVM.ByteCode
   , FieldAccess (..)
   , Invokation (..)
 
-  -- * Operations
 
+  -- * Operations
   , BitOpr (..)
   , CmpOpr (..)
   , CastOpr (..)
@@ -42,47 +61,239 @@ module Language.JVM.ByteCode
 
   -- * Renames
   , WordSize
-  , LongOffset
   , ByteOffset
   , ByteCodeIndex
-  , Offset
   , LocalAddress
   , IncrementAmount
   ) where
 
-import           GHC.Generics                           (Generic)
+import           GHC.Generics          (Generic)
 
-import           Numeric                                (showHex)
-import           Prelude                                hiding (fail)
+import           Numeric               (showHex)
+import           Prelude               hiding (fail)
 
-import           Control.DeepSeq                        (NFData)
-import           Control.Monad                          hiding (fail)
-import           Control.Monad.Fail                     (fail)
+import           Control.DeepSeq       (NFData)
+import           Control.Monad         hiding (fail)
+import           Control.Monad.Fail    (fail)
 import           Unsafe.Coerce
 
 import           Data.Binary
-import           Data.Binary.Get                        hiding (Get, label)
-import           Data.Binary.Put                        hiding (Put)
-import qualified Data.ByteString.Lazy                   as BL
+import           Data.Binary.Get       hiding (Get, label)
+import           Data.Binary.Put       hiding (Put)
+import qualified Data.ByteString.Lazy  as BL
 import           Data.Int
-
-import qualified Data.Vector                            as V
--- import           Debug.Trace
+import qualified Data.IntMap           as IM
+import qualified Data.Vector           as V
 
 import           Language.JVM.Constant
 import           Language.JVM.Staged
 
-
+-- | ByteCode is a newtype wrapper around a list of ByteCode instructions.
+-- if the ByteCode is in the Low stage then the byte code instructions are
+-- annotated with the byte code offsets.
 newtype ByteCode i = ByteCode
-  { unByteCode :: Choice i [ByteCodeInst i] [ByteCodeOpr i]
+  { unByteCode ::
+      V.Vector (Choice i ByteCodeInst (ByteCodeOpr High))
   }
+
+-- | The offset in the byte code
+type ByteCodeOffset = Word16
+
+-- | The index of the byte code.
+type ByteCodeIndex = Int
+
+-- | A ByteCode reference is either byte code offset in the
+-- low stage, and a byte code index in the high state
+type ByteCodeRef i  = Choice i ByteCodeOffset ByteCodeIndex
+
+-- | The offset map, maps offset to instruction ids.
+type OffsetMap = IM.IntMap ByteCodeIndex
+
+-- | Given an `OffsetMap` turn a offset into a bytecode index
+offsetIndex :: OffsetMap -> ByteCodeOffset -> Maybe (ByteCodeIndex)
+offsetIndex o i = IM.lookup (fromIntegral i) o
+
+-- | Given an `OffsetMap` turn a offset into a bytecode index
+evolveOffset ::
+  EvolveM m
+  => OffsetMap
+  -> ByteCodeOffset
+  -> m (ByteCodeIndex)
+evolveOffset o i =
+  case offsetIndex o i of
+    Just a -> return $ a
+    Nothing ->
+      attributeError $ "Not valid offset" ++ show o
+
+-- | Given an `OffsetMap` turn a offset into a bytecode index
+devolveOffset ::
+  DevolveM m
+  => ByteCode Low
+  -> ByteCodeIndex
+  -> m (ByteCodeOffset)
+devolveOffset v i = do
+  let Just x = indexOffset v i
+  return x
+
+-- | Given low byte code we can create an `OffsetMap`
+offsetMap :: ByteCode Low -> OffsetMap
+offsetMap =
+  IM.fromList
+  . V.ifoldl' (\ls idx i -> (fromIntegral $ offset i, idx) : ls) []
+  . unByteCode
+
+-- | Return the bytecode offset from the bytecode.
+indexOffset :: ByteCode Low -> ByteCodeIndex -> Maybe (ByteCodeOffset)
+indexOffset (ByteCode bc) i = offset <$> bc V.!? i
+
+-- | The byte code instruction is mostly used to succinctly read and
+-- write an bytecode instruction from a bytestring.
+data ByteCodeInst = ByteCodeInst
+  { offset :: !(ByteCodeOffset)
+  , opcode :: !(ByteCodeOpr Low)
+  }
+
+evolveByteCode :: EvolveM m => ByteCode Low -> m (OffsetMap, ByteCode High)
+evolveByteCode bc = do
+  let om = offsetMap bc
+  (om,) . ByteCode <$> V.mapM (evolveByteCodeOpr om) (unByteCode bc)
+
+devolveByteCode :: DevolveM m => ByteCode High -> m (ByteCode Low)
+devolveByteCode (ByteCode bc)= do
+  -- Devolving byte code is not straight forward.
+  let zeros = 0 <$ bc
+  offsets <- V.fromList . reverse . snd <$> V.foldM' (acc zeros) (0,[]) bc
+  ByteCode <$> V.zipWithM (devolveByteCodeOpr offsets) offsets bc
+  where
+    calcSize :: ByteCodeInst -> Word16
+    calcSize inst = (offset inst) + byteSize inst
+
+    acc zeros (off, lst) opr = do
+      inst <- devolveByteCodeOpr zeros off opr
+      let o =  calcSize inst
+      return (o, o:lst)
+
+class ByteCodeStaged s where
+  evolveBC ::
+    EvolveM m
+    => (ByteCodeOffset -> m ByteCodeIndex)
+    -> s Low
+    -> m (s High)
+
+  devolveBC ::
+    DevolveM m
+    => (ByteCodeIndex -> m ByteCodeOffset)
+    -> s High
+    -> m (s Low)
+
+byteSize :: ByteCodeInst -> Word16
+byteSize inst =
+  fromIntegral . BL.length . runPut $ putByteCode (offset inst) (opcode inst)
+
+evolveByteCodeOpr ::
+  EvolveM m
+  => OffsetMap
+  -> ByteCodeInst
+  -> m (ByteCodeOpr High)
+evolveByteCodeOpr om (ByteCodeInst ofs opr) = do
+  case opr of
+    Push c            -> label "Push" $ Push <$> evolve c
+    Get fa r          -> label "Get" $ Get fa <$> evolve r
+    Put fa r          -> label "Put" $ Put fa <$> evolve r
+    Invoke r          -> label "Invoke" $ Invoke <$> evolve r
+    New r             -> label "New" $ New <$> evolve r
+    NewArray r        -> label "NewArray" $ NewArray <$> evolve r
+    MultiNewArray r u -> label "MultiNewArray" $ MultiNewArray <$> evolve r <*> pure u
+    CheckCast r       -> label "CheckCast" $ CheckCast <$> evolve r
+    InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> evolve r
+    If cp on r        -> label "If" $ If cp on <$> calcOffset r
+    IfRef b on r      -> label "IfRef" $ IfRef b on <$> calcOffset r
+    Goto r            -> label "Goto" $ Goto <$> calcOffset r
+    Jsr r             -> label "Jsr" $ Jsr <$> calcOffset r
+    TableSwitch i (SwitchTable l ofss) ->
+      label "TableSwitch" $ (TableSwitch i . SwitchTable l <$> V.mapM calcOffset ofss)
+    a                 -> return $ unsafeCoerce a
+  where
+    calcOffset r = do
+      let offset = (fromIntegral $ fromIntegral ofs + r)
+      case offsetIndex om offset of
+        Just id -> return $ id
+        Nothing -> attributeError
+          ("Can't find offset " ++ show offset ++ " from delta " ++ show r)
+
+devolveByteCodeOpr ::
+  DevolveM m
+  => V.Vector ByteCodeOffset
+  -> ByteCodeOffset
+  -> ByteCodeOpr High
+  -> m ByteCodeInst
+devolveByteCodeOpr v o opr =
+  ByteCodeInst o <$> case opr of
+    Push c            -> label "Push" $ Push <$> devolve c
+    Get fa r          -> label "Get" $ Get fa <$> devolve r
+    Put fa r          -> label "Put" $ Put fa <$> devolve r
+    Invoke r          -> label "Invoke" $ Invoke <$> devolve r
+    New r             -> label "New" $ New <$> devolve r
+    NewArray r        -> label "NewArray" $ NewArray <$> devolve r
+    MultiNewArray r u -> label "MultiNewArray" $ MultiNewArray <$> devolve r <*> pure u
+    CheckCast r       -> label "CheckCast" $ CheckCast <$> devolve r
+    InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> devolve r
+    If cp on r        -> label "If" $ If cp on <$> calcOffset r
+    IfRef b on r      -> label "IfRef" $ IfRef b on <$> calcOffset r
+    Goto r            -> label "Goto" $ Goto <$> calcOffset r
+    Jsr r             -> label "Jsr" $ Jsr <$> calcOffset r
+    TableSwitch i (SwitchTable l ofss) -> label "TableSwitch" $
+        (TableSwitch i . SwitchTable l <$> V.mapM calcOffset ofss)
+    a -> return $ unsafeCoerce a
+  where
+    calcOffset r = do
+      case v V.!? r of
+        Just off -> return $ (fromIntegral off) - (fromIntegral o)
+        Nothing  -> error ("Index out of range." ++ show r)
+
+instance Staged Invokation where
+  stage f i =
+    case i of
+      InvkSpecial r     -> label "InvkSpecial" $ InvkSpecial <$> f r
+      InvkVirtual r     -> label "InvkVirtual" $ InvkVirtual <$> f r
+      InvkStatic r      -> label "InvkStatic" $ InvkStatic <$> f r
+      InvkInterface w r -> label "InvkInterface" $ InvkInterface w <$> f r
+      InvkDynamic r     -> label "InvkDynamic" $ InvkDynamic <$> f r
+
+instance Staged ByteCodeOpr where
+  stage f x =
+    case x of
+      Push c            -> label "Push" $ Push <$> f c
+      Get fa r          -> label "Get" $ Get fa <$> f r
+      Put fa r          -> label "Put" $ Put fa <$> f r
+      Invoke r          -> label "Invoke" $ Invoke <$> f r
+      New r             -> label "New" $ New <$> f r
+      NewArray r        -> label "NewArray" $ NewArray <$> f r
+      MultiNewArray r u -> label "MultiNewArray" $ MultiNewArray <$> f r <*> pure u
+      CheckCast r       -> label "CheckCast" $ CheckCast <$> f r
+      InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> f r
+      a                 -> return $ unsafeCoerce a
+
+instance Staged ExactArrayType where
+  stage f x =
+    case x of
+      EARef r -> EARef <$> f r
+      a       -> return $ unsafeCoerce a
+
+
+instance Staged CConstant where
+  stage f x =
+    case x of
+      -- CHalfRef r -> label "HalfRef" $ CHalfRef <$> f r
+      CRef w r -> label "Ref" $ CRef w <$> f r
+      a        -> return $ unsafeCoerce a
 
 instance Binary (ByteCode Low) where
   get = do
     x <- getWord32be
     bs <- getLazyByteString (fromIntegral x)
     case runGetOrFail go bs of
-      Right (_,_,bcs) -> return $ ByteCode bcs
+      Right (_,_,bcs) -> return . ByteCode . V.fromList $ bcs
       Left (_,_,msg)  -> fail msg
     where
       go = isEmpty >>= \t ->
@@ -97,23 +308,18 @@ instance Binary (ByteCode Low) where
     putWord32be (fromIntegral $ BL.length bs)
     putLazyByteString bs
 
-data ByteCodeInst r = ByteCodeInst
-  { offset :: Word16
-  , opcode :: ByteCodeOpr r
-  }
-
-calculateOffsets :: [ByteCodeOpr Low] -> [ByteCodeInst Low]
-calculateOffsets = go 0
-  where
-    go n (bc:rest) =
-      ByteCodeInst n bc : go (byteSize n bc + n) rest
-    go _ [] = []
-
-instance Binary (ByteCodeInst Low) where
+instance Binary (ByteCodeInst) where
   get =
     ByteCodeInst <$> (fromIntegral <$> bytesRead) <*> get
   put x =
     putByteCode (offset x) $ opcode x
+
+-- | A short relative bytecode ref is defined in correspondence with the
+type ShortRelativeRef i = Choice i Int16 ByteCodeIndex
+
+-- | A Long relative reference. The only reason this exist because
+-- the signed nature of int, looses a bit.
+type LongRelativeRef i = Choice i Int32 ByteCodeIndex
 
 data ArithmeticType = MInt | MLong | MFloat | MDouble
   deriving (Show, Ord, Eq, Enum, Bounded, Generic, NFData)
@@ -197,10 +403,6 @@ data BitOpr
   | XOr
   deriving (Show, Ord, Eq, Generic, NFData)
 
-type Offset w r = Choice r w Int
-type ByteCodeIndex r = Offset Word16 r
-type SmallOffset r = Offset Int16 r
-type LongOffset r = Offset Int32 r
 
 type LocalAddress = Word16
 type IncrementAmount = Int16
@@ -222,7 +424,7 @@ data CastOpr
 
 data SwitchTable r = SwitchTable
   { switchLow     :: Int32
-  , switchOffsets :: V.Vector (LongOffset r)
+  , switchOffsets :: V.Vector (LongRelativeRef r)
   }
 
 switchHigh :: SwitchTable Low -> Int32
@@ -264,16 +466,16 @@ data ByteCodeOpr r
   -- ^ Compare two floating values, #1 indicates if greater-than, #2
   -- is if float or double should be used.
 
-  | If CmpOpr OneOrTwo (SmallOffset r)
+  | If CmpOpr OneOrTwo (ShortRelativeRef r)
   -- ^ compare with 0 if #2 is False, and two ints from the stack if
   -- True. the last value is the offset
 
-  | IfRef Bool OneOrTwo (SmallOffset r)
+  | IfRef Bool OneOrTwo (ShortRelativeRef r)
   -- ^ check if two objects are equal, or not equal. If #2 is True, compare
   -- with null.
 
-  | Goto (LongOffset r)
-  | Jsr (LongOffset r)
+  | Goto (LongRelativeRef r)
+  | Jsr (LongRelativeRef r)
   | Ret LocalAddress
 
   | TableSwitch Int32 (SwitchTable r)
@@ -319,9 +521,6 @@ data ByteCodeOpr r
 
 -- deriving (Eq, Generic, NFData)
 
-byteSize :: Word16 -> ByteCodeOpr Low -> Word16
-byteSize n x =
-  fromIntegral . BL.length . runPut $ putByteCode n x
 
 instance Binary (ByteCodeOpr Low) where
   get = do
@@ -1038,57 +1237,16 @@ putByteCode n bc =
     IfRef False One a -> putWord8 0xc6 >> put a
     IfRef True One a -> putWord8 0xc7 >> put a
 
-instance Staged CConstant where
-  stage f x =
-    case x of
-      -- CHalfRef r -> label "HalfRef" $ CHalfRef <$> f r
-      CRef w r -> label "Ref" $ CRef w <$> f r
-      a        -> return $ unsafeCoerce a
-
-instance Staged ByteCode where
-  evolve (ByteCode bc) =
-    ByteCode <$> mapM (evolve . opcode) bc
-  devolve (ByteCode bc) =
-    ByteCode . calculateOffsets <$> mapM devolve bc
-
-instance Staged ByteCodeInst where
-  stage f ByteCodeInst{..} = label (show offset) $ do
-    opcode <- f opcode
-    return $ ByteCodeInst {..}
-
-instance Staged Invokation where
-  stage f i =
-    case i of
-      InvkSpecial r     -> label "InvkSpecial" $ InvkSpecial <$> f r
-      InvkVirtual r     -> label "InvkVirtual" $ InvkVirtual <$> f r
-      InvkStatic r      -> label "InvkStatic" $ InvkStatic <$> f r
-      InvkInterface w r -> label "InvkInterface" $ InvkInterface w <$> f r
-      InvkDynamic r     -> label "InvkDynamic" $ InvkDynamic <$> f r
-
-instance Staged ByteCodeOpr where
-  stage f x =
-    case x of
-      Push c            -> label "Push" $ Push <$> f c
-      Get fa r          -> label "Get" $ Get fa <$> f r
-      Put fa r          -> label "Put" $ Put fa <$> f r
-      Invoke r          -> label "Invoke" $ Invoke <$> f r
-      New r             -> label "New" $ New <$> f r
-      NewArray r        -> label "NewArray" $ NewArray <$> f r
-      MultiNewArray r u -> label "MultiNewArray" $ MultiNewArray <$> f r <*> pure u
-      CheckCast r       -> label "CheckCast" $ CheckCast <$> f r
-      InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> f r
-      a                 -> return $ unsafeCoerce a
-
-instance Staged ExactArrayType where
-  stage f x =
-    case x of
-      EARef r -> EARef <$> f r
-      a       -> return $ unsafeCoerce a
 
 $(deriveBase ''ByteCode)
-$(deriveBase ''ByteCodeInst)
+-- $(deriveBase ''ByteCodeInst)
 $(deriveBase ''ByteCodeOpr)
 $(deriveBase ''SwitchTable)
 $(deriveBase ''Invokation)
 $(deriveBase ''CConstant)
 $(deriveBase ''ExactArrayType)
+deriving instance (Show ByteCodeInst)
+deriving instance (Eq ByteCodeInst)
+deriving instance (Ord ByteCodeInst)
+deriving instance (NFData ByteCodeInst)
+deriving instance (Generic ByteCodeInst)

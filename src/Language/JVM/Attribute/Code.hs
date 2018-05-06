@@ -21,24 +21,11 @@ module Language.JVM.Attribute.Code
   , codeByteCodeInsts
   ) where
 
-import           GHC.Generics                           (Generic)
-
-import           Numeric                                (showHex)
-import           Prelude                                hiding (fail)
-
-import           Control.DeepSeq                        (NFData)
-import           Control.Monad                          hiding (fail)
-import           Control.Monad.Fail                     (fail)
-import           Unsafe.Coerce
+import           Prelude hiding (fail)
 
 import           Data.Binary
-import           Data.Binary.Get                        hiding (Get, label)
-import           Data.Binary.Put                        hiding (Put)
-import qualified Data.ByteString.Lazy                   as BL
-import           Data.Int
 import           Data.Monoid
-import qualified Data.Vector                            as V
--- import           Debug.Trace
+import qualified Data.Vector as V
 
 import           Language.JVM.Attribute.Base
 import           Language.JVM.Attribute.LineNumberTable
@@ -49,7 +36,7 @@ import           Language.JVM.Staged
 import           Language.JVM.Utils
 
 -- | 'Code' is an Attribute.
-instance IsAttribute Code where
+instance IsAttribute (Code Low) where
   attrName = Const "Code"
 
 -- | Code contains the actual byte-code. The 'i' type parameter is added to
@@ -64,22 +51,22 @@ data Code r = Code
   }
 
 data ExceptionTable r = ExceptionTable
-  { start     :: ! (ByteCodeIndex r)
+  { start     :: ! (ByteCodeRef r)
   -- ^ Inclusive program counter into 'code'
-  , end       :: ! (ByteCodeIndex r)
+  , end       :: ! (ByteCodeRef r)
   -- ^ Exclusive program counter into 'code'
-  , handler   :: ! (ByteCodeIndex r)
+  , handler   :: ! (ByteCodeRef r)
   -- ^ A program counter into 'code' indicating the handler.
   , catchType :: ! (Ref (Maybe ClassName) r)
   }
 
 -- | Extracts a list of bytecode operation
-codeByteCodeOprs :: Code High -> [ByteCodeOpr High]
+codeByteCodeOprs :: Code High -> V.Vector (ByteCodeOpr High)
 codeByteCodeOprs =
   unByteCode . codeByteCode
 
 -- | Extracts a list of bytecode instructions
-codeByteCodeInsts :: Code Low -> [ByteCodeInst Low]
+codeByteCodeInsts :: Code Low -> V.Vector ByteCodeInst
 codeByteCodeInsts =
   unByteCode . codeByteCode
 
@@ -97,42 +84,51 @@ data CodeAttributes r = CodeAttributes
 
 instance Staged Code where
   evolve Code{..} = label "Code" $ do
-    codeByteCode <- evolve codeByteCode
-    codeExceptionTable <- mapM evolve codeExceptionTable
-    codeAttributes <- fromCollector <$> fromAttributes collect' codeAttributes
+    (offsets, codeByteCode) <- evolveByteCode codeByteCode
+    let evolver = (evolveOffset offsets)
+    codeExceptionTable <- mapM (evolveBC evolver) codeExceptionTable
+    codeAttributes <- fromCollector <$> fromAttributes (collect' evolver) codeAttributes
     return $ Code {..}
     where
       fromCollector (a, b, c) =
         CodeAttributes (appEndo a []) (appEndo b []) (appEndo c [])
-      collect' attr =
+      collect' evolver attr =
         collect (mempty, mempty, Endo (attr:)) attr
-          [ toC $ \e -> (Endo (e:), mempty, mempty)
-          , toC $ \e -> (mempty, Endo (e:), mempty)
+          [ toC' (evolveBC evolver) $ \e -> (Endo (e:), mempty, mempty)
+          , toC' (evolveBC evolver) $ \e -> (mempty, Endo (e:), mempty)
           ]
+
   devolve Code{..} = do
-    codeByteCode <- devolve codeByteCode
-    codeExceptionTable <- mapM devolve codeExceptionTable
-    codeAttributes <- SizedList <$> fromCodeAttributes codeAttributes
+    codeByteCode <- devolveByteCode codeByteCode
+    let bcdevolver = devolveOffset codeByteCode
+    codeExceptionTable <-
+      mapM (devolveBC bcdevolver) codeExceptionTable
+    codeAttributes <- SizedList <$> fromCodeAttributes bcdevolver codeAttributes
     return $ Code {..}
     where
-      fromCodeAttributes (CodeAttributes a b c) = do
-        a' <- mapM toAttribute a
-        b' <- mapM toAttribute b
+      fromCodeAttributes bcdevolver (CodeAttributes a b c) = do
+        a' <- mapM (devolveAttribute (devolveBC bcdevolver)) a
+        b' <- mapM (devolveAttribute (devolveBC bcdevolver)) b
         c' <- mapM devolve c
         return (a' ++ b' ++ c')
 
-
-instance Staged ExceptionTable where
-  evolve ExceptionTable{..} = label "ExceptionTable" $ do
+instance ByteCodeStaged ExceptionTable where
+  evolveBC f ExceptionTable{..} = label "ExceptionTable" $ do
     catchType <- case idx catchType of
       0 -> return $ RefV Nothing
       n -> RefV . Just <$> link n
+    start <- f start
+    end <- f end
+    handler <- f handler
     return $ ExceptionTable {..}
 
-  devolve ExceptionTable{..} = do
+  devolveBC f ExceptionTable{..} = do
     catchType <- case value catchType of
       Just s  -> RefI <$> unlink s
       Nothing -> return $ RefI 0
+    start <- f start
+    end <- f end
+    handler <- f handler
     return $ ExceptionTable {..}
 
 $(deriveBaseWithBinary ''Code)

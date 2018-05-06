@@ -28,9 +28,9 @@ import qualified Data.Text                   as Text
 -- import           GHC.Generics                (Generic)
 import           Language.JVM.Attribute.Base
 import           Language.JVM.Staged
-import           Language.JVM.Type
+-- import           Language.JVM.Type
 
-instance IsAttribute Signature where
+instance IsAttribute (Signature Low) where
   attrName = Const "Signature"
 
 data Signature a =
@@ -42,50 +42,50 @@ signatureToText (Signature (RefV s)) = s
 signatureFromText :: Text.Text -> Signature High
 signatureFromText s = (Signature (RefV s))
 
-data ClassSignature = ClassSignature
-  { csTypeParameters :: [TypeParameter]
-  , csSuperclassSignature :: ClassTypeSignature
-  , csInterfaceSignatures :: [ClassTypeSignature]
-  }
+-- data ClassSignature = ClassSignature
+--   { csTypeParameters :: [TypeParameter]
+--   , csSuperclassSignature :: ClassTypeSignature
+--   , csInterfaceSignatures :: [ClassTypeSignature]
+--   }
 
-data TypeParameter =
-  TypeParameter
-  { tpIndentifier :: Text.Text
-  , tpClassBound :: Maybe ClassName
-  , tpInterfaceBound :: [ClassName]
-  }
+-- data TypeParameter =
+--   TypeParameter
+--   { tpIndentifier :: Text.Text
+--   , tpClassBound :: Maybe ClassName
+--   , tpInterfaceBound :: [ClassName]
+--   }
 
-data ClassTypeSignature
-  = ClassTypeSignature
-    { ctsClassName :: ClassName
-    , ctsTypeArguments :: [TypeArgument]
-    }
-  | InnerClassTypeSignature
-    { ctsInnerClassName :: Text.Text
-    , ctsTypeArguments :: [TypeArgument]
-    }
+-- data ClassTypeSignature
+--   = ClassTypeSignature
+--     { ctsClassName :: ClassName
+--     , ctsTypeArguments :: [TypeArgument]
+--     }
+--   | InnerClassTypeSignature
+--     { ctsInnerClassName :: Text.Text
+--     , ctsTypeArguments :: [TypeArgument]
+--     }
 
-data TypeArgument
-  = AnyTypeArgument
-  | TypeArgument
-    { taWildcard :: Maybe Wildcard
-    , taType :: ReferenceType
-    }
+-- data TypeArgument
+--   = AnyTypeArgument
+--   | TypeArgument
+--     { taWildcard :: Maybe Wildcard
+--     , taType :: ReferenceType
+--     }
 
-data ReferenceType
-  = RTClassType ClassTypeSignature
-  | RTTypeVariable TypeVariableSignature
-  | RTArrayType JavaTypeSignature
+-- data ReferenceType
+--   = RTClassType ClassTypeSignature
+--   | RTTypeVariable TypeVariableSignature
+--   | RTArrayType JavaTypeSignature
 
-newtype TypeVariableSignature
-  = TypeVariableSignature Text.Text
+-- newtype TypeVariableSignature
+--   = TypeVariableSignature Text.Text
 
-data JavaTypeSignature
-  = ReferenceType ReferenceType
-  | BaseType JBaseType
+-- data JavaTypeSignature
+--   = ReferenceType ReferenceType
+--   | BaseType JBaseType
 
-data Wildcard =
-  WPlus | WMinus
+-- data Wildcard =
+--   WPlus | WMinus
 
 
 instance Staged Signature where

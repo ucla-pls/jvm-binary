@@ -23,7 +23,7 @@ import           Language.JVM.Constant
 import           Language.JVM.Staged
 
 -- | 'ConstantValue' is an Attribute.
-instance IsAttribute ConstantValue where
+instance IsAttribute (ConstantValue Low) where
   attrName = Const "ConstantValue"
 
 
