@@ -29,11 +29,12 @@ import           Data.Binary
 import qualified Data.IntMap as IM
 import           GHC.Generics                (Generic)
 import           Language.JVM.Attribute.Base
+import           Language.JVM.ByteCode
 import           Language.JVM.Utils
 import           Language.JVM.Staged
 
 -- | 'Signature' is an Attribute.
-instance IsAttribute LineNumberTable where
+instance IsAttribute (LineNumberTable Low) where
   attrName = Const "LineNumberTable"
 
 type LineNumber = Word16
@@ -44,8 +45,14 @@ newtype LineNumberTable r = LineNumberTable
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 
-instance Staged LineNumberTable where
-  stage _ (LineNumberTable x) = return $ (LineNumberTable x)
+instance ByteCodeStaged LineNumberTable where
+  evolveBC f (LineNumberTable mp) =
+    LineNumberTable
+    . IM.fromList <$> (mapM (\(x, y) -> do x' <- f (fromIntegral x); pure (x', y)) . IM.toList) mp
+
+  devolveBC f (LineNumberTable mp) =
+    LineNumberTable
+    . IM.fromList <$> (mapM (\(x, y) -> do x' <- f x; pure (fromIntegral x', y)) . IM.toList) mp
 
 -- | Returns the line number of an offset.
 linenumber :: Int -> LineNumberTable r -> Maybe LineNumber

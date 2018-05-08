@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE OverloadedStrings    #-}
 {-|
 Module      : Language.JVM.Method
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -36,6 +37,7 @@ import           Language.JVM.Attribute.Exceptions (exceptionIndexTable)
 import           Language.JVM.Constant
 import           Language.JVM.Staged
 import           Language.JVM.Utils
+import           Language.JVM.Type
 
 -- | A Method in the class-file, as described
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.6).
@@ -92,7 +94,8 @@ instance Staged Method where
   evolve (Method mf mn md mattr) = do
     mn' <- evolve mn
     md' <- evolve md
-    mattr' <- fromCollector <$> fromAttributes collect' mattr
+    mattr' <- label (Text.unpack (value mn' <> ":" <> methodDescriptorToText (value md')))
+      $ fromCollector <$> fromAttributes collect' mattr
     return $ Method mf mn' md' mattr'
     where
       fromCollector (a, b, c, d) =

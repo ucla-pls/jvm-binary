@@ -20,10 +20,12 @@ module Language.JVM
   , module Language.JVM.Staged
   , module Language.JVM.Utils
   , module Language.JVM.Type
+  , module Language.JVM.ByteCode
   ) where
 
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
+import           Language.JVM.ByteCode
 import           Language.JVM.ClassFile
 import           Language.JVM.ClassFileReader
 import           Language.JVM.Constant
@@ -32,5 +34,5 @@ import           Language.JVM.Field
 import           Language.JVM.Method
 import           Language.JVM.Stage
 import           Language.JVM.Staged
-import           Language.JVM.Utils
 import           Language.JVM.Type
+import           Language.JVM.Utils

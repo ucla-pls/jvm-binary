@@ -14,11 +14,16 @@ module Language.JVM.Attribute.Base
   ( Attribute (..)
   , aInfo
   , aName
+  , toAttribute
+  , devolveAttribute
+  , fromAttribute'
+  , toAttribute'
 
   -- * Helpers
   , IsAttribute (..)
   , fromAttributes
   , toC
+  , toC'
   , collect
   , Const (..)
   , firstOne
@@ -74,39 +79,61 @@ newtype Const a b = Const { unConst :: a }
 -- | A class-type that describes a data-type 'a' as an Attribute. Most notable
 -- it provides the 'fromAttribute'' method that enables converting an Attribute
 -- to a data-type 'a'.
-class (Binary (a Low), Staged a) => IsAttribute a where
+class (Binary a) => IsAttribute a where
   -- | The name of an attribute. This is used to lookup an attribute.
-  attrName :: Const Text.Text (a Low)
+  attrName :: Const Text.Text a
 
-  -- | Generate an attribute in a low stage 'Low'.
-  fromAttribute' :: Attribute r -> Either String (a Low)
-  fromAttribute' = readFromStrict
+-- | Generate an attribute in a low stage 'Low'.
+fromAttribute' :: IsAttribute a => Attribute r -> Either String a
+fromAttribute' = readFromStrict
 
-  -- | Generate an attribute in the 'EvolveM' monad
-  fromAttribute :: EvolveM m => Attribute High -> Maybe (m (a High))
-  fromAttribute as =
-    if aName as == unConst (attrName :: Const Text.Text (a Low))
-    then Just $ do
-      either attributeError evolve $ fromAttribute' as
-    else Nothing
+toAttribute' :: forall a. IsAttribute a => a -> Attribute High
+toAttribute' a =
+  let name = unConst (attrName :: Const Text.Text a)
+      bytes = encode a
+  in Attribute (RefV name) (SizedByteString . BL.toStrict $ bytes)
 
-  toAttribute' :: a Low -> Attribute High
-  toAttribute' a =
-    let name = unConst (attrName :: Const Text.Text (a Low))
-        bytes = encode a
-    in Attribute (RefV name) (SizedByteString . BL.toStrict $ bytes)
+toAttribute :: (IsAttribute (a Low), Staged a, DevolveM m) => a High -> m (Attribute Low)
+toAttribute =
+  devolveAttribute devolve
 
-  toAttribute :: DevolveM m => a High -> m (Attribute Low)
-  toAttribute a = do
-    a' <- devolve a
-    devolve $ toAttribute' a'
+devolveAttribute :: (IsAttribute (a Low), DevolveM m) => (a High -> m (a Low)) -> a High -> m (Attribute Low)
+devolveAttribute f a = do
+  a' <- f a
+  devolve $ toAttribute' a'
 
-  -- toAttribute :: DevolveM m => a High -> m (Attribute Low)
-  -- toAttribute
+-- | Generate an attribute in the 'EvolveM' monad
+fromAttribute ::
+  forall a m. (IsAttribute (a Low), Staged a, EvolveM m)
+  => Attribute High
+  -> Maybe (m (a High))
+fromAttribute as =
+  if aName as == unConst (attrName :: Const Text.Text (a Low))
+  then Just $ do
+    either attributeError evolve $ fromAttribute' as
+  else Nothing
 
-toC :: (EvolveM m, IsAttribute a) => (a High -> c) -> Attribute High -> Maybe (m c)
+-- | Generate an attribute in the 'EvolveM' monad
+evolveAttribute ::
+  forall a m. (IsAttribute (a Low), EvolveM m)
+  => (a Low -> m (a High))
+  -> Attribute High
+  -> Maybe (m (a High))
+evolveAttribute g as =
+  if aName as == unConst (attrName :: Const Text.Text (a Low))
+  then Just $ do
+    either attributeError g $ fromAttribute' as
+  else Nothing
+
+toC :: (EvolveM m, Staged a, IsAttribute (a Low)) => (a High -> c) -> Attribute High -> Maybe (m c)
 toC f attr =
   case fromAttribute attr of
+    Just m -> Just $ f <$> m
+    Nothing -> Nothing
+
+toC' :: (EvolveM m, IsAttribute (a Low)) => (a Low -> m (a High)) -> (a High -> c) -> Attribute High -> Maybe (m c)
+toC' g f attr =
+  case evolveAttribute g attr of
     Just m -> Just $ f <$> m
     Nothing -> Nothing
 

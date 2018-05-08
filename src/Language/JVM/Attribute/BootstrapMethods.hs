@@ -29,7 +29,7 @@ import           Language.JVM.Staged
 import           Language.JVM.Utils
 
 -- | 'BootstrapMethods' is an Attribute.
-instance IsAttribute BootstrapMethods where
+instance IsAttribute (BootstrapMethods Low) where
   attrName = Const "BootstrapMethods"
 
 -- | Is a list of bootstrapped methods.

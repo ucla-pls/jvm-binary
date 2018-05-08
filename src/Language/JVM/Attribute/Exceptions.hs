@@ -25,7 +25,7 @@ import           Language.JVM.Utils
 
 
 -- | 'Exceptions' is an Attribute.
-instance IsAttribute Exceptions where
+instance IsAttribute (Exceptions Low) where
   attrName = Const "Exceptions"
 
 -- | An Exceptions attribute is a list of references into the
