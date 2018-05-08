@@ -46,8 +46,8 @@ module Language.JVM.ByteCode
   , FieldAccess (..)
   , Invokation (..)
 
-
   -- * Operations
+  , BinOpr (..)
   , BitOpr (..)
   , CmpOpr (..)
   , CastOpr (..)
@@ -62,7 +62,6 @@ module Language.JVM.ByteCode
   -- * Renames
   , WordSize
   , ByteOffset
-  , ByteCodeIndex
   , LocalAddress
   , IncrementAmount
   ) where
@@ -123,17 +122,7 @@ evolveOffset o i =
   case offsetIndex o i of
     Just a -> return $ a
     Nothing ->
-      attributeError $ "Not valid offset" ++ show o
-
--- | Given an `OffsetMap` turn a offset into a bytecode index
-devolveOffset ::
-  DevolveM m
-  => ByteCode Low
-  -> ByteCodeIndex
-  -> m (ByteCodeOffset)
-devolveOffset v i = do
-  let Just x = indexOffset v i
-  return x
+      attributeError $ "Not valid offset " ++ show i
 
 -- | Given low byte code we can create an `OffsetMap`
 offsetMap :: ByteCode Low -> OffsetMap
@@ -142,9 +131,37 @@ offsetMap =
   . V.ifoldl' (\ls idx i -> (fromIntegral $ offset i, idx) : ls) []
   . unByteCode
 
+-- | Given an `OffsetMap` turn a offset into a bytecode index
+devolveOffset ::
+  DevolveM m
+  => ByteCode Low
+  -> ByteCodeIndex
+  -> m (ByteCodeOffset)
+devolveOffset v i = do
+  case indexOffset v i of
+    Just x ->
+      return x
+    Nothing ->
+      error $ "Bad index " ++ show i
+
 -- | Return the bytecode offset from the bytecode.
 indexOffset :: ByteCode Low -> ByteCodeIndex -> Maybe (ByteCodeOffset)
 indexOffset (ByteCode bc) i = offset <$> bc V.!? i
+
+devolveOffset' ::
+  DevolveM m
+  => V.Vector ByteCodeOffset
+  -> ByteCodeIndex
+  -> m (ByteCodeOffset)
+devolveOffset' v i = do
+  case indexOffset' v i of
+    Just x ->
+      return x
+    Nothing ->
+      error $ "Bad index " ++ show i
+
+indexOffset' :: V.Vector ByteCodeOffset -> ByteCodeIndex -> Maybe (ByteCodeOffset)
+indexOffset' c i = c V.!? i
 
 -- | The byte code instruction is mostly used to succinctly read and
 -- write an bytecode instruction from a bytestring.
@@ -156,22 +173,18 @@ data ByteCodeInst = ByteCodeInst
 evolveByteCode :: EvolveM m => ByteCode Low -> m (OffsetMap, ByteCode High)
 evolveByteCode bc = do
   let om = offsetMap bc
-  (om,) . ByteCode <$> V.mapM (evolveByteCodeOpr om) (unByteCode bc)
+  (om,) . ByteCode <$> V.mapM (evolveByteCodeOpr (evolveOffset om)) (unByteCode bc)
 
 devolveByteCode :: DevolveM m => ByteCode High -> m (ByteCode Low)
 devolveByteCode (ByteCode bc)= do
   -- Devolving byte code is not straight forward.
-  let zeros = 0 <$ bc
-  offsets <- V.fromList . reverse . snd <$> V.foldM' (acc zeros) (0,[]) bc
-  ByteCode <$> V.zipWithM (devolveByteCodeOpr offsets) offsets bc
+  offsets <- V.fromList . reverse . snd <$> V.foldM' acc (0,[]) bc
+  ByteCode <$> V.zipWithM (devolveByteCodeOpr (devolveOffset' offsets)) offsets bc
   where
-    calcSize :: ByteCodeInst -> Word16
-    calcSize inst = (offset inst) + byteSize inst
-
-    acc zeros (off, lst) opr = do
-      inst <- devolveByteCodeOpr zeros off opr
-      let o =  calcSize inst
-      return (o, o:lst)
+    acc (off, lst) opr = do
+      inst <- devolveByteCodeOpr (const $ return 0) off opr
+      let o = off + byteSize inst
+      return (o, off:lst)
 
 class ByteCodeStaged s where
   evolveBC ::
@@ -192,10 +205,10 @@ byteSize inst =
 
 evolveByteCodeOpr ::
   EvolveM m
-  => OffsetMap
+  => (ByteCodeOffset -> m ByteCodeIndex)
   -> ByteCodeInst
   -> m (ByteCodeOpr High)
-evolveByteCodeOpr om (ByteCodeInst ofs opr) = do
+evolveByteCodeOpr g (ByteCodeInst ofs opr) = do
   case opr of
     Push c            -> label "Push" $ Push <$> evolve c
     Get fa r          -> label "Get" $ Get fa <$> evolve r
@@ -214,21 +227,18 @@ evolveByteCodeOpr om (ByteCodeInst ofs opr) = do
       label "TableSwitch" $ (TableSwitch i . SwitchTable l <$> V.mapM calcOffset ofss)
     a                 -> return $ unsafeCoerce a
   where
-    calcOffset r = do
-      let offset = (fromIntegral $ fromIntegral ofs + r)
-      case offsetIndex om offset of
-        Just id -> return $ id
-        Nothing -> attributeError
-          ("Can't find offset " ++ show offset ++ " from delta " ++ show r)
+    calcOffset r =
+      g (fromIntegral $ fromIntegral ofs + r)
+
 
 devolveByteCodeOpr ::
   DevolveM m
-  => V.Vector ByteCodeOffset
+  => (ByteCodeIndex -> m ByteCodeOffset)
   -> ByteCodeOffset
   -> ByteCodeOpr High
   -> m ByteCodeInst
-devolveByteCodeOpr v o opr =
-  ByteCodeInst o <$> case opr of
+devolveByteCodeOpr g ofs opr =
+  ByteCodeInst ofs <$> case opr of
     Push c            -> label "Push" $ Push <$> devolve c
     Get fa r          -> label "Get" $ Get fa <$> devolve r
     Put fa r          -> label "Put" $ Put fa <$> devolve r
@@ -247,9 +257,8 @@ devolveByteCodeOpr v o opr =
     a -> return $ unsafeCoerce a
   where
     calcOffset r = do
-      case v V.!? r of
-        Just off -> return $ (fromIntegral off) - (fromIntegral o)
-        Nothing  -> error ("Index out of range." ++ show r)
+      x <- g r
+      return (fromIntegral x - fromIntegral ofs)
 
 instance Staged Invokation where
   stage f i =

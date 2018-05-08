@@ -16,4 +16,5 @@ instance Arbitrary (BootstrapMethods High) where
   arbitrary = genericArbitraryU
 
 instance Arbitrary (BootstrapMethod High) where
-  arbitrary = genericArbitraryU
+  arbitrary =
+    BootstrapMethod <$> arbitrary <*> (SizedList <$> listOf (resize 1 arbitrary))

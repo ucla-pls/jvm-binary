@@ -23,6 +23,10 @@ module Language.JVM.Attribute.StackMapTable
   , StackMapFrameType (..)
 
   , VerificationTypeInfo (..)
+
+  -- * Helper functions
+  , offsetDelta
+  , offsetDeltaInv
   ) where
 
 import           Control.Monad               (replicateM)
@@ -188,21 +192,47 @@ instance ByteCodeStaged StackMapTable where
     label "StackMapTable" $
     StackMapTable . reverse . snd <$> foldl' acc (return (0, [])) ls
     where
-      acc a (StackMapFrame off frm) = do
-        (bco, lst) <- a
-        x <- f bco
+      acc a (StackMapFrame delta frm) = do
+        (lidx, lst) <- a
         frm' <- evolve frm
-        return (bco + off + 1, StackMapFrame x frm' : lst)
+        let bco = offsetDelta lidx delta
+        x <- f bco
+        return (bco, StackMapFrame x frm' : lst)
 
   devolveBC f (StackMapTable ls) =
     label "StackMapTable" $
     StackMapTable . SizedList . reverse . snd <$> foldl' acc (return (0 :: Word16, [])) ls
     where
       acc a (StackMapFrame x frm) = do
-        (index, lst) <- a
-        bco <- f x
+        (lidx, lst) <- a
         frm' <- devolve frm
-        return (bco, StackMapFrame (bco - index - 1) frm' : lst)
+        tidx <- f x
+        let delta = offsetDeltaInv lidx tidx
+        return (tidx, StackMapFrame delta frm' : lst)
+
+
+offsetDelta ::
+  Word16
+  -- ^ Last Index
+  -> Word16
+  -- ^ Delta
+  -> Word16
+  -- ^ This Index
+offsetDelta lidx delta
+  | lidx > 0 = lidx + delta + 1
+  | otherwise = delta
+
+offsetDeltaInv ::
+  Word16
+  -- ^ Last Index
+  -> Word16
+  -- ^ Current Index
+  -> Word16
+  -- ^ Delta
+offsetDeltaInv lidx tidx
+  | lidx > 0 = tidx - lidx - 1
+  | otherwise = tidx
+
 
 instance Staged StackMapFrameType where
   stage f x =

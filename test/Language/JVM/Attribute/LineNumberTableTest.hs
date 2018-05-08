@@ -16,8 +16,8 @@ import           Language.JVM.UtilsTest     ()
 import           Language.JVM
 import           Language.JVM.Attribute.LineNumberTable
 
-prop_roundtrip_LineNumberTable :: LineNumberTable High -> Property
-prop_roundtrip_LineNumberTable = isoRoundtrip
+-- prop_roundtrip_LineNumberTable :: LineNumberTable High -> Property
+-- prop_roundtrip_LineNumberTable = isoRoundtrip
 
 instance Arbitrary (LineNumberTable High) where
   arbitrary =

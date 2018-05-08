@@ -22,7 +22,7 @@ prop_encode_and_decode = isoBinary
 instance Arbitrary (ConstantPool Low) where
   arbitrary = do
     lst <- arbitrary :: Gen [Constant High]
-    let (a, x) = runConstantPoolBuilder (mapM devolve lst) cpbEmpty
+    let (_, x) = runConstantPoolBuilder (mapM devolve lst) cpbEmpty
     return (cpbConstantPool x)
 
 -- prop_Constant_encode_and_decode :: Constant Low -> Property
@@ -75,22 +75,31 @@ instance Arbitrary (AbsInterfaceMethodId High) where
   arbitrary = genericArbitraryU
 
 instance Arbitrary (Constant High) where
-  arbitrary = oneof
-    [ CString <$> arbitrary
-    , CInteger <$> arbitrary
-    , CFloat <$> arbitrary
-    , CLong <$> arbitrary
-    , CDouble <$> arbitrary
-    , CClassRef <$> arbitrary
-    , CStringRef <$> arbitrary
-    , CFieldRef <$> arbitrary
-    , CMethodRef <$> arbitrary
-    , CInterfaceMethodRef <$> arbitrary
-    , CNameAndType <$> arbitrary <*> arbitrary
-    , CMethodHandle <$> arbitrary
-    , CMethodType <$> arbitrary
-    , CInvokeDynamic <$> arbitrary
-    ]
+  arbitrary = sized $ \n ->
+    if n < 2
+    then oneof
+        [ CString <$> arbitrary
+        , CInteger <$> arbitrary
+        , CFloat <$> arbitrary
+        , CLong <$> arbitrary
+        , CDouble <$> arbitrary
+        ]
+    else scale (flip div 2) $ oneof
+        [ CString <$> arbitrary
+        , CInteger <$> arbitrary
+        , CFloat <$> arbitrary
+        , CLong <$> arbitrary
+        , CDouble <$> arbitrary
+        , CClassRef <$> arbitrary
+        , CStringRef <$> arbitrary
+        , CFieldRef <$> arbitrary
+        , CMethodRef <$> arbitrary
+        , CInterfaceMethodRef <$> arbitrary
+        , CNameAndType <$> arbitrary <*> arbitrary
+        , CMethodHandle <$> arbitrary
+        , CMethodType <$> arbitrary
+        , CInvokeDynamic <$> arbitrary
+        ]
 
 instance (Arbitrary (a High)) => Arbitrary (InClass a High) where
   arbitrary = InClass <$> arbitrary <*> arbitrary

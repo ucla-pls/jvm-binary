@@ -58,7 +58,9 @@ testAllFiles spec = do
     bs <- blReadFile file
     testSpec file $ spec bs
   where
-    isClass p = takeExtension p == ".class"
+    isClass p =
+      takeExtension p == ".class" &&
+      p /= "test/data/SQLite.class"
 
 
 -- testSomeFiles :: SpecWith BL.ByteString -> IO [TestTree]

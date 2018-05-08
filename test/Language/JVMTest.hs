@@ -54,9 +54,9 @@ test_reading_classfile = testAllFiles $ \bs -> do
             return (n, x)
           forM_ (mAttributes m) $ \a -> do
             -- Assume code
-            case fromAttribute' a of
+            case fromAttribute' a :: Either String (C.Code Low) of
               Right c -> do
-                forM_ (C.unByteCode . C.codeByteCode $ c) $ \i ->
+                forM_ (unByteCode . C.codeByteCode $ c) $ \i ->
                   putStr " -> " >> print i
 
                 forM_ (C.codeAttributes c) $ \ca -> do
@@ -85,8 +85,8 @@ test_reading_classfile = testAllFiles $ \bs -> do
 
     let Right x = me
     it "has same or smaller constant pool" $ do
-      let d = devolveClassFile x
-      (IM.size . unConstantPool $ cConstantPool d) `shouldSatisfy`
+      let d' = devolveClassFile x
+      (IM.size . unConstantPool $ cConstantPool d') `shouldSatisfy`
         (<= (IM.size . unConstantPool $ cConstantPool cls))
 
     it "is the same when devolving with the original constant pool" $
@@ -145,7 +145,8 @@ shouldMatchMethod' ym xm = do
         cmpOn C.codeByteCodeInsts yc xc
         cmpOn C.codeExceptionTable yc xc
         cmpOver (List.sort . unSizedList .C.codeAttributes) yc xc $ \ yca xca -> do
-          case (fromAttribute' yca, fromAttribute' xca) of
+          case (fromAttribute' yca, fromAttribute' xca)
+             :: (Either String (StackMapTable Low), Either String (StackMapTable Low)) of
             (Right yst, Right xst) -> do
               cmpOver stackMapTable yst xst $ shouldBe
             (yst, xst) ->

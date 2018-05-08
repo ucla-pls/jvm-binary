@@ -34,11 +34,18 @@ spec_parses = do
 
       r `shouldSatisfy` isRight
 
-prop_roundtrip_StackMapTable :: StackMapTable High -> Property
-prop_roundtrip_StackMapTable = isoRoundtrip
+-- prop_offset_delta :: (Word16, Word16) -> Bool
+prop_offset_delta :: (Word16, Word16) -> Property
+prop_offset_delta (lidx, delta) =
+  let tidx = offsetDelta lidx delta
+  in counterexample (show tidx) $
+     offsetDeltaInv lidx tidx === delta
 
-prop_roundtrip_StackMapFrame :: StackMapFrame High -> Property
-prop_roundtrip_StackMapFrame = isoRoundtrip
+-- prop_roundtrip_StackMapTable :: StackMapTable High -> Property
+-- prop_roundtrip_StackMapTable = isoRoundtrip
+
+-- prop_roundtrip_StackMapFrame :: StackMapFrame High -> Property
+-- prop_roundtrip_StackMapFrame = isoRoundtrip
 
 instance Arbitrary (StackMapTable High) where
   arbitrary = StackMapTable <$> arbitrary

@@ -16,6 +16,8 @@ module Language.JVM.Attribute.Base
   , aName
   , toAttribute
   , devolveAttribute
+  , fromAttribute'
+  , toAttribute'
 
   -- * Helpers
   , IsAttribute (..)
