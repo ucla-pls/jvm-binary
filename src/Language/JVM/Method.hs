@@ -1,5 +1,5 @@
+{-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE TemplateHaskell    #-}
-{-# LANGUAGE OverloadedStrings    #-}
 {-|
 Module      : Language.JVM.Method
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -14,8 +14,6 @@ Maintainer  : kalhuage@cs.ucla.edu
 module Language.JVM.Method
   ( Method (..)
   , mAccessFlags
-  , mName
-  , mDescriptor
 
   -- * Attributes
   , MethodAttributes (..)
@@ -26,45 +24,37 @@ module Language.JVM.Method
 
   ) where
 
-import           Data.Monoid
 import           Data.Maybe
-import           Data.Set                (Set)
-import qualified Data.Text               as Text
+import           Data.Monoid
+import           Data.Set                          (Set)
+import qualified Data.Text                         as Text
 
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
-import           Language.JVM.Attribute.Exceptions (exceptionIndexTable)
+import           Language.JVM.Attribute.Exceptions (exceptions)
 import           Language.JVM.Constant
 import           Language.JVM.Staged
-import           Language.JVM.Utils
 import           Language.JVM.Type
+import           Language.JVM.Utils
 
 -- | A Method in the class-file, as described
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.6).
 data Method r = Method
-  { mAccessFlags'    :: BitSet16 MAccessFlag
-  , mNameIndex       :: Ref Text.Text r
-  , mDescriptorIndex :: Ref MethodDescriptor r
-  , mAttributes      :: Choice r (SizedList16 (Attribute r)) (MethodAttributes r)
+  { mAccessFlags'    :: !(BitSet16 MAccessFlag)
+  , mName :: !(Ref Text.Text r)
+  , mDescriptor :: !(Ref MethodDescriptor r)
+  , mAttributes      :: !(Choice r (SizedList16 (Attribute r)) (MethodAttributes r))
   }
 
 -- | Unpack the BitSet and get the AccessFlags as a Set.
 mAccessFlags :: Method r -> Set MAccessFlag
 mAccessFlags = toSet . mAccessFlags'
 
--- | Lookup the name of the method in the 'ConstantPool'.
-mName :: Method High -> Text.Text
-mName = value . mNameIndex
-
--- | Lookup the descriptor of the method in the 'ConstantPool'.
-mDescriptor :: Method High -> MethodDescriptor
-mDescriptor = value .  mDescriptorIndex
-
 data MethodAttributes r = MethodAttributes
   { maCode       :: [Code r]
   , maExceptions :: [Exceptions r]
   , maSignatures :: [Signature r]
-  , maOthers :: [Attribute r]
+  , maOthers     :: [Attribute r]
   }
 
 -- | Fetch the 'Code' attribute, if any.
@@ -83,7 +73,7 @@ mExceptions' =
 -- If no exceptions field where found the empty list is returned
 mExceptions :: Method High -> [ClassName]
 mExceptions =
-  map value . fromMaybe [] . fmap exceptionIndexTable . mExceptions'
+  fromMaybe [] . fmap (unSizedList . exceptions) . mExceptions'
 
 -- | Fetches the 'Signature' attribute, if any.
 mSignature :: Method High -> Maybe (Signature High)
@@ -92,9 +82,9 @@ mSignature =
 
 instance Staged Method where
   evolve (Method mf mn md mattr) = do
-    mn' <- evolve mn
-    md' <- evolve md
-    mattr' <- label (Text.unpack (value mn' <> ":" <> methodDescriptorToText (value md')))
+    mn' <- link mn
+    md' <- link md
+    mattr' <- label (Text.unpack (mn' <> ":" <> methodDescriptorToText md'))
       $ fromCollector <$> fromAttributes collect' mattr
     return $ Method mf mn' md' mattr'
     where
@@ -108,8 +98,8 @@ instance Staged Method where
           ]
 
   devolve (Method mf mn md mattr) = do
-    mn' <- devolve mn
-    md' <- devolve md
+    mn' <- unlink mn
+    md' <- unlink md
     mattr' <- fromMethodAttributes $ mattr
     return $ Method mf mn' md' (SizedList mattr')
     where

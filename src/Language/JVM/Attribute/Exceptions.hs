@@ -15,7 +15,6 @@ exceptions that a method can make.
 -}
 module Language.JVM.Attribute.Exceptions
   ( Exceptions (..)
-  , exceptionIndexTable
   ) where
 
 import           Language.JVM.Attribute.Base
@@ -31,15 +30,11 @@ instance IsAttribute (Exceptions Low) where
 -- | An Exceptions attribute is a list of references into the
 -- constant pool.
 newtype Exceptions r = Exceptions
-  { exceptionIndexTable' :: SizedList16 (Ref ClassName r)
+  { exceptions :: SizedList16 (Ref ClassName r)
   }
 
--- | Get the constant refs that points .
-exceptionIndexTable :: Exceptions r -> [(Ref ClassName r)]
-exceptionIndexTable = unSizedList . exceptionIndexTable'
-
 instance Staged Exceptions where
-  evolve (Exceptions t) = Exceptions <$> mapM evolve t
-  devolve (Exceptions t) = Exceptions <$> mapM devolve t
+  evolve (Exceptions t) = Exceptions <$> mapM link t
+  devolve (Exceptions t) = Exceptions <$> mapM unlink t
 
 $(deriveBaseWithBinary ''Exceptions)

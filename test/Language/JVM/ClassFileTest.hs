@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Language.JVM.ClassFileTest where
 
@@ -12,7 +13,6 @@ import           Language.JVM.AttributeTest                  ()
 import           Language.JVM.ConstantTest                   ()
 import           Language.JVM.FieldTest                      ()
 import           Language.JVM.MethodTest                     ()
-import           Language.JVM.Utils
 import           Language.JVM.UtilsTest                      ()
 
 prop_roundtrip_ClassFile :: ClassFile High -> Property
@@ -36,7 +36,7 @@ instance Arbitrary (ClassFile High) where
     <*> arbitrary
 
   shrink ClassFile{..} = do
-    cInterfaceIndicies' <- shrink cInterfaceIndicies'
+    cInterfaces <- shrink cInterfaces
     cAttributes <- shrink cAttributes
     cMethods' <- shrink cMethods'
     cFields' <- shrink cFields'

@@ -51,18 +51,6 @@ instance Arbitrary BS.ByteString where
     , "\0  asd ßåæ∂ø∆œ˜˜¬å˚¬"
     ]
 
-instance Arbitrary a => Arbitrary (Ref a High) where
-  arbitrary =
-    RefV <$> arbitrary
-  shrink (RefV x) =
-    RefV <$> shrink x
-
-instance Arbitrary (a High) => Arbitrary (DeepRef a High) where
-  arbitrary =
-    DeepRef . RefV <$> arbitrary
-  shrink (DeepRef (RefV x)) =
-    DeepRef .RefV <$> shrink x
-
 instance Arbitrary (ConstantPool High) where
   arbitrary =
     ConstantPool . IM.fromList . go 1 <$> arbitrary

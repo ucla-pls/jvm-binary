@@ -12,8 +12,6 @@ Maintainer  : kalhuage@cs.ucla.edu
 {-# LANGUAGE StandaloneDeriving #-}
 module Language.JVM.Field
   ( Field (..)
-  , fName
-  , fDescriptor
   , fAccessFlags
   -- * Attributes
   , fConstantValue
@@ -36,23 +34,15 @@ import           Language.JVM.Utils
 -- | A Field in the class-file, as described
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.5).
 data Field r = Field
-  { fAccessFlags'    :: BitSet16 FAccessFlag
-  , fNameIndex       :: Ref Text.Text r
-  , fDescriptorIndex :: Ref FieldDescriptor r
-  , fAttributes      :: Choice r (SizedList16 (Attribute r)) (FieldAttributes r)
+  { fAccessFlags'    :: !(BitSet16 FAccessFlag)
+  , fName  :: !(Ref Text.Text r)
+  , fDescriptor :: !(Ref FieldDescriptor r)
+  , fAttributes      :: !(Choice r (SizedList16 (Attribute r)) (FieldAttributes r))
   }
-
--- | Get the name of the field
-fName :: Field High -> Text.Text
-fName = value . fNameIndex
 
 -- | Get the set of access flags
 fAccessFlags :: Field r -> Set.Set FAccessFlag
 fAccessFlags = toSet . fAccessFlags'
-
--- | Get the descriptor of the field
-fDescriptor :: Field High -> FieldDescriptor
-fDescriptor = value . fDescriptorIndex
 
 -- | Fetch the 'ConstantValue' attribute.
 fConstantValue :: Field High -> Maybe (ConstantValue High)
@@ -72,8 +62,8 @@ data FieldAttributes r = FieldAttributes
 
 instance Staged Field where
   evolve field = label "Field" $ do
-    fi <- evolve (fNameIndex field)
-    fd <- evolve (fDescriptorIndex field)
+    fi <- link (fName field)
+    fd <- link (fDescriptor field)
     fattr <- fromCollector <$> fromAttributes collect' (fAttributes field)
     return $ Field (fAccessFlags' field) fi fd fattr
     where
@@ -85,8 +75,8 @@ instance Staged Field where
           , toC $ \x -> (mempty, Endo (x:), mempty) ]
 
   devolve field = do
-    fi <- devolve (fNameIndex field)
-    fd <- devolve (fDescriptorIndex field)
+    fi <- unlink (fName field)
+    fd <- unlink (fDescriptor field)
     fattr <- fromFieldAttributes (fAttributes field)
     return $ Field (fAccessFlags' field) fi fd (SizedList fattr)
 

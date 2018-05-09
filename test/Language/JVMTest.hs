@@ -1,21 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.JVMTest where
 
-import SpecHelper
+import           SpecHelper
 
-import Data.Either
-import Data.List as List
-import qualified Data.IntMap as IM
--- import qualified Data.List as L
+import           Data.Either
+import qualified Data.IntMap                          as IM
+import           Data.List                            as List
+import qualified Data.Text                            as Text
+import qualified Data.ByteString.Lazy                 as BL
+import           Data.Foldable
 
-import Data.Foldable
-import Language.JVM
-import qualified Language.JVM.Attribute.Code as C
-import Language.JVM.Attribute.StackMapTable
-import qualified Data.ByteString.Lazy as BL
-
--- import Data.Binary
-
+import           Language.JVM
+import qualified Language.JVM.Attribute.Code          as C
+import           Language.JVM.Attribute.StackMapTable
 
 spec_testing_example :: SpecWith ()
 spec_testing_example =
@@ -49,9 +46,9 @@ test_reading_classfile = testAllFiles $ \bs -> do
         Left err -> do
           putStr (show err) >> putStr ": "
           print . runEvolve cp' $ do
-            x <- evolve (mDescriptorIndex m)
-            n <- evolve (mNameIndex m)
-            return (n, x)
+            x <- link (mDescriptor m)
+            n <- link (mName m)
+            return ((n, x) :: (MethodDescriptor, Text.Text))
           forM_ (mAttributes m) $ \a -> do
             -- Assume code
             case fromAttribute' a :: Either String (C.Code Low) of
@@ -102,9 +99,9 @@ test_reading_classfile = testAllFiles $ \bs -> do
 shouldMatchClass :: ClassFile High -> ClassFile High -> IO ()
 shouldMatchClass y x = do
   cAccessFlags' y `shouldBe` cAccessFlags' x
-  cThisClassIndex y `shouldBe` cThisClassIndex x
-  cSuperClassIndex y `shouldBe` cSuperClassIndex x
-  cInterfaceIndicies' y `shouldBe` cInterfaceIndicies' x
+  cThisClass y `shouldBe` cThisClass x
+  cSuperClass y `shouldBe` cSuperClass x
+  cInterfaces y `shouldBe` cInterfaces x
   cFields' y `shouldBe` cFields' x
   forM_ (zip (cMethods y) (cMethods x)) $ \ (ym, xm) -> do
     ym `shouldMatchMethod` xm
@@ -113,9 +110,9 @@ shouldMatchClass y x = do
 shouldMatchClass' :: ClassFile Low -> ClassFile Low -> IO ()
 shouldMatchClass' y x = do
   cAccessFlags' y `shouldBe` cAccessFlags' x
-  cThisClassIndex y `shouldBe` cThisClassIndex x
-  cSuperClassIndex y `shouldBe` cSuperClassIndex x
-  cInterfaceIndicies' y `shouldBe` cInterfaceIndicies' x
+  cThisClass y `shouldBe` cThisClass x
+  cSuperClass y `shouldBe` cSuperClass x
+  cInterfaces y `shouldBe` cInterfaces x
   cFields' y `shouldBe` cFields' x
   forM_ (zip (cMethods y) (cMethods x)) $ \(ym, xm) -> do
     shouldMatchMethod' ym xm
@@ -135,8 +132,8 @@ shouldMatchMethod ym xm = do
 shouldMatchMethod' :: Method Low -> Method Low -> IO ()
 shouldMatchMethod' ym xm = do
   mAccessFlags ym `shouldBe` mAccessFlags xm
-  mNameIndex ym `shouldBe` mNameIndex xm
-  mDescriptorIndex ym `shouldBe` mDescriptorIndex xm
+  mName ym `shouldBe` mName xm
+  mDescriptor ym `shouldBe` mDescriptor xm
   forM_ (zip (unSizedList $ mAttributes ym ) (unSizedList $ mAttributes xm)) $ \(ya, xa) -> do
     case (fromAttribute' ya, fromAttribute' xa) of
       (Right yc, Right xc) -> do

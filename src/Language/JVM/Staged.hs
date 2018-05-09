@@ -1,5 +1,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-|
 Copyright   : (c) Christian Gram Kalhauge, 2018
 License     : MIT
@@ -46,70 +48,99 @@ class Staged s where
   devolve = stage devolve
 
 instance Staged Constant where
-  stage f c =
+  evolve c =
     case c of
       CString s -> pure $ CString s
       CInteger i -> pure $ CInteger i
       CFloat d -> pure $ CFloat d
       CLong l -> pure $ CLong l
       CDouble d -> pure $ CDouble d
-      CClassRef r -> label "CClassRef" $ CClassRef <$> f r
-      CStringRef r -> label "CStringRef" $ CStringRef <$> f r
-      CFieldRef r -> label "CFieldRef" $ CFieldRef <$> f r
-      CMethodRef r -> label "CMethodRef" $ CMethodRef <$> f r
-      CInterfaceMethodRef r -> label "CInterfaceMethodRef" $ CInterfaceMethodRef <$> f r
-      CNameAndType r1 r2 -> label "CNameAndType" $ CNameAndType <$> f r1 <*> f r2
-      CMethodHandle mh -> label "CMetho" $ CMethodHandle <$> f mh
-      CMethodType r -> label "CMethodType" $ CMethodType <$> f r
-      CInvokeDynamic i -> label "CInvokeDynamic" $ CInvokeDynamic <$> f i
+      CClassRef r -> label "CClassRef" $ CClassRef <$> link r
+      CStringRef r -> label "CStringRef" $ CStringRef <$> link r
+      CFieldRef r -> label "CFieldRef" $ CFieldRef <$> evolve r
+      CMethodRef r -> label "CMethodRef" $ CMethodRef <$> evolve r
+      CInterfaceMethodRef r -> label "CInterfaceMethodRef" $ CInterfaceMethodRef <$> evolve r
+      CNameAndType r1 r2 -> label "CNameAndType" $ CNameAndType <$> link r1 <*> link r2
+      CMethodHandle mh -> label "CMetho" $ CMethodHandle <$> evolve mh
+      CMethodType r -> label "CMethodType" $ CMethodType <$> link r
+      CInvokeDynamic i -> label "CInvokeDynamic" $ CInvokeDynamic <$> evolve i
 
-instance Referenceable r => Staged (Ref r) where
-  stage _ _ = error "Cannot stage a reference"
+  devolve c =
+    case c of
+      CString s -> pure $ CString s
+      CInteger i -> pure $ CInteger i
+      CFloat d -> pure $ CFloat d
+      CLong l -> pure $ CLong l
+      CDouble d -> pure $ CDouble d
+      CClassRef r -> label "CClassRef" $ CClassRef <$> unlink r
+      CStringRef r -> label "CStringRef" $ CStringRef <$> unlink r
+      CFieldRef r -> label "CFieldRef" $ CFieldRef <$> devolve r
+      CMethodRef r -> label "CMethodRef" $ CMethodRef <$> devolve r
+      CInterfaceMethodRef r -> label "CInterfaceMethodRef" $ CInterfaceMethodRef <$> devolve r
+      CNameAndType r1 r2 -> label "CNameAndType" $ CNameAndType <$> unlink r1 <*> unlink r2
+      CMethodHandle mh -> label "CMetho" $ CMethodHandle <$> devolve mh
+      CMethodType r -> label "CMethodType" $ CMethodType <$> unlink r
+      CInvokeDynamic i -> label "CInvokeDynamic" $ CInvokeDynamic <$> devolve i
 
-  evolve (RefI ref) = do
-    RefV <$> link ref
-  devolve (RefV v) = do
-    RefI <$> unlink v
-
-instance Referenceable (r High) => Staged (DeepRef r) where
-  stage _ _ = error "Cannot stage a deep reference"
-
-  evolve (DeepRef (RefI ref)) = do
-    DeepRef . RefV <$> link ref
-  devolve (DeepRef (RefV v)) = do
-    DeepRef . RefI <$> unlink v
 
 instance Staged InvokeDynamic where
-  stage f (InvokeDynamic w ref) =
-    InvokeDynamic w <$> f ref
+  evolve (InvokeDynamic w ref) =
+    InvokeDynamic w <$> link ref
+
+  devolve (InvokeDynamic w ref) =
+    InvokeDynamic w <$> unlink ref
 
 instance Staged MethodId where
-  stage f (MethodId n d) =
-    MethodId <$> f n <*> f d
+  evolve (MethodId n d) =
+    MethodId <$> link n <*> link d
+
+  devolve (MethodId n d) =
+    MethodId <$> unlink n <*> unlink d
 
 instance Referenceable (r High) => Staged (InClass r) where
-  stage f (InClass cn cid) = do
-    InClass <$> f cn <*> f cid
+  evolve (InClass cn cid) =
+    InClass <$> link cn <*> link cid
+  devolve (InClass cn cid) =
+    InClass <$> unlink cn <*> unlink cid
 
 instance Staged MethodHandle where
-  stage f m =
+  evolve m =
     case m of
-      MHField r -> MHField <$> f r
-      MHMethod r -> MHMethod <$> f r
-      MHInterface r -> MHInterface <$> f r
+      MHField r -> MHField <$> evolve r
+      MHMethod r -> MHMethod <$> evolve r
+      MHInterface r -> MHInterface <$> evolve r
+
+  devolve m =
+    case m of
+      MHField r -> MHField <$> devolve r
+      MHMethod r -> MHMethod <$> devolve r
+      MHInterface r -> MHInterface <$> devolve r
 
 instance Staged MethodHandleMethod where
-  stage f g =
+  evolve g =
     case g of
-      MHInvokeVirtual m -> MHInvokeVirtual <$> f m
-      MHInvokeStatic m -> MHInvokeStatic <$> f m
-      MHInvokeSpecial m -> MHInvokeSpecial <$> f m
-      MHNewInvokeSpecial m -> MHNewInvokeSpecial <$> f m
+      MHInvokeVirtual m -> MHInvokeVirtual <$> link m
+      MHInvokeStatic m -> MHInvokeStatic <$> link m
+      MHInvokeSpecial m -> MHInvokeSpecial <$> link m
+      MHNewInvokeSpecial m -> MHNewInvokeSpecial <$> link m
+
+  devolve g =
+    case g of
+      MHInvokeVirtual m -> MHInvokeVirtual <$> unlink m
+      MHInvokeStatic m -> MHInvokeStatic <$> unlink m
+      MHInvokeSpecial m -> MHInvokeSpecial <$> unlink m
+      MHNewInvokeSpecial m -> MHNewInvokeSpecial <$> unlink m
 
 instance Staged MethodHandleField where
-  stage f (MethodHandleField k ref) =
-    MethodHandleField k <$> f ref
+  evolve (MethodHandleField k ref) =
+    MethodHandleField k <$> link ref
+
+  devolve (MethodHandleField k ref) =
+    MethodHandleField k <$> unlink ref
 
 instance Staged MethodHandleInterface where
-  stage f (MethodHandleInterface ref) =
-    MethodHandleInterface <$> f ref
+  evolve (MethodHandleInterface ref) =
+    MethodHandleInterface <$> link ref
+
+  devolve (MethodHandleInterface ref) =
+    MethodHandleInterface <$> unlink ref

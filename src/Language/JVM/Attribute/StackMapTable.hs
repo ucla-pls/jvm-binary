@@ -1,10 +1,10 @@
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell    #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE DeriveAnyClass      #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving  #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-|
 Module      : Language.JVM.Attribute.StackMapTable
 Copyright   : (c) Christian Gram Kalhauge, 2018
@@ -35,6 +35,7 @@ import           Data.Binary.Get             hiding (label)
 import           Data.Binary.Put
 import           Data.Foldable
 import           Numeric
+import           Unsafe.Coerce
 
 import           Language.JVM.Attribute.Base
 import           Language.JVM.ByteCode
@@ -237,24 +238,21 @@ offsetDeltaInv lidx tidx
 instance Staged StackMapFrameType where
   stage f x =
     case x of
-      SameFrame                   -> return $ SameFrame
       SameLocals1StackItemFrame a -> SameLocals1StackItemFrame <$> f a
-      ChopFrame w                 -> return $ ChopFrame w
       AppendFrame ls              -> AppendFrame <$> mapM f ls
       FullFrame bs as             -> FullFrame <$> mapM f bs <*> mapM f as
+      a                           -> return $ unsafeCoerce a
 
 instance Staged VerificationTypeInfo where
-  stage f x =
+  devolve x =
     case x of
-      VTop               -> return VTop
-      VInteger           -> return VInteger
-      VFloat             -> return VFloat
-      VLong              -> return VLong
-      VDouble            -> return VDouble
-      VNull              -> return VNull
-      VUninitializedThis -> return VUninitializedThis
-      VObject a          -> VObject <$> f a
-      VUninitialized w   -> return $ VUninitialized w
+      VObject a -> VObject <$> unlink a
+      a         -> return $ unsafeCoerce a
+
+  evolve x =
+    case x of
+      VObject a -> VObject <$> link a
+      a         -> return $ unsafeCoerce a
 
 
 $(deriveBaseWithBinary ''StackMapTable)

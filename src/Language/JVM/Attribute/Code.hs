@@ -114,22 +114,23 @@ instance Staged Code where
 
 instance ByteCodeStaged ExceptionTable where
   evolveBC f ExceptionTable{..} = label "ExceptionTable" $ do
-    catchType <- case idx catchType of
-      0 -> return $ RefV Nothing
-      n -> RefV . Just <$> link n
+    catchType <- case catchType of
+      0 -> return $ Nothing
+      n -> Just <$> link n
     start <- f start
     end <- f end
     handler <- f handler
     return $ ExceptionTable {..}
 
   devolveBC f ExceptionTable{..} = do
-    catchType <- case value catchType of
-      Just s  -> RefI <$> unlink s
-      Nothing -> return $ RefI 0
+    catchType <- case catchType of
+      Just s  -> unlink s
+      Nothing -> return $ 0
     start <- f start
     end <- f end
     handler <- f handler
     return $ ExceptionTable {..}
+
 
 $(deriveBaseWithBinary ''Code)
 $(deriveBaseWithBinary ''ExceptionTable)

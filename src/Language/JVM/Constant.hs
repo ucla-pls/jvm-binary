@@ -1,8 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -53,14 +53,14 @@ module Language.JVM.Constant
   , Low
   ) where
 
--- TODO: Data.Binary.IEEE754?
-
 import           Control.DeepSeq          (NFData)
 import           Control.Monad.Reader
 import           Data.Binary
 import           Data.Binary.IEEE754
+import qualified Data.ByteString          as BS
 import           Data.Int
 import qualified Data.Text                as Text
+import qualified Data.Text.Encoding.Error as TE
 import           GHC.Generics             (Generic)
 import           Numeric                  (showHex)
 import           Prelude                  hiding (fail, lookup)
@@ -69,13 +69,6 @@ import           Language.JVM.Stage
 import           Language.JVM.TH
 import           Language.JVM.Type
 import           Language.JVM.Utils
-
-import qualified Data.Text.Encoding.Error as TE
-
--- import qualified Data.Text as Text
-import qualified Data.ByteString          as BS
-
--- import Data.Functor.Classes
 
 
 -- | A constant is a multi word item in the 'ConstantPool'. Each of
@@ -106,8 +99,8 @@ data InClass a r = InClass
 
 -- | A method identifier
 data MethodId r = MethodId
-  { methodIdName        :: !(Ref Text.Text r)
-  , methodIdDescriptor  :: !(Ref MethodDescriptor r)
+  { methodIdName       :: !(Ref Text.Text r)
+  , methodIdDescriptor :: !(Ref MethodDescriptor r)
   }
 
 -- | A method id in a class.
@@ -115,8 +108,8 @@ type AbsMethodId = InClass MethodId
 
 -- | A field identifier
 data FieldId r = FieldId
-  { fieldIdName        :: !(Ref Text.Text r)
-  , fieldIdDescriptor  :: !(Ref FieldDescriptor r)
+  { fieldIdName       :: !(Ref Text.Text r)
+  , fieldIdDescriptor :: !(Ref FieldDescriptor r)
   } -- deriving (Show, Eq, Ord, Generic, NFData)
 
 -- | A field id in a class
@@ -130,15 +123,17 @@ newtype AbsInterfaceMethodId r = AbsInterfaceMethodId
 fieldIdToText :: FieldId High -> Text.Text
 fieldIdToText fid =
   Text.concat
-  [ value $ fieldIdName fid, ":"
-  , fieldDescriptorToText . value $ fieldIdDescriptor fid
+  [ fieldIdName fid
+  , ":"
+  , fieldDescriptorToText $ fieldIdDescriptor fid
   ]
 
 methodIdToText :: MethodId High -> Text.Text
 methodIdToText fid =
   Text.concat
-  [ value $ methodIdName fid, ":"
-  , methodDescriptorToText . value $ methodIdDescriptor fid
+  [ methodIdName fid
+  , ":"
+  , methodDescriptorToText $ methodIdDescriptor fid
   ]
 
 -- | In some cases we can both point to interface methods and
@@ -182,7 +177,6 @@ data InvokeDynamic r = InvokeDynamic
   { invokeDynamicAttrIndex :: !Word16
   , invokeDynamicMethod    :: !(DeepRef MethodId r)
   }
-
 
 -- | Hack that returns the name of a constant.
 typeToStr :: Constant r -> String
@@ -307,22 +301,22 @@ instance Referenceable (Constant High) where
   toConst a = return a
 
 instance Referenceable (MethodId High) where
-  fromConst err (CNameAndType rn (RefV txt)) = do
+  fromConst err (CNameAndType rn txt) = do
     md <- either err return $ methodDescriptorFromText txt
-    return $ MethodId rn (RefV md)
+    return $ MethodId rn md
   fromConst e c = expected "CNameAndType" e c
 
-  toConst (MethodId rn (RefV md)) =
-    return $ CNameAndType rn (RefV $ methodDescriptorToText md)
+  toConst (MethodId rn md) =
+    return $ CNameAndType rn (methodDescriptorToText md)
 
 instance Referenceable (FieldId High) where
-  fromConst err (CNameAndType rn (RefV txt)) = do
+  fromConst err (CNameAndType rn txt) = do
     md <- either err return $ fieldDescriptorFromText txt
-    return $ FieldId rn (RefV md)
+    return $ FieldId rn md
   fromConst e c = expected "CNameAndType" e c
 
-  toConst (FieldId rn (RefV md)) =
-    return $ CNameAndType rn (RefV $ fieldDescriptorToText md)
+  toConst (FieldId rn md) =
+    return $ CNameAndType rn (fieldDescriptorToText md)
 
 -- TODO: Find good encoding of string.
 instance Referenceable Text.Text where
@@ -343,19 +337,19 @@ instance Referenceable BS.ByteString where
   fromConst err c =
     case c of
       CString str -> return $ unSizedByteString str
-      a -> err $ wrongType "String" a
+      a           -> err $ wrongType "String" a
   toConst =
     return . CString . SizedByteString
 
 
 instance Referenceable ClassName where
-  fromConst _ (CClassRef (RefV r)) =
+  fromConst _ (CClassRef r) =
     return . ClassName $ r
   fromConst err a =
     err $ wrongType "ClassRef" a
 
   toConst (ClassName txt) = do
-    return . CClassRef $ RefV txt
+    return . CClassRef $ txt
 
 instance Referenceable MethodDescriptor where
   fromConst err c = do

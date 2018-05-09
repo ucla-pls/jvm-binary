@@ -211,14 +211,14 @@ evolveByteCodeOpr ::
 evolveByteCodeOpr g (ByteCodeInst ofs opr) = do
   case opr of
     Push c            -> label "Push" $ Push <$> evolve c
-    Get fa r          -> label "Get" $ Get fa <$> evolve r
-    Put fa r          -> label "Put" $ Put fa <$> evolve r
+    Get fa r          -> label "Get" $ Get fa <$> link r
+    Put fa r          -> label "Put" $ Put fa <$> link r
     Invoke r          -> label "Invoke" $ Invoke <$> evolve r
-    New r             -> label "New" $ New <$> evolve r
+    New r             -> label "New" $ New <$> link r
     NewArray r        -> label "NewArray" $ NewArray <$> evolve r
-    MultiNewArray r u -> label "MultiNewArray" $ MultiNewArray <$> evolve r <*> pure u
-    CheckCast r       -> label "CheckCast" $ CheckCast <$> evolve r
-    InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> evolve r
+    MultiNewArray r u -> label "MultiNewArray" $ MultiNewArray <$> link r <*> pure u
+    CheckCast r       -> label "CheckCast" $ CheckCast <$> link r
+    InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> link r
     If cp on r        -> label "If" $ If cp on <$> calcOffset r
     IfRef b on r      -> label "IfRef" $ IfRef b on <$> calcOffset r
     Goto r            -> label "Goto" $ Goto <$> calcOffset r
@@ -240,14 +240,14 @@ devolveByteCodeOpr ::
 devolveByteCodeOpr g ofs opr =
   ByteCodeInst ofs <$> case opr of
     Push c            -> label "Push" $ Push <$> devolve c
-    Get fa r          -> label "Get" $ Get fa <$> devolve r
-    Put fa r          -> label "Put" $ Put fa <$> devolve r
+    Get fa r          -> label "Get" $ Get fa <$> unlink r
+    Put fa r          -> label "Put" $ Put fa <$> unlink r
     Invoke r          -> label "Invoke" $ Invoke <$> devolve r
-    New r             -> label "New" $ New <$> devolve r
+    New r             -> label "New" $ New <$> unlink r
     NewArray r        -> label "NewArray" $ NewArray <$> devolve r
-    MultiNewArray r u -> label "MultiNewArray" $ MultiNewArray <$> devolve r <*> pure u
-    CheckCast r       -> label "CheckCast" $ CheckCast <$> devolve r
-    InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> devolve r
+    MultiNewArray r u -> label "MultiNewArray" $ MultiNewArray <$> unlink r <*> pure u
+    CheckCast r       -> label "CheckCast" $ CheckCast <$> unlink r
+    InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> unlink r
     If cp on r        -> label "If" $ If cp on <$> calcOffset r
     IfRef b on r      -> label "IfRef" $ IfRef b on <$> calcOffset r
     Goto r            -> label "Goto" $ Goto <$> calcOffset r
@@ -261,40 +261,43 @@ devolveByteCodeOpr g ofs opr =
       return (fromIntegral x - fromIntegral ofs)
 
 instance Staged Invokation where
-  stage f i =
+  evolve i =
     case i of
-      InvkSpecial r     -> label "InvkSpecial" $ InvkSpecial <$> f r
-      InvkVirtual r     -> label "InvkVirtual" $ InvkVirtual <$> f r
-      InvkStatic r      -> label "InvkStatic" $ InvkStatic <$> f r
-      InvkInterface w r -> label "InvkInterface" $ InvkInterface w <$> f r
-      InvkDynamic r     -> label "InvkDynamic" $ InvkDynamic <$> f r
+      InvkSpecial r     -> label "InvkSpecial" $ InvkSpecial <$> link r
+      InvkVirtual r     -> label "InvkVirtual" $ InvkVirtual <$> link r
+      InvkStatic r      -> label "InvkStatic" $ InvkStatic <$> link r
+      InvkInterface w r -> label "InvkInterface" $ InvkInterface w <$> link r
+      InvkDynamic r     -> label "InvkDynamic" $ InvkDynamic <$> link r
 
-instance Staged ByteCodeOpr where
-  stage f x =
-    case x of
-      Push c            -> label "Push" $ Push <$> f c
-      Get fa r          -> label "Get" $ Get fa <$> f r
-      Put fa r          -> label "Put" $ Put fa <$> f r
-      Invoke r          -> label "Invoke" $ Invoke <$> f r
-      New r             -> label "New" $ New <$> f r
-      NewArray r        -> label "NewArray" $ NewArray <$> f r
-      MultiNewArray r u -> label "MultiNewArray" $ MultiNewArray <$> f r <*> pure u
-      CheckCast r       -> label "CheckCast" $ CheckCast <$> f r
-      InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> f r
-      a                 -> return $ unsafeCoerce a
+  devolve i =
+    case i of
+      InvkSpecial r     -> label "InvkSpecial" $ InvkSpecial <$> unlink r
+      InvkVirtual r     -> label "InvkVirtual" $ InvkVirtual <$> unlink r
+      InvkStatic r      -> label "InvkStatic" $ InvkStatic <$> unlink r
+      InvkInterface w r -> label "InvkInterface" $ InvkInterface w <$> unlink r
+      InvkDynamic r     -> label "InvkDynamic" $ InvkDynamic <$> unlink r
+
 
 instance Staged ExactArrayType where
-  stage f x =
+  evolve x =
     case x of
-      EARef r -> EARef <$> f r
+      EARef r -> EARef <$> link r
+      a       -> return $ unsafeCoerce a
+  devolve x =
+    case x of
+      EARef r -> EARef <$> unlink r
       a       -> return $ unsafeCoerce a
 
 
 instance Staged CConstant where
-  stage f x =
+  evolve x =
     case x of
-      -- CHalfRef r -> label "HalfRef" $ CHalfRef <$> f r
-      CRef w r -> label "Ref" $ CRef w <$> f r
+      CRef w r -> label "Ref" $ CRef w <$> link r
+      a        -> return $ unsafeCoerce a
+
+  devolve x =
+    case x of
+      CRef w r -> label "Ref" $ CRef w <$> unlink r
       a        -> return $ unsafeCoerce a
 
 instance Binary (ByteCode Low) where
@@ -559,7 +562,7 @@ instance Binary (ByteCodeOpr Low) where
       0x10 -> Push . CByte <$> get
       0x11 -> Push . CShort <$> get
 
-      0x12 -> Push . CRef Nothing . DeepRef . RefI . fromIntegral <$> getWord8
+      0x12 -> Push . CRef Nothing . fromIntegral <$> getWord8
       0x13 -> Push . CRef (Just One) <$> get
       0x14 -> Push . CRef (Just Two) <$> get
 
@@ -890,10 +893,10 @@ putByteCode n bc =
     Push (CByte x) -> putWord8 0x10 >> put x
     Push (CShort x) -> putWord8 0x11 >> put x
 
-    Push (CRef (Just One) (DeepRef (RefI x))) ->
+    Push (CRef (Just One) x) ->
       putWord8 0x13 >> put x
     -- In this case force the wide
-    Push (CRef Nothing (DeepRef (RefI x)))
+    Push (CRef Nothing x)
       | x <= 0xff -> putWord8 0x12 >> (putWord8 . fromIntegral $ x)
       | otherwise -> putWord8 0x13 >> put x
     -- Here there is no direct restrictions

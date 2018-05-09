@@ -37,10 +37,10 @@ data Signature a =
   Signature (Ref Text.Text a)
 
 signatureToText :: Signature High -> Text.Text
-signatureToText (Signature (RefV s)) = s
+signatureToText (Signature s) = s
 
 signatureFromText :: Text.Text -> Signature High
-signatureFromText s = (Signature (RefV s))
+signatureFromText s = Signature s
 
 -- data ClassSignature = ClassSignature
 --   { csTypeParameters :: [TypeParameter]
@@ -87,9 +87,11 @@ signatureFromText s = (Signature (RefV s))
 -- data Wildcard =
 --   WPlus | WMinus
 
-
 instance Staged Signature where
-  stage f (Signature a) =
-    label "Signature" $ Signature <$> f a
+  evolve (Signature a) =
+    label "Signature" $ Signature <$> link a
+
+  devolve (Signature a) =
+    label "Signature" $ Signature <$> unlink a
 
 $(deriveBaseWithBinary ''Signature)

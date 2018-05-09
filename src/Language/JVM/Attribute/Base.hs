@@ -1,9 +1,9 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveAnyClass      #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving  #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-|
 Module      : Language.JVM.Attribute.Base
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -13,7 +13,6 @@ Maintainer  : kalhuage@cs.ucla.edu
 module Language.JVM.Attribute.Base
   ( Attribute (..)
   , aInfo
-  , aName
   , toAttribute
   , devolveAttribute
   , fromAttribute'
@@ -29,13 +28,13 @@ module Language.JVM.Attribute.Base
   , firstOne
   ) where
 
-import qualified Data.Text             as Text
-import qualified Data.List             as List
-import qualified Data.ByteString       as BS
-import qualified Data.ByteString.Lazy                    as BL
+import           Control.Monad
+import           Data.Bifunctor
 import           Data.Binary
-import Data.Bifunctor
-import Control.Monad
+import qualified Data.ByteString      as BS
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.List            as List
+import qualified Data.Text            as Text
 
 import           Language.JVM.Staged
 import           Language.JVM.Utils
@@ -47,8 +46,8 @@ firstOne as = fst <$> List.uncons as
 -- | An Attribute, simply contains of a reference to a name and
 -- contains info.
 data Attribute r = Attribute
-  { aNameIndex :: ! (Ref Text.Text r)
-  , aInfo'     :: ! (SizedByteString32)
+  { aName  :: ! (Ref Text.Text r)
+  , aInfo' :: ! (SizedByteString32)
   }
 
 -- | A small helper function to extract the info as a
@@ -56,17 +55,12 @@ data Attribute r = Attribute
 aInfo :: Attribute r -> BS.ByteString
 aInfo = unSizedByteString . aInfo'
 
--- | Extracts the name from the attribute, if it exists in the
--- ConstantPool.
-aName :: Attribute High -> Text.Text
-aName = value . aNameIndex
-
 instance Staged Attribute where
   evolve (Attribute an ai) = do
-    an' <- evolve an
+    an' <- link an
     return $ Attribute an' ai
   devolve (Attribute an ai) = do
-    an' <- devolve an
+    an' <- unlink an
     return $ Attribute an' ai
 
 $(deriveBaseWithBinary ''Attribute)
@@ -91,7 +85,7 @@ toAttribute' :: forall a. IsAttribute a => a -> Attribute High
 toAttribute' a =
   let name = unConst (attrName :: Const Text.Text a)
       bytes = encode a
-  in Attribute (RefV name) (SizedByteString . BL.toStrict $ bytes)
+  in Attribute name (SizedByteString . BL.toStrict $ bytes)
 
 toAttribute :: (IsAttribute (a Low), Staged a, DevolveM m) => a High -> m (Attribute Low)
 toAttribute =
@@ -128,19 +122,19 @@ evolveAttribute g as =
 toC :: (EvolveM m, Staged a, IsAttribute (a Low)) => (a High -> c) -> Attribute High -> Maybe (m c)
 toC f attr =
   case fromAttribute attr of
-    Just m -> Just $ f <$> m
+    Just m  -> Just $ f <$> m
     Nothing -> Nothing
 
 toC' :: (EvolveM m, IsAttribute (a Low)) => (a Low -> m (a High)) -> (a High -> c) -> Attribute High -> Maybe (m c)
 toC' g f attr =
   case evolveAttribute g attr of
-    Just m -> Just $ f <$> m
+    Just m  -> Just $ f <$> m
     Nothing -> Nothing
 
 collect :: (Monad m) => c -> Attribute High -> [Attribute High -> Maybe (m c)] -> m c
 collect c attr options =
   case msum $ Prelude.map ($ attr) options of
-    Just x -> x
+    Just x  -> x
     Nothing -> return c
 
 -- | Given a 'Foldable' structure 'f', and a function that can calculate a

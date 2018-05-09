@@ -18,9 +18,6 @@ module Language.JVM.Attribute.BootstrapMethods
   ( BootstrapMethods (..)
   , methods
   , BootstrapMethod (..)
-  , method
-  , argumentIndicies
-  , arguments
   ) where
 
 import           Language.JVM.Constant
@@ -43,29 +40,20 @@ methods = unSizedList . methods'
 
 -- | A bootstraped methods.
 data BootstrapMethod r = BootstrapMethod
-  { methodIndex :: DeepRef MethodHandle r
-  , argumentIndicies' :: SizedList16 (DeepRef Constant r)
+  { method :: !(DeepRef MethodHandle r)
+  , arguments :: !(SizedList16 (DeepRef Constant r))
   }
-
-method :: BootstrapMethod High -> MethodHandle High
-method =
-  value . unDeep . methodIndex
-
--- | The arguments as a list
-argumentIndicies :: BootstrapMethod r -> [ DeepRef Constant r ]
-argumentIndicies = unSizedList . argumentIndicies'
-
--- | The arguments as a list
-arguments :: BootstrapMethod High -> [ Constant High ]
-arguments = map (value . unDeep) . argumentIndicies
 
 instance Staged BootstrapMethods where
   stage f (BootstrapMethods m) =
     label "BootstrapMethods" $ BootstrapMethods <$> mapM f m
 
 instance Staged BootstrapMethod where
-  stage f (BootstrapMethod a m) =
-    BootstrapMethod <$> f a <*> mapM f m
+  evolve (BootstrapMethod a m) =
+    BootstrapMethod <$> link a <*> mapM link m
+
+  devolve (BootstrapMethod a m) =
+    BootstrapMethod <$> unlink a <*> mapM unlink m
 
 $(deriveBaseWithBinary ''BootstrapMethod)
 $(deriveBaseWithBinary ''BootstrapMethods)
