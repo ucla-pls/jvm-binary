@@ -396,7 +396,7 @@ data CConstant r
   | CByte Int8
   | CShort Int16
 
-  | CRef (Maybe WordSize) (DeepRef Constant r)
+  | CRef (Maybe WordSize) (Ref JValue r)
 
 data BinOpr
   = Add
@@ -414,7 +414,6 @@ data BitOpr
   | Or
   | XOr
   deriving (Show, Ord, Eq, Generic, NFData)
-
 
 type LocalAddress = Word16
 type IncrementAmount = Int16

@@ -47,6 +47,7 @@ newtype ClassName = ClassName
 strCls :: String -> ClassName
 strCls = ClassName . Text.pack
 
+-- | A Jvm a base type
 data JBaseType
   = JTByte
   | JTChar
@@ -76,19 +77,17 @@ newtype FieldDescriptor = FieldDescriptor
   { fieldDescriptorType :: JType
   } deriving (Show, Ord, Eq, Generic, NFData)
 
--- type Parser = Parsec Void Text.Text
-
 -- | Parse a JType
 parseJType :: Parser JType
 parseJType = try $ do
   s <- anyChar
   case s :: Char of
-    'B' -> return $JTBase JTByte
-    'C' -> return $JTBase JTChar
-    'D' -> return $JTBase JTDouble
-    'F' -> return $JTBase JTFloat
-    'I' -> return $JTBase JTInt
-    'J' -> return $JTBase JTLong
+    'B' -> return $ JTBase JTByte
+    'C' -> return $ JTBase JTChar
+    'D' -> return $ JTBase JTDouble
+    'F' -> return $ JTBase JTFloat
+    'I' -> return $ JTBase JTInt
+    'J' -> return $ JTBase JTLong
     'L' -> do
       txt <- takeWhile (/= ';')
       _ <- char ';'

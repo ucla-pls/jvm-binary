@@ -22,6 +22,8 @@ module Language.JVM.Constant
 
   , Referenceable (..)
 
+  , JValue (..)
+
     -- * Special constants
   , ClassName (..)
 
@@ -447,3 +449,39 @@ $(deriveBaseWithBinary ''AbsMethodId)
 $(deriveBaseWithBinary ''AbsFieldId)
 $(deriveBaseWithBinary ''AbsInterfaceMethodId)
 $(deriveBaseWithBinary ''AbsVariableMethodId)
+
+-- | A constant pool value in java
+data JValue
+  = VInteger Int32
+  | VLong Int64
+  | VFloat Float
+  | VDouble Double
+  | VString BS.ByteString
+  | VClass ClassName
+  | VMethodType (MethodDescriptor)
+  | VMethodHandle (MethodHandle High)
+  deriving (Show, Eq, Generic, NFData)
+
+instance Referenceable JValue where
+  fromConst err c = do
+    case c of
+      CStringRef s    -> return $ VString s
+      CInteger i      -> return $ VInteger i
+      CFloat f        -> return $ VFloat f
+      CLong l         -> return $ VLong l
+      CDouble d       -> return $ VDouble d
+      CClassRef r     -> return $ VClass (ClassName r)
+      CMethodHandle m -> return $ VMethodHandle m
+      CMethodType t   -> return $ VMethodType t
+      x               -> expected "Expected a Value" err x
+
+  toConst c =
+    return $ case c of
+      VString s            -> CStringRef s
+      VInteger i           -> CInteger i
+      VFloat f             -> CFloat f
+      VLong l              -> CLong l
+      VDouble d            -> CDouble d
+      VClass (ClassName r) -> CClassRef r
+      VMethodHandle m      -> CMethodHandle m
+      VMethodType t        -> CMethodType t

@@ -28,7 +28,7 @@ instance IsAttribute (ConstantValue Low) where
 
 -- | A constant value is just a index into the constant pool.
 data ConstantValue r = ConstantValue
-  { constantValue :: DeepRef Constant r
+  { constantValue :: !(Ref JValue r)
   }
 
 instance Staged ConstantValue where

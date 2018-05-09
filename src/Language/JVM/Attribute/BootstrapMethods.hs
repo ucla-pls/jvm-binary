@@ -41,7 +41,7 @@ methods = unSizedList . methods'
 -- | A bootstraped methods.
 data BootstrapMethod r = BootstrapMethod
   { method :: !(DeepRef MethodHandle r)
-  , arguments :: !(SizedList16 (DeepRef Constant r))
+  , arguments :: !(SizedList16 (Ref JValue r))
   }
 
 instance Staged BootstrapMethods where

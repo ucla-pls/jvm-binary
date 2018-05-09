@@ -150,43 +150,43 @@ instance Binary (StackMapFrame Low) where
 
 -- | The types info of the stack map frame.
 data VerificationTypeInfo r
-  = VTop
-  | VInteger
-  | VFloat
-  | VLong
-  | VDouble
-  | VNull
-  | VUninitializedThis
-  | VObject (Ref ClassName r)
-  | VUninitialized !Word16
+  = VTTop
+  | VTInteger
+  | VTFloat
+  | VTLong
+  | VTDouble
+  | VTNull
+  | VTUninitializedThis
+  | VTObject (Ref ClassName r)
+  | VTUninitialized !Word16
 
 
 instance Binary (VerificationTypeInfo Low) where
   get = do
     tag <- getWord8
     case tag of
-      0 -> pure VTop
-      1 -> pure VInteger
-      2 -> pure VFloat
-      3 -> pure VLong
-      4 -> pure VDouble
-      5 -> pure VNull
-      6 -> pure VUninitializedThis
-      7 -> VObject <$> get
-      8 -> VUninitialized <$> get
+      0 -> pure VTTop
+      1 -> pure VTInteger
+      2 -> pure VTFloat
+      3 -> pure VTLong
+      4 -> pure VTDouble
+      5 -> pure VTNull
+      6 -> pure VTUninitializedThis
+      7 -> VTObject <$> get
+      8 -> VTUninitialized <$> get
       _ -> fail $ "Unexpected tag : '0x" ++ showHex tag "'"
 
   put a = do
     case a of
-      VTop               -> putWord8 0
-      VInteger           -> putWord8 1
-      VFloat             -> putWord8 2
-      VLong              -> putWord8 3
-      VDouble            -> putWord8 4
-      VNull              -> putWord8 5
-      VUninitializedThis -> putWord8 6
-      VObject s          -> do putWord8 7; put s
-      VUninitialized s   -> do putWord8 8; put s
+      VTTop               -> putWord8 0
+      VTInteger           -> putWord8 1
+      VTFloat             -> putWord8 2
+      VTLong              -> putWord8 3
+      VTDouble            -> putWord8 4
+      VTNull              -> putWord8 5
+      VTUninitializedThis -> putWord8 6
+      VTObject s          -> do putWord8 7; put s
+      VTUninitialized s   -> do putWord8 8; put s
 
 instance ByteCodeStaged StackMapTable where
   evolveBC f (StackMapTable ls) =
@@ -246,12 +246,12 @@ instance Staged StackMapFrameType where
 instance Staged VerificationTypeInfo where
   devolve x =
     case x of
-      VObject a -> VObject <$> unlink a
+      VTObject a -> VTObject <$> unlink a
       a         -> return $ unsafeCoerce a
 
   evolve x =
     case x of
-      VObject a -> VObject <$> link a
+      VTObject a -> VTObject <$> link a
       a         -> return $ unsafeCoerce a
 
 

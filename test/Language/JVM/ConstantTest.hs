@@ -119,3 +119,6 @@ instance Arbitrary (AbsVariableMethodId High) where
 
 instance Arbitrary (InvokeDynamic High) where
   arbitrary = InvokeDynamic <$> arbitrary <*> arbitrary
+
+instance Arbitrary JValue where
+  arbitrary = genericArbitraryU

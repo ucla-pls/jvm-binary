@@ -65,15 +65,13 @@ instance Arbitrary (StackMapFrameType High) where
 
 instance Arbitrary (VerificationTypeInfo High) where
   arbitrary = oneof
-    [ pure VTop
-    , pure VInteger
-    , pure VTop
-    , pure VInteger
-    , pure VFloat
-    , pure VLong
-    , pure VDouble
-    , pure VNull
-    , pure VUninitializedThis
-    , VObject <$> arbitrary
-    , VUninitialized <$> arbitrary
+    [ pure VTTop
+    , pure VTInteger
+    , pure VTFloat
+    , pure VTLong
+    , pure VTDouble
+    , pure VTNull
+    , pure VTUninitializedThis
+    , VTObject <$> arbitrary
+    , VTUninitialized <$> arbitrary
     ]
