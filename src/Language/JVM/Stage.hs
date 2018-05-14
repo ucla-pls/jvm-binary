@@ -24,15 +24,26 @@ module Language.JVM.Stage
   , Choice
   ) where
 
-import Data.Binary
+import Data.Word
 
+-- | Any data structure that is in the low stage should be serializable using
+-- the binary library.
 data Low
+
+-- | Any data structure in the 'High' stage, is easier to read.
 data High
 
-type family Choice r a b
-type instance Choice High a b = b
-type instance Choice Low a b = a
-type Ref v r = Choice r Index v
+-- | The basic part of the stage system is the choice. The 'Choice' chooses
+-- between two types depending on the stage.
+type family Choice a b r
+type instance Choice a b High = b
+type instance Choice a b Low = a
+
+-- | An index into the constant pool.
 type Index = Word16
 
+-- | A reference is a choice between an index and a value.
+type Ref v r = Choice Index v r
+
+-- | A deep reference points to something that itself is staged.
 type DeepRef v r = Ref (v r) r

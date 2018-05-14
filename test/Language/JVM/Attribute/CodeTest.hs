@@ -25,11 +25,22 @@ prop_roundtrip_Code = isoRoundtrip
 -- prop_roundtrip_ByteCode :: ByteCode High -> Property
 -- prop_roundtrip_ByteCode = isoRoundtrip
 
--- prop_roundtrip_ExceptionTable :: ExceptionTable High -> Property
--- prop_roundtrip_ExceptionTable = isoRoundtrip
+prop_roundtrip_ExceptionTable :: ExceptionTable High -> Property
+prop_roundtrip_ExceptionTable = isoByteCodeRoundtrip
 
--- prop_roundtrip_ByteCodeOpr :: ByteCodeOpr High -> Property
--- prop_roundtrip_ByteCodeOpr = isoRoundtrip
+prop_roundtrip_ByteCodeInst :: ByteCodeInst High -> Property
+prop_roundtrip_ByteCodeInst = isoByteCodeRoundtrip
+
+
+spec_ByteCode_examples :: SpecWith ()
+spec_ByteCode_examples = do
+  it "can round trip 'push (i127)'" $ do
+    let opr = ByteCodeInst 0 (Push (Just (VInteger 127)))
+    (snd <$> byteCodeRoundtrip opr) `shouldBe` Right opr
+
+  it "can round trip 'push (i-129)'" $ do
+    let opr = ByteCodeInst 0 (Push (Just (VInteger (-129))))
+    (snd <$> byteCodeRoundtrip opr) `shouldBe` Right opr
 
 instance Arbitrary (Code High) where
   arbitrary = do
@@ -56,10 +67,18 @@ arbitraryRef i =
 instance Arbitrary (CodeAttributes High) where
   arbitrary = genericArbitraryU
 
+instance Arbitrary (ExceptionTable High) where
+  arbitrary =
+    ExceptionTable <$> arbitraryRef 0xffff <*> arbitraryRef 0xffff <*> arbitraryRef 0xffff <*> arbitrary
+
 instance Arbitrary (ByteCode High) where
   arbitrary = do
     s <- getSize
     ByteCode . V.fromList <$> vectorOf s (genByteCodeOpr s)
+
+instance Arbitrary (ByteCodeInst High) where
+  arbitrary =
+    ByteCodeInst <$> pure 0 <*> genByteCodeOpr 0xffff
 
 instance Arbitrary ArithmeticType where
   arbitrary = elements [ MInt, MLong, MFloat, MDouble ]
@@ -142,7 +161,7 @@ instance Arbitrary CmpOpr where
 instance Arbitrary FieldAccess where
   arbitrary = genericArbitrary uniform
 
-instance Arbitrary (Invokation High) where
+instance Arbitrary (Invocation High) where
   arbitrary =
     oneof
     [ InvkSpecial <$> arbitrary

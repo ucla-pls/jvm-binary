@@ -20,6 +20,7 @@ module Language.JVM.Attribute.Base
 
   -- * Helpers
   , IsAttribute (..)
+  , Attributes
   , fromAttributes
   , toC
   , toC'
@@ -65,6 +66,8 @@ instance Staged Attribute where
 
 $(deriveBaseWithBinary ''Attribute)
 
+-- | A list of attributes and described by the expected values.
+type Attributes b r = Choice (SizedList16 (Attribute r)) (b r) r
 
 -- | Create a type dependent on another type 'b',
 -- used for accessing the correct 'attrName' in 'IsAttribute'.

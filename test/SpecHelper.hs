@@ -1,3 +1,4 @@
+
 module SpecHelper
   ( module Test.Tasty
   , module Test.Hspec.Expectations.Pretty
@@ -8,19 +9,22 @@ module SpecHelper
   , blReadFile
   , isoBinary
   , isoRoundtrip
+  , isoByteCodeRoundtrip
+  , byteCodeRoundtrip
   , testAllFiles
   , hexStringS
   , hexString
   , Spec
   , SpecWith
   , it
+  , xit
   , describe
   ) where
 
 import Test.Hspec.Expectations.Pretty
 
 import Test.Tasty
-import Test.Tasty.Hspec
+import Test.Tasty.Hspec hiding (shouldBe)
 import Test.Tasty.QuickCheck
 import qualified Test.QuickCheck.Property as P
 import qualified Data.ByteString.Lazy as BL
@@ -37,6 +41,7 @@ import Data.Binary
 import Data.Bits
 import qualified Data.List as List
 
+import Language.JVM.ByteCode
 import Language.JVM.Utils
 import Language.JVM.Staged
 import Language.JVM.ClassFileReader
@@ -59,8 +64,8 @@ testAllFiles spec = do
     testSpec file $ spec bs
   where
     isClass p =
-      takeExtension p == ".class" &&
-      p /= "test/data/SQLite.class"
+      takeExtension p == ".class"
+      -- && p /= "test/data/SQLite.class"
 
 
 -- testSomeFiles :: SpecWith BL.ByteString -> IO [TestTree]
@@ -109,6 +114,27 @@ isoRoundtrip a =
       cp' <- first show $ bootstrapConstantPool cp
       a3 <- first show $ runEvolve cp' (evolve a'')
       return (bs, a3)
+
+-- | Test that a value can go from the Highest state to binary and back again
+-- without losing data.
+isoByteCodeRoundtrip ::
+  (ByteCodeStaged a, Eq (a High), Show (a High), Binary (a Low))
+  => (a High) -> Property
+isoByteCodeRoundtrip a =
+  case byteCodeRoundtrip a of
+    Right (_, a') ->
+      a' === a
+    Left msg -> property $ P.failed { P.reason = msg }
+  where
+
+byteCodeRoundtrip :: (ByteCodeStaged s, Binary (s Low)) => s High -> Either String (BL.ByteString, s High)
+byteCodeRoundtrip a1 = do
+  let (a', CPBuilder _ cp) = runConstantPoolBuilder (devolveBC (return . fromIntegral) a1) cpbEmpty
+  let bs = encode a'
+  a'' <- bimap trd trd $ decodeOrFail bs
+  cp' <- first show $ bootstrapConstantPool cp
+  a3 <- first show $ runEvolve cp' (evolveBC (return . fromIntegral) a'')
+  return (bs, a3)
 
 folderContents :: FilePath -> IO [ FilePath ]
 folderContents fp =

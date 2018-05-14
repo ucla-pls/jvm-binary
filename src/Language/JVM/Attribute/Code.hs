@@ -47,7 +47,7 @@ data Code r = Code
   , codeMaxLocals      :: !(Word16)
   , codeByteCode       :: !((ByteCode r))
   , codeExceptionTable :: !(SizedList16 (ExceptionTable r))
-  , codeAttributes     :: !(Choice r (SizedList16 (Attribute r)) (CodeAttributes r))
+  , codeAttributes     :: !(Attributes CodeAttributes r)
   }
 
 data ExceptionTable r = ExceptionTable
@@ -66,7 +66,7 @@ codeByteCodeOprs =
   unByteCode . codeByteCode
 
 -- | Extracts a list of bytecode instructions
-codeByteCodeInsts :: Code Low -> V.Vector ByteCodeInst
+codeByteCodeInsts :: Code Low -> V.Vector (ByteCodeInst Low)
 codeByteCodeInsts =
   unByteCode . codeByteCode
 

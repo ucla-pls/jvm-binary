@@ -44,7 +44,7 @@ module Language.JVM.ByteCode
   , switchHigh
 
   , FieldAccess (..)
-  , Invokation (..)
+  , Invocation (..)
 
   -- * Operations
   , BinOpr (..)
@@ -92,7 +92,7 @@ import           Language.JVM.Staged
 -- annotated with the byte code offsets.
 newtype ByteCode i = ByteCode
   { unByteCode ::
-      V.Vector (Choice i ByteCodeInst (ByteCodeOpr High))
+      V.Vector (Choice (ByteCodeInst Low) (ByteCodeOpr High) i)
   }
 
 -- | The offset in the byte code
@@ -103,7 +103,7 @@ type ByteCodeIndex = Int
 
 -- | A ByteCode reference is either byte code offset in the
 -- low stage, and a byte code index in the high state
-type ByteCodeRef i  = Choice i ByteCodeOffset ByteCodeIndex
+type ByteCodeRef i  = Choice ByteCodeOffset ByteCodeIndex i
 
 -- | The offset map, maps offset to instruction ids.
 type OffsetMap = IM.IntMap ByteCodeIndex
@@ -165,24 +165,27 @@ indexOffset' c i = c V.!? i
 
 -- | The byte code instruction is mostly used to succinctly read and
 -- write an bytecode instruction from a bytestring.
-data ByteCodeInst = ByteCodeInst
+data ByteCodeInst r = ByteCodeInst
   { offset :: !(ByteCodeOffset)
-  , opcode :: !(ByteCodeOpr Low)
+  , opcode :: !(ByteCodeOpr r)
   }
+
+(...) :: (b -> c) -> (a1 -> a2 -> b) -> a1 -> a2 -> c
+(...) = (.) . (.)
 
 evolveByteCode :: EvolveM m => ByteCode Low -> m (OffsetMap, ByteCode High)
 evolveByteCode bc = do
   let om = offsetMap bc
-  (om,) . ByteCode <$> V.mapM (evolveByteCodeOpr (evolveOffset om)) (unByteCode bc)
+  (om,) . ByteCode <$> V.mapM (fmap opcode . evolveByteCodeInst (evolveOffset om)) (unByteCode bc)
 
 devolveByteCode :: DevolveM m => ByteCode High -> m (ByteCode Low)
-devolveByteCode (ByteCode bc)= do
+devolveByteCode (ByteCode bc) = do
   -- Devolving byte code is not straight forward.
   offsets <- V.fromList . reverse . snd <$> V.foldM' acc (0,[]) bc
-  ByteCode <$> V.zipWithM (devolveByteCodeOpr (devolveOffset' offsets)) offsets bc
+  ByteCode <$> V.zipWithM (devolveByteCodeInst (devolveOffset' offsets) ... ByteCodeInst) offsets bc
   where
     acc (off, lst) opr = do
-      inst <- devolveByteCodeOpr (const $ return 0) off opr
+      inst <- devolveByteCodeInst (const $ return 0) (ByteCodeInst off opr)
       let o = off + byteSize inst
       return (o, off:lst)
 
@@ -199,18 +202,22 @@ class ByteCodeStaged s where
     -> s High
     -> m (s Low)
 
-byteSize :: ByteCodeInst -> Word16
+byteSize :: ByteCodeInst Low -> Word16
 byteSize inst =
   fromIntegral . BL.length . runPut $ putByteCode (offset inst) (opcode inst)
 
-evolveByteCodeOpr ::
+instance ByteCodeStaged ByteCodeInst where
+  evolveBC = evolveByteCodeInst
+  devolveBC = devolveByteCodeInst
+
+evolveByteCodeInst ::
   EvolveM m
   => (ByteCodeOffset -> m ByteCodeIndex)
-  -> ByteCodeInst
-  -> m (ByteCodeOpr High)
-evolveByteCodeOpr g (ByteCodeInst ofs opr) = do
-  case opr of
-    Push c            -> label "Push" $ Push <$> evolve c
+  -> ByteCodeInst Low
+  -> m (ByteCodeInst High)
+evolveByteCodeInst g (ByteCodeInst ofs opr) = do
+  x <- case opr of
+    Push c            -> label "Push" $ Push <$> evolveBConstant c
     Get fa r          -> label "Get" $ Get fa <$> link r
     Put fa r          -> label "Put" $ Put fa <$> link r
     Invoke r          -> label "Invoke" $ Invoke <$> evolve r
@@ -226,20 +233,19 @@ evolveByteCodeOpr g (ByteCodeInst ofs opr) = do
     TableSwitch i (SwitchTable l ofss) ->
       label "TableSwitch" $ (TableSwitch i . SwitchTable l <$> V.mapM calcOffset ofss)
     a                 -> return $ unsafeCoerce a
+  return (ByteCodeInst ofs x)
   where
     calcOffset r =
       g (fromIntegral $ fromIntegral ofs + r)
 
-
-devolveByteCodeOpr ::
+devolveByteCodeInst ::
   DevolveM m
   => (ByteCodeIndex -> m ByteCodeOffset)
-  -> ByteCodeOffset
-  -> ByteCodeOpr High
-  -> m ByteCodeInst
-devolveByteCodeOpr g ofs opr =
+  -> ByteCodeInst High
+  -> m (ByteCodeInst Low)
+devolveByteCodeInst g (ByteCodeInst ofs opr) =
   ByteCodeInst ofs <$> case opr of
-    Push c            -> label "Push" $ Push <$> devolve c
+    Push c            -> label "Push" $ Push <$> devolveBConstant c
     Get fa r          -> label "Get" $ Get fa <$> unlink r
     Put fa r          -> label "Put" $ Put fa <$> unlink r
     Invoke r          -> label "Invoke" $ Invoke <$> devolve r
@@ -260,7 +266,7 @@ devolveByteCodeOpr g ofs opr =
       x <- g r
       return (fromIntegral x - fromIntegral ofs)
 
-instance Staged Invokation where
+instance Staged Invocation where
   evolve i =
     case i of
       InvkSpecial r     -> label "InvkSpecial" $ InvkSpecial <$> link r
@@ -289,17 +295,6 @@ instance Staged ExactArrayType where
       a       -> return $ unsafeCoerce a
 
 
-instance Staged CConstant where
-  evolve x =
-    case x of
-      CRef w r -> label "Ref" $ CRef w <$> link r
-      a        -> return $ unsafeCoerce a
-
-  devolve x =
-    case x of
-      CRef w r -> label "Ref" $ CRef w <$> unlink r
-      a        -> return $ unsafeCoerce a
-
 instance Binary (ByteCode Low) where
   get = do
     x <- getWord32be
@@ -320,18 +315,18 @@ instance Binary (ByteCode Low) where
     putWord32be (fromIntegral $ BL.length bs)
     putLazyByteString bs
 
-instance Binary (ByteCodeInst) where
+instance Binary (ByteCodeInst Low) where
   get =
     ByteCodeInst <$> (fromIntegral <$> bytesRead) <*> get
   put x =
     putByteCode (offset x) $ opcode x
 
 -- | A short relative bytecode ref is defined in correspondence with the
-type ShortRelativeRef i = Choice i Int16 ByteCodeIndex
+type ShortRelativeRef i = Choice Int16 ByteCodeIndex i
 
 -- | A Long relative reference. The only reason this exist because
 -- the signed nature of int, looses a bit.
-type LongRelativeRef i = Choice i Int32 ByteCodeIndex
+type LongRelativeRef i = Choice Int32 ByteCodeIndex i
 
 data ArithmeticType = MInt | MLong | MFloat | MDouble
   deriving (Show, Ord, Eq, Enum, Bounded, Generic, NFData)
@@ -351,7 +346,7 @@ data ExactArrayType r
   = EABoolean | EAByte | EAChar | EAShort | EAInt | EALong
   | EAFloat | EADouble | EARef (Ref ClassName r)
 
-data Invokation r
+data Invocation r
   = InvkSpecial (DeepRef AbsVariableMethodId r)
   -- ^ Variable since 52.0
   | InvkVirtual (DeepRef AbsMethodId r)
@@ -370,6 +365,71 @@ data OneOrTwo = One | Two
   deriving (Show, Ord, Bounded, Eq, Enum, Generic, NFData)
 
 type WordSize = OneOrTwo
+
+
+evolveBConstant :: EvolveM m => BConstant Low -> m (BConstant High)
+evolveBConstant ccnst = do
+  x <- evolve ccnst
+  return $ case x of
+    CNull    -> Nothing
+    CIntM1   -> Just $ VInteger (-1)
+    CInt0    -> Just $ VInteger 0
+    CInt1    -> Just $ VInteger 1
+    CInt2    -> Just $ VInteger 2
+    CInt3    -> Just $ VInteger 3
+    CInt4    -> Just $ VInteger 4
+    CInt5    -> Just $ VInteger 5
+    CLong0   -> Just $ VLong 0
+    CLong1   -> Just $ VLong 1
+    CFloat0  -> Just $ VFloat 0
+    CFloat1  -> Just $ VFloat 1
+    CFloat2  -> Just $ VFloat 2
+    CDouble0 -> Just $ VDouble 0
+    CDouble1 -> Just $ VDouble 1
+    CByte i  -> Just $ VInteger (fromIntegral i)
+    CShort i -> Just $ VInteger (fromIntegral i)
+    CRef _ r -> Just $ r
+
+devolveBConstant :: DevolveM m =>  BConstant High -> m (BConstant Low)
+devolveBConstant x = do
+  devolve v
+  where
+    v :: CConstant High
+    v = case x of
+      Nothing -> CNull
+      Just x' -> case x' of
+        VInteger i ->
+          case i of
+            (-1) -> CIntM1; 0 -> CInt0; 1 -> CInt1; 2 -> CInt2; 3 -> CInt3; 4 -> CInt4; 5 -> CInt5;
+            i | -128 <= i && i <= 127      -> CByte (fromIntegral i)
+              | -32768 <= i && i <= 32767 -> CShort (fromIntegral i)
+              | otherwise -> CRef Nothing x'
+        VLong 0                           -> CLong0
+        VLong 1                           -> CLong1
+        VFloat 0                          -> CFloat0
+        VFloat 1                          -> CFloat1
+        VFloat 2                          -> CFloat2
+        VDouble 0                         -> CDouble0
+        VDouble 1                         -> CDouble1
+        VDouble _                         -> CRef (Just Two) x'
+        VLong _                           -> CRef (Just Two) x'
+        _                                 -> CRef Nothing x'
+
+
+-- | A Wrapper around CConstant.
+type BConstant r = Choice (CConstant r) (Maybe JValue) r
+
+instance Staged CConstant where
+  evolve x =
+    case x of
+      CRef w r -> label "Ref" $ CRef w <$> link r
+      a        -> return $ unsafeCoerce a
+
+  devolve x =
+    case x of
+      CRef w r -> label "Ref" $ CRef w <$> unlink r
+      a        -> return $ unsafeCoerce a
+
 
 data CConstant r
   = CNull
@@ -450,7 +510,7 @@ data ByteCodeOpr r
   | ArrayStore ArrayType
   -- ^ aastore bastore ...
 
-  | Push (CConstant r)
+  | Push (BConstant r)
 
   | Load LocalType LocalAddress
   -- ^ aload_0, bload_2, iload 5 ...
@@ -497,7 +557,7 @@ data ByteCodeOpr r
   | Get FieldAccess (DeepRef (InClass FieldId) r)
   | Put FieldAccess (DeepRef (InClass FieldId) r)
 
-  | Invoke (Invokation r)
+  | Invoke (Invocation r)
 
   | New (Ref ClassName r)
 
@@ -529,8 +589,6 @@ data ByteCodeOpr r
   | DupX2 WordSize
 
   | Swap
-
--- deriving (Eq, Generic, NFData)
 
 
 instance Binary (ByteCodeOpr Low) where
@@ -1250,14 +1308,9 @@ putByteCode n bc =
 
 
 $(deriveBase ''ByteCode)
--- $(deriveBase ''ByteCodeInst)
+$(deriveBase ''ByteCodeInst)
 $(deriveBase ''ByteCodeOpr)
 $(deriveBase ''SwitchTable)
-$(deriveBase ''Invokation)
+$(deriveBase ''Invocation)
 $(deriveBase ''CConstant)
 $(deriveBase ''ExactArrayType)
-deriving instance (Show ByteCodeInst)
-deriving instance (Eq ByteCodeInst)
-deriving instance (Ord ByteCodeInst)
-deriving instance (NFData ByteCodeInst)
-deriving instance (Generic ByteCodeInst)

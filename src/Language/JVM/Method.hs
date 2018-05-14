@@ -40,10 +40,10 @@ import           Language.JVM.Utils
 -- | A Method in the class-file, as described
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.6).
 data Method r = Method
-  { mAccessFlags'    :: !(BitSet16 MAccessFlag)
-  , mName :: !(Ref Text.Text r)
-  , mDescriptor :: !(Ref MethodDescriptor r)
-  , mAttributes      :: !(Choice r (SizedList16 (Attribute r)) (MethodAttributes r))
+  { mAccessFlags' :: !(BitSet16 MAccessFlag)
+  , mName         :: !(Ref Text.Text r)
+  , mDescriptor   :: !(Ref MethodDescriptor r)
+  , mAttributes   :: !(Attributes MethodAttributes r)
   }
 
 -- | Unpack the BitSet and get the AccessFlags as a Set.

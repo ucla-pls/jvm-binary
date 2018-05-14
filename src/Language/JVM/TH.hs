@@ -2,6 +2,15 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-|
+Module      : Language.JVM.TH
+Copyright   : (c) Christian Gram Kalhauge, 2018
+License     : MIT
+Maintainer  : kalhuage@cs.ucla.edu
+
+This module contains some Template Haskell functions for internal use.
+-}
+
 module Language.JVM.TH
   ( deriveBase
   , deriveBases
@@ -34,6 +43,7 @@ deriveBase name =
   ]
   where n = conT name
 
+-- | Derives the bases of a list of names
 deriveBases :: [Name] -> Q [Dec]
 deriveBases names =
   concat <$> mapM deriveBase names

@@ -50,11 +50,11 @@ instance IsAttribute (StackMapTable Low) where
 -- | An Exceptions attribute is a list of references into the
 -- constant pool.
 newtype StackMapTable r = StackMapTable
-  { stackMapTable :: Choice r (SizedList16 (StackMapFrame Low)) [StackMapFrame High]
+  { stackMapTable :: Choice (SizedList16 (StackMapFrame Low)) [StackMapFrame High] r
   }
 
 -- | A delta offset
-type DeltaOffset i = Choice i Word16 Int
+type DeltaOffset i = Choice Word16 Int i
 
 -- | An stack map frame
 data StackMapFrame r = StackMapFrame

@@ -48,7 +48,7 @@ data ClassFile r = ClassFile
   , cMinorVersion :: !Word16
   , cMajorVersion :: !Word16
 
-  , cConstantPool :: !(Choice r (ConstantPool r) ())
+  , cConstantPool :: !(Choice (ConstantPool r) () r)
 
   , cAccessFlags' :: !(BitSet16 CAccessFlag)
 
@@ -58,7 +58,7 @@ data ClassFile r = ClassFile
   , cInterfaces   :: !(SizedList16 (Ref ClassName r))
   , cFields'      :: !(SizedList16 (Field r))
   , cMethods'     :: !(SizedList16 (Method r))
-  , cAttributes   :: !(Choice r (SizedList16 (Attribute r)) (ClassAttributes r))
+  , cAttributes   :: !(Attributes ClassAttributes r)
   }
 
 -- | Get the set of access flags
@@ -138,7 +138,7 @@ instance Staged ClassFile where
     ca' <- fromClassAttributes $ cAttributes cf
     return $ cf
       { cConstantPool       = CP.empty
-      -- ^ We cannot yet set the constant pool
+      -- We cannot yet set the constant pool
       , cThisClass = tci'
       , cSuperClass = sci'
       , cInterfaces  = cii'

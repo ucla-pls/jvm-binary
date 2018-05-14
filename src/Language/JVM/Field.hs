@@ -37,7 +37,7 @@ data Field r = Field
   { fAccessFlags'    :: !(BitSet16 FAccessFlag)
   , fName  :: !(Ref Text.Text r)
   , fDescriptor :: !(Ref FieldDescriptor r)
-  , fAttributes      :: !(Choice r (SizedList16 (Attribute r)) (FieldAttributes r))
+  , fAttributes      :: !(Attributes FieldAttributes r)
   }
 
 -- | Get the set of access flags

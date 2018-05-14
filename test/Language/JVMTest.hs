@@ -86,8 +86,8 @@ test_reading_classfile = testAllFiles $ \bs -> do
       (IM.size . unConstantPool $ cConstantPool d') `shouldSatisfy`
         (<= (IM.size . unConstantPool $ cConstantPool cls))
 
-    it "is the same when devolving with the original constant pool" $
-      devolveClassFile' (cConstantPool cls) x `shouldMatchClass'` cls
+    -- it "is the same when devolving with the original constant pool" $
+    --   devolveClassFile' (cConstantPool cls) x `shouldMatchClass'` cls
 
     it "can do full read - write - read process" $ do
       let w  = writeClassFile' (cConstantPool cls) x
