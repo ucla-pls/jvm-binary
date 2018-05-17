@@ -89,13 +89,13 @@ instance Arbitrary (Constant High) where
         , CInvokeDynamic <$> arbitrary
         ]
 
-instance (Arbitrary (a High)) => Arbitrary (InClass a High) where
+instance (Arbitrary a) => Arbitrary (InClass a High) where
   arbitrary = InClass <$> arbitrary <*> arbitrary
 
-instance Arbitrary (FieldId High) where
+instance Arbitrary (FieldId) where
   arbitrary = FieldId <$> arbitrary <*> arbitrary
 
-instance Arbitrary (MethodId High) where
+instance Arbitrary (MethodId) where
   arbitrary = MethodId <$> arbitrary <*> arbitrary
 
 instance Arbitrary (MethodHandle High) where

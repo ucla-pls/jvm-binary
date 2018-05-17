@@ -90,14 +90,14 @@ instance Staged InvokeDynamic where
   devolve (InvokeDynamic w ref) =
     InvokeDynamic w <$> unlink ref
 
-instance Staged MethodId where
-  evolve (MethodId n d) =
-    MethodId <$> link n <*> link d
+-- instance Staged MethodId where
+--   evolve (MethodId n d) =
+--     MethodId <$> link n <*> link d
 
-  devolve (MethodId n d) =
-    MethodId <$> unlink n <*> unlink d
+--   devolve (MethodId n d) =
+--     MethodId <$> unlink n <*> unlink d
 
-instance Referenceable (r High) => Staged (InClass r) where
+instance Referenceable r => Staged (InClass r) where
   evolve (InClass cn cid) =
     InClass <$> link cn <*> link cid
   devolve (InClass cn cid) =

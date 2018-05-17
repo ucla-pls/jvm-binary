@@ -96,23 +96,24 @@ data Constant r
 -- | Anything pointing inside a class
 data InClass a r = InClass
   { inClassName :: !(Ref ClassName r)
-  , inClassId   :: !(DeepRef a r)
+  , inClassId   :: !(Ref a r)
   }
 
 -- | A method identifier
-data MethodId r = MethodId
-  { methodIdName       :: !(Ref Text.Text r)
-  , methodIdDescriptor :: !(Ref MethodDescriptor r)
-  }
+data MethodId = MethodId
+  { methodIdName       :: !Text.Text
+  , methodIdDescriptor :: !MethodDescriptor
+  } deriving (Show, Eq, Ord, Generic, NFData)
+
 
 -- | A method id in a class.
 type AbsMethodId = InClass MethodId
 
 -- | A field identifier
-data FieldId r = FieldId
-  { fieldIdName       :: !(Ref Text.Text r)
-  , fieldIdDescriptor :: !(Ref FieldDescriptor r)
-  } -- deriving (Show, Eq, Ord, Generic, NFData)
+data FieldId = FieldId
+  { fieldIdName       :: ! Text.Text
+  , fieldIdDescriptor :: ! FieldDescriptor
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 -- | A field id in a class
 type AbsFieldId = InClass FieldId
@@ -122,7 +123,7 @@ newtype AbsInterfaceMethodId r = AbsInterfaceMethodId
   { interfaceMethodId :: InClass MethodId r
   }
 
-fieldIdToText :: FieldId High -> Text.Text
+fieldIdToText :: FieldId -> Text.Text
 fieldIdToText fid =
   Text.concat
   [ fieldIdName fid
@@ -130,7 +131,7 @@ fieldIdToText fid =
   , fieldDescriptorToText $ fieldIdDescriptor fid
   ]
 
-methodIdToText :: MethodId High -> Text.Text
+methodIdToText :: MethodId -> Text.Text
 methodIdToText fid =
   Text.concat
   [ methodIdName fid
@@ -177,7 +178,7 @@ data MethodHandleInterface r = MethodHandleInterface
 
 data InvokeDynamic r = InvokeDynamic
   { invokeDynamicAttrIndex :: !Word16
-  , invokeDynamicMethod    :: !(DeepRef MethodId r)
+  , invokeDynamicMethod    :: !(Ref MethodId r)
   }
 
 -- | Hack that returns the name of a constant.
@@ -302,7 +303,7 @@ instance Referenceable (Constant High) where
   fromConst _ a = return a
   toConst a = return a
 
-instance Referenceable (MethodId High) where
+instance Referenceable (MethodId) where
   fromConst err (CNameAndType rn txt) = do
     md <- either err return $ methodDescriptorFromText txt
     return $ MethodId rn md
@@ -311,7 +312,7 @@ instance Referenceable (MethodId High) where
   toConst (MethodId rn md) =
     return $ CNameAndType rn (methodDescriptorToText md)
 
-instance Referenceable (FieldId High) where
+instance Referenceable (FieldId) where
   fromConst err (CNameAndType rn txt) = do
     md <- either err return $ fieldDescriptorFromText txt
     return $ FieldId rn md
@@ -436,13 +437,14 @@ badEncoding :: String -> BS.ByteString -> String
 badEncoding str bs =
   "Could not encode '" ++ str ++ "': " ++ show bs
 
+-- $(deriveBaseWithBinary ''MethodId)
+-- $(deriveBaseWithBinary ''FieldId)
+
 $(deriveBase ''Constant)
 $(deriveBase ''MethodHandle)
 $(deriveBase ''MethodHandleField)
 $(deriveBase ''MethodHandleMethod)
 $(deriveBase ''MethodHandleInterface)
-$(deriveBaseWithBinary ''MethodId)
-$(deriveBaseWithBinary ''FieldId)
 $(deriveBaseWithBinary ''InvokeDynamic)
 
 $(deriveBaseWithBinary ''AbsMethodId)

@@ -48,8 +48,10 @@ import           Prelude              hiding (takeWhile)
 -- | A class name
 newtype ClassName = ClassName
   { classNameAsText :: Text.Text
-  } deriving (Show, Eq, Ord, Generic, NFData)
+  } deriving (Eq, Ord, Generic, NFData)
 
+instance Show ClassName where
+  show = show . classNameAsText
 
 -- | Wrapper method that converts a string representation of a class into
 -- a class. 
