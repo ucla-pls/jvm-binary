@@ -42,3 +42,9 @@ instance Arbitrary MethodDescriptor where
 
 instance Arbitrary FieldDescriptor where
   arbitrary = genericArbitrary uniform
+
+instance Arbitrary t => Arbitrary (NameAndType t) where
+  arbitrary =
+    NameAndType
+    <$> elements ["a", "f", "x", "y"]
+    <*> arbitrary

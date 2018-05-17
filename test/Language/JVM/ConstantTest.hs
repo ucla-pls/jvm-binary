@@ -93,10 +93,10 @@ instance (Arbitrary a) => Arbitrary (InClass a High) where
   arbitrary = InClass <$> arbitrary <*> arbitrary
 
 instance Arbitrary (FieldId) where
-  arbitrary = FieldId <$> arbitrary <*> arbitrary
+  arbitrary = FieldId <$> arbitrary
 
 instance Arbitrary (MethodId) where
-  arbitrary = MethodId <$> arbitrary <*> arbitrary
+  arbitrary = MethodId <$> arbitrary
 
 instance Arbitrary (MethodHandle High) where
   arbitrary =

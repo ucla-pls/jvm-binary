@@ -4,11 +4,12 @@ Copyright   : (c) Christian Gram Kalhauge, 2018
 License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
 
-This module contains the 'JType', 'ClassName', 'MethodDescriptor', and 'FieldDescriptor'.
+This module contains the 'JType', 'ClassName', 'MethodDescriptor', and
+'FieldDescriptor'.
 -}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric  #-}
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveGeneric        #-}
+{-# LANGUAGE OverloadedStrings    #-}
 module Language.JVM.Type
   (
   -- * Base types
@@ -20,22 +21,18 @@ module Language.JVM.Type
   -- ** JType
   , JType (..)
   , JBaseType (..)
-  , jTypeFromText
-  , jTypeToText
-  , parseJType
 
-  -- * MethodDescriptor
+  -- ** MethodDescriptor
   , MethodDescriptor (..)
-  , methodDescriptorFromText
-  , methodDescriptorToText
-  , parseMethodDescriptor
 
-  -- * FieldDescriptor
+  -- ** FieldDescriptor
   , FieldDescriptor (..)
-  , fieldDescriptorFromText
-  , fieldDescriptorToText
-  , parseFieldDescriptor
 
+  -- ** NameAndType
+  , NameAndType (..)
+  , (<:>)
+
+  , TypeParse (..)
   ) where
 
 import           Control.DeepSeq      (NFData)
@@ -54,11 +51,11 @@ instance Show ClassName where
   show = show . classNameAsText
 
 -- | Wrapper method that converts a string representation of a class into
--- a class. 
+-- a class.
 strCls :: String -> ClassName
 strCls = dotCls . Text.pack
 
--- | Takes the dot representation and converts it into a class. 
+-- | Takes the dot representation and converts it into a class.
 dotCls :: Text.Text -> ClassName
 dotCls = ClassName . Text.intercalate "/" . Text.splitOn "."
 
@@ -81,50 +78,6 @@ data JType
   | JTArray JType
   deriving (Show, Eq, Ord, Generic, NFData)
 
--- | Parse a JType
-parseJType :: Parser JType
-parseJType = try $ do
-  s <- anyChar
-  case s :: Char of
-    'B' -> return $ JTBase JTByte
-    'C' -> return $ JTBase JTChar
-    'D' -> return $ JTBase JTDouble
-    'F' -> return $ JTBase JTFloat
-    'I' -> return $ JTBase JTInt
-    'J' -> return $ JTBase JTLong
-    'L' -> do
-      txt <- takeWhile (/= ';')
-      _ <- char ';'
-      return $ JTClass (ClassName txt)
-    'S' -> return $ JTBase JTShort
-    'Z' -> return $ JTBase JTBoolean
-    '[' -> JTArray <$> parseJType
-    _ -> fail $ "Unknown char " ++ show s
-
--- | Read a method descriptor from `Text.Text`
-jTypeFromText :: Text.Text -> Either String JType
-jTypeFromText = parseOnly parseJType
-
--- | Converts a 'JType' into 'Text.Text'. It follows the scheme of
--- the jvm descriptor <https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.3>.
-jTypeToText :: JType -> Text.Text
-jTypeToText tp =
-  Text.pack $ go tp ""
-  where
-    go x =
-      case x of
-        JTBase JTByte -> ('B':)
-        JTBase JTChar -> ('C':)
-        JTBase JTDouble -> ('D':)
-        JTBase JTFloat -> ('F':)
-        JTBase JTInt -> ('I':)
-        JTBase JTLong -> ('J':)
-        JTClass (ClassName cn) -> ((('L':Text.unpack cn) ++ ";") ++)
-        JTBase JTShort -> ('S':)
-        JTBase JTBoolean -> ('Z':)
-        JTArray tp' -> ('[':) . go tp'
-
-
 -- | Method Descriptor
 data MethodDescriptor = MethodDescriptor
   { methodDescriptorArguments  :: [JType]
@@ -136,55 +89,106 @@ newtype FieldDescriptor = FieldDescriptor
   { fieldDescriptorType :: JType
   } deriving (Show, Ord, Eq, Generic, NFData)
 
--- | Convert a 'MethodDescriptor' to 'Text.Text'
-methodDescriptorToText :: MethodDescriptor -> Text.Text
-methodDescriptorToText md =
-  Text.concat $
-    ["("] ++ map jTypeToText (methodDescriptorArguments md)
-    ++ [")", case methodDescriptorReturnType md of
-               Just x -> jTypeToText x
-               Nothing -> "V"
-           ]
+-- | A name and a type
+data NameAndType a = NameAndType
+  { ntName       :: Text.Text
+  , ntDescriptor :: a
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
--- | Convert a 'FieldDescriptor' to 'Text.Text'
-fieldDescriptorToText :: FieldDescriptor -> Text.Text
-fieldDescriptorToText (FieldDescriptor jtp) =
-  jTypeToText jtp
+(<:>) :: Text.Text -> a -> NameAndType a
+(<:>) = NameAndType
 
--- | Parse a method descriptor
-parseMethodDescriptor :: Parser MethodDescriptor
-parseMethodDescriptor = do
-  _ <- char '('
-  args <- many' parseJType <?> "method arguments"
-  _ <- char ')'
-  returnType <- choice
-    [ char 'V' >> return Nothing
-    , Just <$> parseJType
-    ] <?> "return type"
-  return $ MethodDescriptor args returnType
+class TypeParse a where
+  fromText :: Text.Text -> Either String a
+  fromText = parseOnly parseText
+  parseText :: Parser a
+  toText :: a -> Text.Text
 
--- | Read a method descriptor from `Text.Text`
-methodDescriptorFromText :: Text.Text -> Either String MethodDescriptor
-methodDescriptorFromText = parseOnly parseMethodDescriptor
+instance TypeParse JType where
+  parseText = try $ do
+    s <- anyChar
+    case s :: Char of
+      'B' -> return $ JTBase JTByte
+      'C' -> return $ JTBase JTChar
+      'D' -> return $ JTBase JTDouble
+      'F' -> return $ JTBase JTFloat
+      'I' -> return $ JTBase JTInt
+      'J' -> return $ JTBase JTLong
+      'L' -> do
+        txt <- takeWhile (/= ';')
+        _ <- char ';'
+        return $ JTClass (ClassName txt)
+      'S' -> return $ JTBase JTShort
+      'Z' -> return $ JTBase JTBoolean
+      '[' -> JTArray <$> parseText
+      _ -> fail $ "Unknown char " ++ show s
+  toText tp =
+    Text.pack $ go tp ""
+    where
+      go x =
+        case x of
+          JTBase y               -> textbase y
+          JTClass (ClassName cn) -> ((('L':Text.unpack cn) ++ ";") ++)
+          JTArray tp'            -> ('[':) . go tp'
+      textbase y =
+        case y of
+          JTByte    -> ('B':)
+          JTChar    -> ('C':)
+          JTDouble  -> ('D':)
+          JTFloat   -> ('F':)
+          JTInt     -> ('I':)
+          JTLong    -> ('J':)
+          JTShort   -> ('S':)
+          JTBoolean -> ('Z':)
 
--- | Parse a field descriptor
-parseFieldDescriptor :: Parser FieldDescriptor
-parseFieldDescriptor = FieldDescriptor <$> parseJType
+instance TypeParse MethodDescriptor where
+  toText md =
+    Text.concat (
+      ["("]
+      ++ map toText (methodDescriptorArguments md)
+      ++ [")", maybe "V" toText $ methodDescriptorReturnType md ]
+    )
+  parseText = do
+    _ <- char '('
+    args <- many' parseText <?> "method arguments"
+    _ <- char ')'
+    returnType <- choice
+      [ char 'V' >> return Nothing
+      , Just <$> parseText
+      ] <?> "return type"
+    return $ MethodDescriptor args returnType
 
--- | Read a field descriptor from `Text.Text`.
-fieldDescriptorFromText :: Text.Text -> Either String FieldDescriptor
-fieldDescriptorFromText = parseOnly parseFieldDescriptor
+instance TypeParse FieldDescriptor where
+  parseText = FieldDescriptor <$> parseText
+  toText (FieldDescriptor t) = toText t
+
+instance TypeParse t => TypeParse (NameAndType t)  where
+  parseText = do
+    name <- many1 $ notChar ':'
+    _ <- char ':'
+    _type <- parseText
+    return $ NameAndType (Text.pack name) _type
+  toText (NameAndType name _type) =
+    Text.concat [ name , ":" , toText _type ]
+
+fromString' ::
+  TypeParse t
+  => String
+  -> t
+fromString' =
+  either (error . ("Failed " ++)) id . fromText . Text.pack
 
 instance IsString ClassName where
   fromString = strCls
 
 instance IsString JType where
-  fromString = either (error . ("Failed " ++)) id . jTypeFromText . Text.pack
-
-instance IsString MethodDescriptor where
-  fromString = either (error . ("Failed " ++)) id . methodDescriptorFromText . Text.pack
+  fromString = fromString'
 
 instance IsString FieldDescriptor where
-  fromString = either (error . ("Failed " ++)) id . fieldDescriptorFromText . Text.pack
+  fromString = fromString'
 
+instance IsString MethodDescriptor where
+  fromString = fromString'
 
+instance TypeParse t => IsString (NameAndType t) where
+  fromString = fromString'

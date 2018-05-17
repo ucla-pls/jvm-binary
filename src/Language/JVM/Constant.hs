@@ -35,9 +35,9 @@ module Language.JVM.Constant
   , AbsVariableMethodId (..)
 
   , MethodId (..)
-  , methodIdToText
   , FieldId (..)
-  , fieldIdToText
+  , NameAndType (..)
+
 
   , MethodDescriptor
   , FieldDescriptor
@@ -58,6 +58,7 @@ module Language.JVM.Constant
 import           Control.DeepSeq          (NFData)
 import           Control.Monad.Reader
 import           Data.Binary
+import           Data.String
 import           Data.Binary.IEEE754
 import qualified Data.ByteString          as BS
 import           Data.Int
@@ -99,21 +100,8 @@ data InClass a r = InClass
   , inClassId   :: !(Ref a r)
   }
 
--- | A method identifier
-data MethodId = MethodId
-  { methodIdName       :: !Text.Text
-  , methodIdDescriptor :: !MethodDescriptor
-  } deriving (Show, Eq, Ord, Generic, NFData)
-
-
 -- | A method id in a class.
 type AbsMethodId = InClass MethodId
-
--- | A field identifier
-data FieldId = FieldId
-  { fieldIdName       :: ! Text.Text
-  , fieldIdDescriptor :: ! FieldDescriptor
-  } deriving (Show, Eq, Ord, Generic, NFData)
 
 -- | A field id in a class
 type AbsFieldId = InClass FieldId
@@ -123,21 +111,17 @@ newtype AbsInterfaceMethodId r = AbsInterfaceMethodId
   { interfaceMethodId :: InClass MethodId r
   }
 
-fieldIdToText :: FieldId -> Text.Text
-fieldIdToText fid =
-  Text.concat
-  [ fieldIdName fid
-  , ":"
-  , fieldDescriptorToText $ fieldIdDescriptor fid
-  ]
+newtype MethodId = MethodId (NameAndType MethodDescriptor)
+  deriving (Eq, Show, NFData, Ord, Generic)
 
-methodIdToText :: MethodId -> Text.Text
-methodIdToText fid =
-  Text.concat
-  [ methodIdName fid
-  , ":"
-  , methodDescriptorToText $ methodIdDescriptor fid
-  ]
+newtype FieldId  = FieldId (NameAndType FieldDescriptor)
+  deriving (Eq, Show, NFData, Ord, Generic)
+
+instance IsString FieldId where
+  fromString = FieldId . fromString
+
+instance IsString MethodId where
+  fromString = MethodId . fromString
 
 -- | In some cases we can both point to interface methods and
 -- regular methods.
@@ -303,23 +287,14 @@ instance Referenceable (Constant High) where
   fromConst _ a = return a
   toConst a = return a
 
-instance Referenceable (MethodId) where
+instance TypeParse a => Referenceable (NameAndType a) where
   fromConst err (CNameAndType rn txt) = do
-    md <- either err return $ methodDescriptorFromText txt
-    return $ MethodId rn md
+    md <- either err return $ fromText txt
+    return $ NameAndType rn md
   fromConst e c = expected "CNameAndType" e c
 
-  toConst (MethodId rn md) =
-    return $ CNameAndType rn (methodDescriptorToText md)
-
-instance Referenceable (FieldId) where
-  fromConst err (CNameAndType rn txt) = do
-    md <- either err return $ fieldDescriptorFromText txt
-    return $ FieldId rn md
-  fromConst e c = expected "CNameAndType" e c
-
-  toConst (FieldId rn md) =
-    return $ CNameAndType rn (fieldDescriptorToText md)
+  toConst (NameAndType rn md) =
+    return $ CNameAndType rn (toText md)
 
 -- TODO: Find good encoding of string.
 instance Referenceable Text.Text where
@@ -355,20 +330,27 @@ instance Referenceable ClassName where
     return . CClassRef $ txt
 
 instance Referenceable MethodDescriptor where
-  fromConst err c = do
-    txt <- fromConst err c
-    either err return $ methodDescriptorFromText txt
-
-  toConst c =
-    toConst (methodDescriptorToText c)
+  fromConst err =
+    fromConst err >=> either err pure . fromText
+  toConst = toConst . toText
 
 instance Referenceable FieldDescriptor where
-  fromConst err c = do
-    txt <- fromConst err c
-    either err return $ fieldDescriptorFromText txt
+  fromConst err =
+    fromConst err >=> either err pure . fromText
+  toConst = toConst . toText
 
-  toConst c =
-    toConst (fieldDescriptorToText c)
+-- instance TypeParse f => Referenceable (NameAndType f) where
+--   fromConst err =
+--     fromConst err >=> either err pure . fromText
+--   toConst = toConst . toText
+
+instance Referenceable MethodId where
+  fromConst err x = MethodId <$> fromConst err x
+  toConst (MethodId s) = toConst s
+
+instance Referenceable FieldId where
+  fromConst err x = FieldId <$> fromConst err x
+  toConst (FieldId s) = toConst s
 
 instance Referenceable (InClass FieldId High) where
   fromConst _ (CFieldRef s) = do

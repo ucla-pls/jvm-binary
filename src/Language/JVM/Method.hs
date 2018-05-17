@@ -84,7 +84,7 @@ instance Staged Method where
   evolve (Method mf mn md mattr) = do
     mn' <- link mn
     md' <- link md
-    mattr' <- label (Text.unpack (mn' <> ":" <> methodDescriptorToText md'))
+    mattr' <- label (Text.unpack (mn' <> ":" <> toText md'))
       $ fromCollector <$> fromAttributes collect' mattr
     return $ Method mf mn' md' mattr'
     where
