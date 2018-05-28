@@ -196,7 +196,7 @@ instance ByteCodeStaged StackMapTable where
       acc a (StackMapFrame delta frm) = do
         (lidx, lst) <- a
         frm' <- evolve frm
-        let bco = offsetDelta lidx delta
+        let bco = if lst /= [] then offsetDelta lidx delta else delta
         x <- f bco
         return (bco, StackMapFrame x frm' : lst)
 
@@ -208,7 +208,7 @@ instance ByteCodeStaged StackMapTable where
         (lidx, lst) <- a
         frm' <- devolve frm
         tidx <- f x
-        let delta = offsetDeltaInv lidx tidx
+        let delta = if lst /= [] then offsetDeltaInv lidx tidx else tidx
         return (tidx, StackMapFrame delta frm' : lst)
 
 
@@ -220,8 +220,7 @@ offsetDelta ::
   -> Word16
   -- ^ This Index
 offsetDelta lidx delta
-  | lidx > 0 = lidx + delta + 1
-  | otherwise = delta
+  = lidx + delta + 1
 
 offsetDeltaInv ::
   Word16
@@ -231,9 +230,7 @@ offsetDeltaInv ::
   -> Word16
   -- ^ Delta
 offsetDeltaInv lidx tidx
-  | lidx > 0 = tidx - lidx - 1
-  | otherwise = tidx
-
+  = tidx - lidx - 1
 
 instance Staged StackMapFrameType where
   stage f x =

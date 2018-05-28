@@ -65,7 +65,7 @@ testAllFiles spec = do
   where
     isClass p =
       takeExtension p == ".class"
-      -- && p /= "test/data/SQLite.class"
+      && p /= "test/data/SQLite.class"
 
 
 -- testSomeFiles :: SpecWith BL.ByteString -> IO [TestTree]
