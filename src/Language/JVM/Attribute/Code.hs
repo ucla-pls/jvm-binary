@@ -68,7 +68,7 @@ codeByteCodeOprs =
 -- | Extracts a list of bytecode instructions
 codeByteCodeInsts :: Code Low -> V.Vector (ByteCodeInst Low)
 codeByteCodeInsts =
-  unByteCode . codeByteCode
+  snd . unByteCode . codeByteCode
 
 -- | Returns the StackMapTable attribute if any
 codeStackMapTable :: Code High -> Maybe (StackMapTable High)
@@ -80,7 +80,6 @@ data CodeAttributes r = CodeAttributes
   , caLineNumberTable :: [ LineNumberTable r ]
   , caOthers          :: [ Attribute r ]
   }
-
 
 instance Staged Code where
   evolve Code{..} = label "Code" $ do
