@@ -46,14 +46,20 @@ import           Language.JVM.Constant
 import           Language.JVM.ConstantPool as CP
 import           Language.JVM.Staged
 
--- | Decode a class file from a lazy 'BL.ByteString'
+-- | Decode a class file from a lazy 'BL.ByteString'. Ensures that the lazy
+-- bytestring is read to EOF, and thereby closing any open files.
 decodeClassFile :: BL.ByteString -> Either ClassFileError (ClassFile Low)
 decodeClassFile bs = do
   case decodeOrFail bs of
-    Right (_, _, cf) ->
-      Right cf
-    Left (_, off, msg) ->
-      Left $ CFEUnreadableFile ((show off) ++ ": " ++ msg)
+    Right (rest, off, cf)
+      | BL.length rest == 0 -> Right cf
+      | otherwise ->
+        unreadable rest off "expected end of file"
+    Left (rest, off, msg) ->
+      unreadable rest off msg
+  where
+    unreadable rest off msg =
+      Left $ CFEUnreadableFile ((show off) ++ "/" ++ (show $ BL.length rest) ++ ": " ++ msg)
 
 -- | Create a lazy byte string from a class file
 encodeClassFile :: ClassFile Low -> BL.ByteString
