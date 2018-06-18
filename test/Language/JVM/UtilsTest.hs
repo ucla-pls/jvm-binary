@@ -35,13 +35,13 @@ spec_parse_zero_text = do
   it "works on chinese characters" $ do
     tryDecode (TE.encodeUtf8 "试一试中文") `shouldBe` Right "试一试中文"
 
-  xit "works on http:/foo/p\237\160\128" $ do
-    -- I don't know exactly the right result of this string, but it should be a correct java byte-string
-    sizedByteStringToText "http:/foo/p\237\160\128" `shouldBe` Right "http:/foo/p?"
+  -- xit "works on http:/foo/p\237\160\128" $ do
+  --   -- I don't know exactly the right result of this string, but it should be a correct java byte-string
+  --   sizedByteStringToText "http:/foo/p\237\160\128" `shouldBe` Right "http:/foo/p?"
 
-  xit "works on long and obscure byte string" $ do
-    -- I don't know exactly the right result of this string, but it should be a correct java byte-string
-    sizedByteStringToText obscureByteString `shouldBe` Right "?"
+  -- xit "works on long and obscure byte string" $ do
+  --   -- I don't know exactly the right result of this string, but it should be a correct java byte-string
+  --   sizedByteStringToText obscureByteString `shouldBe` Right "?"
 
 obscureByteString :: SizedByteString a
 obscureByteString = SizedByteString
