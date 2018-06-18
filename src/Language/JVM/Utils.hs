@@ -7,8 +7,10 @@ Maintainer  : kalhuage@cs.ucla.edu
 This module contains utilities missing not in other libraries.
 -}
 
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 module Language.JVM.Utils
   ( -- * Sized Data Structures
@@ -24,6 +26,10 @@ module Language.JVM.Utils
   , SizedList16
   , SizedByteString32
   , SizedByteString16
+  , sizedByteStringFromText
+  , sizedByteStringToText
+
+  , tryDecode
 
     -- * Bit Set
     --
@@ -43,12 +49,21 @@ import           Data.Binary
 import           Data.Binary.Get
 import           Data.Binary.Put
 import           Data.Bits
-import           Data.List       as List
-import           Data.Set        as Set
+import           Data.List                as List
+import           Data.Set                 as Set
+import           Data.String
 
+import           Control.DeepSeq          (NFData)
 import           Control.Monad
 
-import qualified Data.ByteString as BS
+import qualified Data.Text                as Text
+
+import qualified Data.Text.Encoding       as TE
+import qualified Data.Text.Encoding.Error as TE
+
+import qualified Data.ByteString          as BS
+
+-- import           Debug.Trace
 
 
 -- $SizedDataStructures
@@ -60,7 +75,7 @@ import qualified Data.ByteString as BS
 -- length N of type 'w' and then N items of type 'a'.
 newtype SizedList w a = SizedList
   { unSizedList :: [ a ]
-  } deriving (Show, Eq, Functor)
+  } deriving (Show, Eq, Functor, NFData, Ord)
 
 -- | Get the size of the sized list.
 listSize :: Num w => SizedList w a -> w
@@ -87,7 +102,7 @@ instance (Binary w, Integral w, Binary a) => Binary (SizedList w a) where
 -- | A byte string with a size w.
 newtype SizedByteString w = SizedByteString
   { unSizedByteString :: BS.ByteString
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, NFData, Ord, IsString)
 
 -- | Get the size of a SizedByteString
 byteStringSize :: (Num w) => SizedByteString w -> w
@@ -101,6 +116,42 @@ instance (Binary w, Integral w) => Binary (SizedByteString w) where
   put sbs@(SizedByteString bs) = do
     put (byteStringSize sbs)
     putByteString bs
+
+replaceJavaZeroWithNormalZero :: BS.ByteString -> BS.ByteString
+replaceJavaZeroWithNormalZero = go
+  where
+    go bs =
+      case BS.breakSubstring "\192\128" bs of
+        (h, "") -> h
+        (h, t) -> h `BS.append` "\0" `BS.append` go (BS.drop 2 t)
+
+replaceNormalZeroWithJavaZero::BS.ByteString -> BS.ByteString
+replaceNormalZeroWithJavaZero = go
+  where
+      go bs =
+        case BS.breakSubstring "\0" bs of
+          (h, "") -> h
+          (h, t) -> h `BS.append` "\192\128" `BS.append` go (BS.drop 1 t)
+
+-- | Convert a Sized bytestring to Utf8 Text.
+sizedByteStringToText ::
+     SizedByteString w
+  -> Either TE.UnicodeException Text.Text
+sizedByteStringToText (SizedByteString bs) =
+  let rst = TE.decodeUtf8' bs
+    in case rst of
+      Right txt -> Right txt
+      Left _ -> tryDecode bs
+
+tryDecode :: BS.ByteString -> Either TE.UnicodeException Text.Text
+tryDecode =  TE.decodeUtf8' . replaceJavaZeroWithNormalZero
+
+-- | Convert a Sized bytestring from Utf8 Text.
+sizedByteStringFromText ::
+     Text.Text
+  -> SizedByteString w
+sizedByteStringFromText t
+  = SizedByteString . replaceNormalZeroWithJavaZero . TE.encodeUtf8 $ t
 
 -- $BitSet
 -- A bit set is a set where each element is represented a bit in a word. This
@@ -123,18 +174,23 @@ class (Eq a, Ord a) => Enumish a where
 -- | A bit set of size w
 newtype BitSet w a = BitSet
   { toSet :: Set.Set a
-  } deriving (Ord, Show, Eq)
+  } deriving (Ord, Show, Eq, NFData)
 
-instance (Bits w, Binary w, Enumish a) => Binary (BitSet w a) where
+
+bitSetToWord :: (Enumish a, Bits w) => BitSet w a -> w
+bitSetToWord =
+  toWord . Set.toList . toSet
+
+toWord :: (Enumish a, Bits w) => [a] -> w
+toWord =
+  List.foldl' (\a -> setBit a . fromEnumish) zeroBits
+
+instance (Show w, Bits w, Binary w, Enumish a) => Binary (BitSet w a) where
   get = do
     word <- get :: Get w
     return . BitSet $ Set.fromList [ x | (i, x) <- inOrder, testBit word i ]
 
-  put (BitSet f) = do
-    let word =
-          List.foldl' setBit zeroBits
-            (List.map fromEnumish $ Set.toList f) :: w
-    put word
+  put = put . bitSetToWord
 
 -- | A sized list using a 16 bit word as length
 type SizedList16 = SizedList Word16

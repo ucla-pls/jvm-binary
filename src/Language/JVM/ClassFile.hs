@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE TemplateHaskell    #-}
 {-|
 Module      : Language.JVM.ClassFile
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -6,85 +8,150 @@ Maintainer  : kalhuage@cs.ucla.edu
 
 The class file is described in this module.
 -}
-
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Language.JVM.ClassFile
   ( ClassFile (..)
-
-  , cInterfaces
+  , cAccessFlags
   , cFields
   , cMethods
-  , cAttributes
-
-  , cThisClass
-  , cSuperClass
+  , cSignature
 
   -- * Attributes
+  , ClassAttributes (..)
   , cBootstrapMethods
   ) where
 
 import           Data.Binary
 import           Data.Monoid
-import qualified Data.Text               as Text
-import           GHC.Generics            (Generic)
+import           Data.Set
 
 import           Language.JVM.AccessFlag
-import           Language.JVM.Attribute  (Attribute, BootstrapMethods, fromAttribute')
+import           Language.JVM.Attribute
+import           Language.JVM.Attribute.BootstrapMethods
+-- import           Language.JVM.Attribute.Signature
 import           Language.JVM.Constant
-import           Language.JVM.Field      (Field)
-import           Language.JVM.Method     (Method)
+import           Language.JVM.ConstantPool               as CP
+import           Language.JVM.Field                      (Field)
+import           Language.JVM.Method                     (Method)
+import           Language.JVM.Staged
 import           Language.JVM.Utils
 
 -- | A 'ClassFile' as described
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html).
 
-data ClassFile = ClassFile
-  { cMagicNumber     :: !Word32
+data ClassFile r = ClassFile
+  { cMagicNumber  :: !Word32
 
-  , cMinorVersion    :: !Word16
-  , cMajorVersion    :: !Word16
+  , cMinorVersion :: !Word16
+  , cMajorVersion :: !Word16
 
-  , cConstantPool    :: !ConstantPool
+  , cConstantPool :: !(Choice (ConstantPool r) () r)
 
-  , cAccessFlags     :: BitSet16 CAccessFlag
+  , cAccessFlags' :: !(BitSet16 CAccessFlag)
 
-  , cThisClassIndex  :: !ConstantRef
-  , cSuperClassIndex :: !ConstantRef
+  , cThisClass    :: !(Ref ClassName r)
+  , cSuperClass   :: !(Ref ClassName r)
 
-  , cInterfaces'     :: SizedList16 ConstantRef
-  , cFields'         :: SizedList16 Field
-  , cMethods'        :: SizedList16 Method
-  , cAttributes'     :: SizedList16 Attribute
-  } deriving (Show, Eq, Generic)
+  , cInterfaces   :: !(SizedList16 (Ref ClassName r))
+  , cFields'      :: !(SizedList16 (Field r))
+  , cMethods'     :: !(SizedList16 (Method r))
+  , cAttributes   :: !(Attributes ClassAttributes r)
+  }
 
-instance Binary ClassFile where
-
--- | Get a list of 'ConstantRef's to interfaces.
-cInterfaces :: ClassFile -> [ConstantRef]
-cInterfaces = unSizedList . cInterfaces'
+-- | Get the set of access flags
+cAccessFlags :: ClassFile r -> Set CAccessFlag
+cAccessFlags = toSet . cAccessFlags'
 
 -- | Get a list of 'Field's of a ClassFile.
-cFields :: ClassFile -> [Field]
+cFields :: ClassFile r -> [Field r]
 cFields = unSizedList . cFields'
 
 -- | Get a list of 'Method's of a ClassFile.
-cMethods :: ClassFile -> [Method]
+cMethods :: ClassFile r -> [Method r]
 cMethods = unSizedList . cMethods'
 
--- | Lookup the this class in a ConstantPool
-cThisClass :: ConstantPool -> ClassFile -> Maybe Text.Text
-cThisClass cp = flip lookupClassName cp . cThisClassIndex
-
--- | Lookup the super class in the ConstantPool
-cSuperClass :: ConstantPool -> ClassFile -> Maybe Text.Text
-cSuperClass cp = flip lookupClassName cp . cSuperClassIndex
-
--- | Get a list of 'Attribute's of a ClassFile.
-cAttributes :: ClassFile -> [Attribute]
-cAttributes = unSizedList . cAttributes'
 
 -- | Fetch the 'BootstrapMethods' attribute.
--- There can only one be one exceptions attribute on a class-file.
-cBootstrapMethods :: ConstantPool -> ClassFile -> Maybe (Either String BootstrapMethods)
-cBootstrapMethods cp =
-  getFirst . foldMap (First . fromAttribute' cp) . cAttributes
+-- There can only one bootstrap methods per class, but there might not be
+-- one.
+cBootstrapMethods' :: ClassFile High -> Maybe (BootstrapMethods High)
+cBootstrapMethods' =
+  firstOne . caBootstrapMethods . cAttributes
+
+cBootstrapMethods :: ClassFile High -> [BootstrapMethod High]
+cBootstrapMethods =
+  maybe [] methods . cBootstrapMethods'
+
+cSignature :: ClassFile High -> Maybe (Signature High)
+cSignature =
+  firstOne . caSignature . cAttributes
+
+data ClassAttributes r = ClassAttributes
+  { caBootstrapMethods :: [ BootstrapMethods r]
+  , caSignature        :: [ Signature r ]
+  , caOthers           :: [ Attribute r ]
+  }
+
+instance Staged ClassFile where
+  evolve cf = label "ClassFile" $ do
+    tci' <- link (cThisClass cf)
+    sci' <-
+      if tci' /= ClassName "java/lang/Object"
+      then do
+        link (cSuperClass cf)
+      else do
+        return $ ClassName "java/lang/Object"
+    cii' <- mapM link $ cInterfaces cf
+    cf' <- mapM evolve $ cFields' cf
+    cm' <- mapM evolve $ cMethods' cf
+    ca' <- fromCollector <$> fromAttributes collect' (cAttributes cf)
+    return $ cf
+      { cConstantPool = ()
+      , cThisClass = tci'
+      , cSuperClass = sci'
+      , cInterfaces = cii'
+      , cFields'            = cf'
+      , cMethods'           = cm'
+      , cAttributes         = ca'
+      }
+    where
+      fromCollector (a, b, c) =
+        ClassAttributes (appEndo a []) (appEndo b []) (appEndo c [])
+      collect' attr =
+        collect (mempty, mempty, Endo (attr:)) attr
+          [ toC $ \e -> (Endo (e:), mempty, mempty)
+          , toC $ \e -> (mempty, Endo (e:), mempty)]
+
+  devolve cf = do
+    tci' <- unlink (cThisClass cf)
+    sci' <-
+      if cThisClass cf /= ClassName "java/lang/Object" then
+        unlink (cSuperClass cf)
+      else
+        return $ 0
+    cii' <- mapM unlink $ cInterfaces cf
+    cf' <- mapM devolve $ cFields' cf
+    cm' <- mapM devolve $ cMethods' cf
+    ca' <- fromClassAttributes $ cAttributes cf
+    return $ cf
+      { cConstantPool       = CP.empty
+      -- We cannot yet set the constant pool
+      , cThisClass = tci'
+      , cSuperClass = sci'
+      , cInterfaces  = cii'
+      , cFields'            = cf'
+      , cMethods'           = cm'
+      , cAttributes         = SizedList ca'
+      }
+    where
+      fromClassAttributes (ClassAttributes cm cs at) = do
+        cm' <- mapM toAttribute cm
+        cs' <- mapM toAttribute cs
+        at' <- mapM devolve at
+        return (cm' ++ cs' ++ at')
+
+$(deriveBase ''ClassAttributes)
+$(deriveBaseWithBinary ''ClassFile)

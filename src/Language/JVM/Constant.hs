@@ -1,5 +1,12 @@
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-|
-Module      : Language.JVM.Constant
 Copyright   : (c) Christian Gram Kalhauge, 2017
 License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
@@ -8,173 +15,457 @@ This module contains the 'Constant' type and the 'ConstantPool'. These
 are essential for accessing data in the class-file.
 -}
 
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE RankNTypes    #-}
 module Language.JVM.Constant
-  (
-    -- * Constant
-    Constant (..)
+  ( Constant (..)
   , constantSize
-  , ConstantRef (..)
+  , typeToStr
 
-    -- * Constant Pool
-    -- $ConstantPool
-  , ConstantPool (..)
+  , Referenceable (..)
 
-  , lookupConstant
-  , lookupText
-  , lookupClassName
+  , JValue (..)
 
-  , toListOfConstants
+    -- * Special constants
+  , ClassName (..)
+
+  , InClass (..)
+
+  , AbsMethodId
+  , AbsFieldId
+  , AbsInterfaceMethodId (..)
+  , AbsVariableMethodId (..)
+
+  , MethodId (..)
+  , FieldId (..)
+  , NameAndType (..)
+
+
+  , MethodDescriptor
+  , FieldDescriptor
+
+
+  , MethodHandle (..)
+  , MethodHandleField (..)
+  , MethodHandleMethod (..)
+  , MethodHandleInterface (..)
+  , MethodHandleFieldKind (..)
+  , InvokeDynamic (..)
+
+  -- * re-exports
+  , High
+  , Low
   ) where
 
-import           GHC.Generics       (Generic)
-
-import           Prelude            hiding (fail, lookup)
-
-import           Control.Monad      (forM_)
-import           Control.Monad.Fail (fail)
-
+import           Control.DeepSeq          (NFData)
+import           Control.Monad.Reader
 import           Data.Binary
-import           Data.Binary.Get
-import           Data.Binary.Put
-import qualified Data.IntMap.Strict as IM
+import           Data.String
+import           Data.Binary.IEEE754
+import qualified Data.ByteString          as BS
+import           Data.Int
+import qualified Data.Text                as Text
+import qualified Data.Text.Encoding.Error as TE
+import           GHC.Generics             (Generic)
+import           Numeric                  (showHex)
+import           Prelude                  hiding (fail, lookup)
 
+import           Language.JVM.Stage
+import           Language.JVM.TH
+import           Language.JVM.Type
 import           Language.JVM.Utils
 
 
-import qualified Data.Text          as Text
-import qualified Data.Text.Encoding as TE
-
--- | A constant is referenced by the ConstantRef data type. It is
--- just a 16 bit word, but wrapped for type safety.
-newtype ConstantRef =
-  ConstantRef Word16
-  deriving (Eq, Show, Generic)
-
-instance Binary ConstantRef where
-
 -- | A constant is a multi word item in the 'ConstantPool'. Each of
--- the constructors are pretty much self expiatory from the types.
-data Constant
-  = String !SizedByteString16
-  | Integer !Word32
-  | Float !Word32
-  | Long !Word64
-  | Double !Word64
-  | ClassRef !ConstantRef
-  | StringRef !ConstantRef
-  | FieldRef !ConstantRef !ConstantRef
-  | MethodRef !ConstantRef !ConstantRef
-  | InterfaceMethodRef !ConstantRef !ConstantRef
-  | NameAndType !ConstantRef !ConstantRef
-  | MethodHandle !Word8 !ConstantRef
-  | MethodType !ConstantRef
-  | InvokeDynamic !ConstantRef !ConstantRef
-  deriving (Show, Eq)
+-- the constructors are pretty much self-explanatory from the types.
+data Constant r
+  = CString !SizedByteString16
+  | CInteger !Int32
+  | CFloat !Float
+  | CLong !Int64
+  | CDouble !Double
+  | CClassRef !(Ref Text.Text r)
+  | CStringRef !(Ref BS.ByteString r)
+  | CFieldRef !(InClass FieldId r)
+  | CMethodRef !(InClass MethodId r)
+  | CInterfaceMethodRef !(InClass MethodId r)
+  | CNameAndType !(Ref Text.Text r) !(Ref Text.Text r)
+  | CMethodHandle !(MethodHandle r)
+  | CMethodType !(Ref MethodDescriptor r)
+  | CInvokeDynamic !(InvokeDynamic r)
 
-instance Binary Constant where
+--deriving (Show, Eq, Generic, NFData)
+
+-- | Anything pointing inside a class
+data InClass a r = InClass
+  { inClassName :: !(Ref ClassName r)
+  , inClassId   :: !(Ref a r)
+  }
+
+-- | A method id in a class.
+type AbsMethodId = InClass MethodId
+
+-- | A field id in a class
+type AbsFieldId = InClass FieldId
+
+-- | An interface method, which is a class in a method.
+newtype AbsInterfaceMethodId r = AbsInterfaceMethodId
+  { interfaceMethodId :: InClass MethodId r
+  }
+
+newtype MethodId = MethodId (NameAndType MethodDescriptor)
+  deriving (Eq, Show, NFData, Ord, Generic)
+
+newtype FieldId  = FieldId (NameAndType FieldDescriptor)
+  deriving (Eq, Show, NFData, Ord, Generic)
+
+instance IsString FieldId where
+  fromString = FieldId . fromString
+
+instance IsString MethodId where
+  fromString = MethodId . fromString
+
+-- | In some cases we can both point to interface methods and
+-- regular methods.
+data AbsVariableMethodId r
+  = VInterfaceMethodId !(AbsInterfaceMethodId r)
+  | VMethodId !(AbsMethodId r)
+
+-- | The union type over the different method handles.
+data MethodHandle r
+  = MHField !(MethodHandleField r)
+  | MHMethod !(MethodHandleMethod r)
+  | MHInterface !(MethodHandleInterface r)
+
+
+data MethodHandleField r = MethodHandleField
+  { methodHandleFieldKind :: !MethodHandleFieldKind
+  , methodHandleFieldRef  :: !(DeepRef AbsFieldId r)
+  }
+
+data MethodHandleFieldKind
+  = MHGetField
+  | MHGetStatic
+  | MHPutField
+  | MHPutStatic
+  deriving (Eq, Show, NFData, Generic, Ord)
+
+data MethodHandleMethod r
+  = MHInvokeVirtual !(DeepRef AbsMethodId r)
+  | MHInvokeStatic !(DeepRef AbsVariableMethodId r)
+  -- ^ Since version 52.0
+  | MHInvokeSpecial !(DeepRef AbsVariableMethodId r)
+  -- ^ Since version 52.0
+  | MHNewInvokeSpecial !(DeepRef AbsMethodId r)
+
+data MethodHandleInterface r = MethodHandleInterface
+  {  methodHandleInterfaceRef :: !(DeepRef AbsInterfaceMethodId r)
+  }
+
+data InvokeDynamic r = InvokeDynamic
+  { invokeDynamicAttrIndex :: !Word16
+  , invokeDynamicMethod    :: !(Ref MethodId r)
+  }
+
+-- | Hack that returns the name of a constant.
+typeToStr :: Constant r -> String
+typeToStr c =
+  case c of
+    CString _             -> "CString"
+    CInteger _            -> "CInteger"
+    CFloat _              -> "CFloat"
+    CLong _               -> "CLong"
+    CDouble _             -> "CDouble"
+    CClassRef _           -> "CClassRef"
+    CStringRef _          -> "CStringRef"
+    CFieldRef _           -> "CFieldRef"
+    CMethodRef _          -> "CMethodRef"
+    CInterfaceMethodRef _ -> "CInterfaceMethodRef"
+    CNameAndType _ _      -> "CNameAndType"
+    CMethodHandle _       -> "CMethodHandle"
+    CMethodType _         -> "CMethodType"
+    CInvokeDynamic _      -> "CInvokeDynamic"
+
+instance Binary (Constant Low) where
   get = do
     ident <- getWord8
     case ident of
-      1  -> String <$> get
-      3  -> Integer <$> get
-      4  -> Float <$> get
-      5  -> Long <$> get
-      6  -> Double <$> get
-      7  -> ClassRef <$> get
-      8  -> StringRef <$> get
-      9  -> FieldRef <$> get <*> get
-      10 -> MethodRef <$> get <*> get
-      11 -> InterfaceMethodRef <$> get <*> get
-      12 -> NameAndType <$> get <*> get
-      15 -> MethodHandle <$> get <*> get
-      16 -> MethodType <$> get
-      18 -> InvokeDynamic <$> get <*> get
+      1  -> CString <$> get
+      3  -> CInteger <$> get
+      4  -> CFloat <$> getFloat32be
+      5  -> CLong <$> get
+      6  -> CDouble <$> getFloat64be
+      7  -> CClassRef <$> get
+      8  -> CStringRef <$> get
+      9  -> CFieldRef <$> get
+      10 -> CMethodRef <$> get
+      11 -> CInterfaceMethodRef <$> get
+      12 -> CNameAndType <$> get <*> get
+      15 -> CMethodHandle <$> get
+      16 -> CMethodType <$> get
+      18 -> CInvokeDynamic <$> get
       _  -> fail $ "Unkown identifier " ++ show ident
 
   put x =
     case x of
-      String bs              -> do putWord8 1; put bs
-      Integer i              -> do putWord8 3; put i
-      Float i                -> do putWord8 4; put i
-      Long i                 -> do putWord8 5; put i
-      Double i               -> do putWord8 6; put i
-      ClassRef i             -> do putWord8 7; put i
-      StringRef i            -> do putWord8 8; put i
-      FieldRef i j           -> do putWord8 9; put i; put j
-      MethodRef i j          -> do putWord8 10; put i; put j
-      InterfaceMethodRef i j -> do putWord8 11; put i; put j
-      NameAndType i j        -> do putWord8 12; put i; put j
-      MethodHandle i j       -> do putWord8 15; put i; put j
-      MethodType i           -> do putWord8 16; put i;
-      InvokeDynamic i j      -> do putWord8 18; put i; put j
+      CString bs            -> do putWord8 1; put bs
+      CInteger i            -> do putWord8 3; put i
+      CFloat i              -> do putWord8 4; putFloat32be i
+      CLong i               -> do putWord8 5; put i
+      CDouble i             -> do putWord8 6; putFloat64be i
+      CClassRef i           -> do putWord8 7; put i
+      CStringRef i          -> do putWord8 8; put i
+      CFieldRef i           -> do putWord8 9; put i
+      CMethodRef i          -> do putWord8 10; put i
+      CInterfaceMethodRef i -> do putWord8 11; put i
+      CNameAndType i j      -> do putWord8 12; put i; put j
+      CMethodHandle h       -> do putWord8 15; put h
+      CMethodType i         -> do putWord8 16; put i;
+      CInvokeDynamic i      -> do putWord8 18; put i
+
+instance Binary (MethodHandle Low) where
+  get = do
+    w <- getWord8
+    case w of
+      1 -> MHField . MethodHandleField MHGetField <$> get
+      2 -> MHField . MethodHandleField MHGetStatic <$> get
+      3 -> MHField . MethodHandleField MHPutField <$> get
+      4 -> MHField . MethodHandleField MHPutStatic <$> get
+
+      5 -> MHMethod . MHInvokeVirtual <$> get
+      6 -> MHMethod . MHInvokeStatic <$> get
+      7 -> MHMethod . MHInvokeSpecial<$> get
+      8 -> MHMethod . MHNewInvokeSpecial <$> get
+
+      9 -> MHInterface . MethodHandleInterface <$> get
+
+      _ -> fail $ "Unknown method handle kind 'x" ++ showHex w "'"
+
+  put x = case x of
+    MHField h -> do
+      putWord8 $ case methodHandleFieldKind h of
+        MHGetField  -> 1
+        MHGetStatic -> 2
+        MHPutField  -> 3
+        MHPutStatic -> 4
+      put $ methodHandleFieldRef h
+
+    MHMethod h -> do
+      case h of
+        MHInvokeVirtual m    -> putWord8 5 >> put m
+        MHInvokeStatic m     -> putWord8 6 >> put m
+        MHInvokeSpecial m    -> putWord8 7 >> put m
+        MHNewInvokeSpecial m -> putWord8 8 >> put m
+
+    MHInterface h -> do
+      putWord8  9
+      put $ methodHandleInterfaceRef h
 
 -- | Some of the 'Constant's take up more space in the constant pool than other.
 -- Notice that 'Language.JVM.Constant.String' and 'MethodType' is not of size
 -- 32, but is still awarded value 1. This is due to an
 -- [inconsistency](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4.5)
 -- in JVM.
-constantSize :: Constant -> Int
+constantSize :: Constant r -> Int
 constantSize x =
   case x of
-    Double _ -> 2
-    Long _   -> 2
-    _        -> 1
+    CDouble _ -> 2
+    CLong _   -> 2
+    _         -> 1
 
--- $ConstantPool
---
--- The 'ConstantPool' contains all the constants, and is accessible using the
--- Lookup methods.
+-- | 'Referenceable' is something that can exist in the constant pool.
+class Referenceable a where
+  fromConst
+    :: (Monad m)
+    => (forall a'. String -> m a')
+    -> Constant High
+    -> m a
+  toConst
+    :: (Monad m)
+    => a
+    -> m (Constant High)
 
--- | A ConstantPool is just an 'IntMap'. A 'IntMap' is used, because constants are
--- accessed after their byte-offset. 'constantSize'
-newtype ConstantPool = ConstantPool
-  { unConstantPool :: IM.IntMap Constant
-  } deriving (Show, Eq)
+instance Referenceable (Constant High) where
+  fromConst _ a = return a
+  toConst a = return a
 
--- | Return a list of reference-constant pairs.
-toListOfConstants :: ConstantPool -> [(ConstantRef, Constant)]
-toListOfConstants =
-  map (\(a,b) -> (ConstantRef . fromIntegral $ a, b)) . IM.toList . unConstantPool
+instance TypeParse a => Referenceable (NameAndType a) where
+  fromConst err (CNameAndType rn txt) = do
+    md <- either err return $ fromText txt
+    return $ NameAndType rn md
+  fromConst e c = expected "CNameAndType" e c
 
-instance Binary ConstantPool where
-  get = do
-    len <- fromIntegral <$> getInt16be
-    list <- go len 1
-    return . ConstantPool $ IM.fromList list
-    where
-      go len n | len > n = do
-        constant <- get
-        rest <- go len (n + constantSize constant)
-        return $ (n, constant) : rest
-      go _ _ = return []
-  put (ConstantPool p)= do
-    case IM.maxViewWithKey p of
-      Just ((key, e), _) -> do
-        putInt16be (fromIntegral (key + constantSize e))
-        forM_ (IM.toAscList p) (put . snd)
-      Nothing -> do
-        putInt16be 0
+  toConst (NameAndType rn md) =
+    return $ CNameAndType rn (toText md)
 
--- | Lookup a 'Constant' in the 'ConstantPool'.
-lookupConstant :: ConstantRef -> ConstantPool -> Maybe Constant
-lookupConstant (ConstantRef ref) (ConstantPool cp) =
-  IM.lookup (fromIntegral ref) cp
+-- TODO: Find good encoding of string.
+instance Referenceable Text.Text where
+  fromConst err c =
+    case c of
+      CString str ->
+        case sizedByteStringToText str of
+          Left (TE.DecodeError msg _) ->
+            err $ badEncoding msg (unSizedByteString str)
+          Left _ -> error "This is deprecated in the api"
+          Right txt -> return txt
+      a -> err $ wrongType "String" a
 
--- | Lookup a 'Text.Text' in the 'ConstantPool', returns 'Nothing' if the
--- reference does not point to something in the ConstantPool, if it points to
--- something not a 'Language.JVM.Constant.String' Constant, or if it is
--- impossible to decode the 'ByteString' as Utf8.
-lookupText :: ConstantRef -> ConstantPool -> Maybe Text.Text
-lookupText ref cp = do
-  String str <- lookupConstant ref cp
-  case TE.decodeUtf8' . unSizedByteString $ str of
-    Left _    -> Nothing
-    Right txt -> Just txt
+  toConst =
+    return . CString . sizedByteStringFromText
 
--- | Lookup a class name in the 'ConstantPool', returns 'Nothing' otherwise.
-lookupClassName :: ConstantRef -> ConstantPool -> Maybe Text.Text
-lookupClassName ref cp = do
-  ClassRef r <- lookupConstant ref cp
-  lookupText r cp
+instance Referenceable BS.ByteString where
+  fromConst err c =
+    case c of
+      CString str -> return $ unSizedByteString str
+      a           -> err $ wrongType "String" a
+  toConst =
+    return . CString . SizedByteString
+
+
+instance Referenceable ClassName where
+  fromConst _ (CClassRef r) =
+    return . ClassName $ r
+  fromConst err a =
+    err $ wrongType "ClassRef" a
+
+  toConst (ClassName txt) = do
+    return . CClassRef $ txt
+
+instance Referenceable MethodDescriptor where
+  fromConst err =
+    fromConst err >=> either err pure . fromText
+  toConst = toConst . toText
+
+instance Referenceable FieldDescriptor where
+  fromConst err =
+    fromConst err >=> either err pure . fromText
+  toConst = toConst . toText
+
+-- instance TypeParse f => Referenceable (NameAndType f) where
+--   fromConst err =
+--     fromConst err >=> either err pure . fromText
+--   toConst = toConst . toText
+
+instance Referenceable MethodId where
+  fromConst err x = MethodId <$> fromConst err x
+  toConst (MethodId s) = toConst s
+
+instance Referenceable FieldId where
+  fromConst err x = FieldId <$> fromConst err x
+  toConst (FieldId s) = toConst s
+
+instance Referenceable (InClass FieldId High) where
+  fromConst _ (CFieldRef s) = do
+    return $ s
+  fromConst err c = expected "CFieldRef" err c
+
+  toConst s =
+    return $ CFieldRef s
+
+instance Referenceable (InClass MethodId High) where
+  fromConst _ (CMethodRef s) = do
+    return $ s
+  fromConst err c = expected "CMethodRef" err c
+
+  toConst s =
+    return $ CMethodRef s
+
+instance Referenceable (InvokeDynamic High) where
+  fromConst _ (CInvokeDynamic c) = do
+    return $ c
+  fromConst err c = expected "CInvokeDynamic" err c
+
+  toConst s =
+    return $ CInvokeDynamic s
+
+instance Referenceable (MethodHandle High) where
+  fromConst _ (CMethodHandle c) = do
+    return $ c
+  fromConst err c = expected "CMethodHandle" err c
+
+  toConst s =
+    return $ CMethodHandle s
+
+instance Referenceable (AbsInterfaceMethodId High) where
+  fromConst _ (CInterfaceMethodRef s) = do
+    return . AbsInterfaceMethodId $ s
+  fromConst err c = expected "CInterfaceMethodRef" err c
+
+  toConst (AbsInterfaceMethodId s) =
+    return $ CInterfaceMethodRef s
+
+instance Referenceable (AbsVariableMethodId High) where
+  fromConst _ (CInterfaceMethodRef s) = do
+    return . VInterfaceMethodId . AbsInterfaceMethodId $ s
+
+  fromConst _ (CMethodRef s) = do
+    return . VMethodId $ s
+
+  fromConst err c = expected "CInterfaceMethodRef or CMethodRef" err c
+
+  toConst (VInterfaceMethodId (AbsInterfaceMethodId s)) =
+    return $ CInterfaceMethodRef s
+
+  toConst (VMethodId s) =
+    return $ CMethodRef s
+
+expected :: String -> (String -> a) -> (Constant r) -> a
+expected name err c =
+  err $ wrongType name c
+
+wrongType :: String -> Constant r -> String
+wrongType n c =
+  "Expected '" ++ n ++ "', but found '" ++ typeToStr c ++ "'."
+
+badEncoding :: String -> BS.ByteString -> String
+badEncoding str bs =
+  "Could not encode '" ++ str ++ "': " ++ show bs
+
+-- $(deriveBaseWithBinary ''MethodId)
+-- $(deriveBaseWithBinary ''FieldId)
+
+$(deriveBase ''Constant)
+$(deriveBase ''MethodHandle)
+$(deriveBase ''MethodHandleField)
+$(deriveBase ''MethodHandleMethod)
+$(deriveBase ''MethodHandleInterface)
+$(deriveBaseWithBinary ''InvokeDynamic)
+
+$(deriveBaseWithBinary ''AbsMethodId)
+$(deriveBaseWithBinary ''AbsFieldId)
+$(deriveBaseWithBinary ''AbsInterfaceMethodId)
+$(deriveBaseWithBinary ''AbsVariableMethodId)
+
+-- | A constant pool value in java
+data JValue
+  = VInteger Int32
+  | VLong Int64
+  | VFloat Float
+  | VDouble Double
+  | VString BS.ByteString
+  | VClass ClassName
+  | VMethodType (MethodDescriptor)
+  | VMethodHandle (MethodHandle High)
+  deriving (Show, Eq, Generic, NFData)
+
+instance Referenceable JValue where
+  fromConst err c = do
+    case c of
+      CStringRef s    -> return $ VString s
+      CInteger i      -> return $ VInteger i
+      CFloat f        -> return $ VFloat f
+      CLong l         -> return $ VLong l
+      CDouble d       -> return $ VDouble d
+      CClassRef r     -> return $ VClass (ClassName r)
+      CMethodHandle m -> return $ VMethodHandle m
+      CMethodType t   -> return $ VMethodType t
+      x               -> expected "Expected a Value" err x
+
+  toConst c =
+    return $ case c of
+      VString s            -> CStringRef s
+      VInteger i           -> CInteger i
+      VFloat f             -> CFloat f
+      VLong l              -> CLong l
+      VDouble d            -> CDouble d
+      VClass (ClassName r) -> CClassRef r
+      VMethodHandle m      -> CMethodHandle m
+      VMethodType t        -> CMethodType t

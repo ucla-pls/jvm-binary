@@ -1,3 +1,9 @@
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell    #-}
 {-|
 Module      : Language.JVM.Attribute.ConstantValue
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -6,21 +12,29 @@ Maintainer  : kalhuage@cs.ucla.edu
 
 Based on the ConstantValue, as documented [here](http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.5).
 -}
-{-# LANGUAGE DeriveGeneric   #-}
 
 module Language.JVM.Attribute.ConstantValue
   ( ConstantValue (..)
   ) where
 
-import           GHC.Generics          (Generic)
+import           Language.JVM.Attribute.Base
+import           Language.JVM.Constant
+import           Language.JVM.Staged
 
-import           Data.Binary
+-- | 'ConstantValue' is an Attribute.
+instance IsAttribute (ConstantValue Low) where
+  attrName = Const "ConstantValue"
 
-import           Language.JVM.Constant (ConstantRef (..))
 
 -- | A constant value is just a index into the constant pool.
-data ConstantValue = ConstantValue
-  { constantValueIndex :: !ConstantRef
-  } deriving (Show, Eq, Generic)
+data ConstantValue r = ConstantValue
+  { constantValue :: !(Ref JValue r)
+  }
 
-instance Binary ConstantValue where
+instance Staged ConstantValue where
+  evolve (ConstantValue r) =
+    ConstantValue <$> link r
+  devolve (ConstantValue r) =
+    ConstantValue <$> unlink r
+
+$(deriveBaseWithBinary ''ConstantValue)

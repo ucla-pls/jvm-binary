@@ -1,17 +1,15 @@
 name: jvm-binary
-version: '0.0.2'
+version: '0.1.0'
 author: Christian Gram Kalhauge
 maintainer: Christian Gram Kalhauge <kalhauge@cs.ucla.edu>
 synopsis: A library for reading Java class-files
 
 license: MIT
 license-file: LICENSE.md
-category: Language, Java
+category: Language, Java, JVM
 github: ucla-pls/jvm-binary
 
 description: A library for reading Java class-files.
-
-ghc-options: -Wall
 
 extra-source-files:
 - CHANGELOG.md
@@ -20,46 +18,51 @@ extra-source-files:
 - README.md
 - stack.yaml
 
+dependencies:
+- base >= 4.9 && < 4.11
+- binary
+- bytestring
+- containers
+- text
+- vector
+- deepseq >= 1.4.3.0
+- deriving-compat
+- attoparsec
+- mtl
+- data-binary-ieee754
+- template-haskell
+
 library:
-  dependencies:
-  - base >= 4.9 && < 4.10
-  - binary
-  - bytestring
-  - containers
-  - text
-  - vector
   source-dirs: src
+  ghc-options: -Wall
 
 tests:
-  jvm-binary-test-suite:
+  jvm-binary-test:
     dependencies:
-    - base >= 4.9 && < 4.10
     - jvm-binary
     - tasty
     - tasty-hspec
     - tasty-discover
     - tasty-quickcheck
-    - binary
-    - bytestring
-    - containers
+    - QuickCheck
     - filepath
     - directory
     - text
+    - generic-random
+    - hspec-expectations-pretty-diff
     ghc-options:
     - -rtsopts
     - -threaded
     - -with-rtsopts=-N
     - -fno-warn-orphans
     main: Test.hs
-    source-dirs: test-suite
+    source-dirs: test
 
 benchmarks:
   jvm-binary-benchmarks:
     dependencies:
-    - base >= 4.9 && < 4.10
     - jvm-binary
     - criterion
-    - bytestring
     ghc-options:
     - -rtsopts
     - -threaded
