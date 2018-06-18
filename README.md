@@ -37,7 +37,6 @@ into the Constant Pool. The `High` stage eliminates all these problems.
 [docs](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7).
 - Add documentation for Code
 - Setup regular benchmarks
-- Do not refer to constant from outside the constant module.
 
 ## Developing
 

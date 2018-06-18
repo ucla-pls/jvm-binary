@@ -8,6 +8,7 @@
 - Introducing a stageing system
 - Added Code writing
 - Changed Megaparsec to Attoparsec of improved performance.
+- A lot of extra work
 
 - Add Attributes 
   - LineNumberTable
