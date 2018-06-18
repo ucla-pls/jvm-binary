@@ -5,3 +5,5 @@
 
 test/data/java
 .DS_Store
+*.el
+test/data/*.class
