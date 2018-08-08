@@ -41,7 +41,7 @@ data InnerClass r = InnerClass
   { icClassName :: !(Ref ClassName r)
   , icOuterClassName :: !(Ref (Maybe ClassName) r)
   , icInnerName :: !(Ref (Maybe Text.Text) r)
-  , icInnerAccessFlags :: !(BitSet16 CAccessFlag)
+  , icInnerAccessFlags :: !(BitSet16 ICAccessFlag)
   }
 
 instance Staged InnerClasses where

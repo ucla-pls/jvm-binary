@@ -4,6 +4,7 @@
 
 - Add EnclosingMethod Attribute
 - Add InnerClasses Attribute
+- Add ICAccessFlag 
 - General optimizations
 
 ## Version 0.1.0 

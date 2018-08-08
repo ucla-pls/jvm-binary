@@ -24,25 +24,25 @@ spec_inner_classes = do
               icClassName = "java/util/PrimitiveIterator$OfDouble",
               icOuterClassName = Just "java/util/PrimitiveIterator",
               icInnerName = Just "OfDouble",
-              icInnerAccessFlags = BitSet $ S.fromList [CPublic, CInterface, CAbstract]
+              icInnerAccessFlags = BitSet $ S.fromList [ICPublic, ICStatic, ICInterface, ICAbstract]
           },
           InnerClass {
               icClassName = "com/google/common/collect/Streams$DoubleFunctionWithIndex",
               icOuterClassName = Just "com/google/common/collect/Streams",
               icInnerName = Just "DoubleFunctionWithIndex",
-              icInnerAccessFlags = BitSet $ S.fromList [CPublic, CInterface, CAbstract]
+              icInnerAccessFlags = BitSet $ S.fromList [ICPublic, ICStatic, ICInterface, ICAbstract]
           },
           InnerClass {
               icClassName = "com/google/common/collect/Streams$5",
               icOuterClassName = Nothing,
               icInnerName = Nothing,
-              icInnerAccessFlags = BitSet $ S.fromList []
+              icInnerAccessFlags = BitSet $ S.fromList [ ICStatic ]
           },
           InnerClass {
               icClassName = "java/util/Spliterators$AbstractSpliterator",
               icOuterClassName = Just "java/util/Spliterators",
               icInnerName = Just "AbstractSpliterator",
-              icInnerAccessFlags = BitSet $ S.fromList [CPublic, CAbstract]
+              icInnerAccessFlags = BitSet $ S.fromList [ICPublic, ICStatic, ICAbstract]
           }
       ]
 

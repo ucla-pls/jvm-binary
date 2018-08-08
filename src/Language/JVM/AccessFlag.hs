@@ -12,6 +12,7 @@ module Language.JVM.AccessFlag
   ( MAccessFlag(..), mflags
   , FAccessFlag(..), fflags
   , CAccessFlag(..), cflags
+  , ICAccessFlag(..), icflags
   ) where
 
 import           Language.JVM.Utils
@@ -84,6 +85,40 @@ cflags =
 
 instance Enumish CAccessFlag where
   inOrder = cflags
+
+
+-- | Access flags for the 'Language.JVM.Attribute.InnerClass'
+data ICAccessFlag
+  = ICPublic
+  | ICPrivate
+  | ICProtected
+  | ICStatic
+  | ICFinal
+  | ICInterface
+  | ICAbstract
+  | ICSynthetic
+  | ICAnnotation
+  | ICEnum
+  deriving (Ord, Show, Eq, NFData, Generic)
+
+-- | The 'Enumish' mapping of the 'CAccessFlag'
+icflags :: [(Int, ICAccessFlag)]
+icflags =
+  [ (0, ICPublic)
+  , (1, ICPrivate)
+  , (2, ICProtected)
+  , (3, ICStatic)
+  , (4, ICFinal)
+  , (9, ICInterface)
+  , (10, ICAbstract)
+  , (12, ICSynthetic)
+  , (13, ICAnnotation)
+  , (14, ICEnum)
+  ]
+
+instance Enumish ICAccessFlag where
+  inOrder = icflags
+
 
 -- | Access flags for the 'Language.JVM.Field.Field'
 data FAccessFlag
