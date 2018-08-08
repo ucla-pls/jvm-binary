@@ -3,6 +3,7 @@
 ## Version 0.1.1
 
 - Add EnclosingMethod Attribute
+- Add InnerClasses Attribute
 - General optimizations
 
 ## Version 0.1.0 

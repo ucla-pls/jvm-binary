@@ -19,7 +19,7 @@ prop_roundtrip_ClassFile :: ClassFile High -> Property
 prop_roundtrip_ClassFile = isoRoundtrip
 
 instance Arbitrary (ClassAttributes High) where
-  arbitrary = ClassAttributes <$> pure [] <*> pure [] <*> pure [] <*> pure []
+  arbitrary = pure $ ClassAttributes [] [] [] [] []
 
 instance Arbitrary (ClassFile High) where
   arbitrary = ClassFile

@@ -19,6 +19,7 @@ module Language.JVM.ClassFile
   , cMethods
   , cSignature
   , cEnclosingMethod
+  , cInnerClasses
 
   -- * Attributes
   , ClassAttributes (..)
@@ -33,6 +34,7 @@ import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
 import           Language.JVM.Attribute.BootstrapMethods
 import           Language.JVM.Attribute.EnclosingMethod
+import           Language.JVM.Attribute.InnerClasses
 -- import           Language.JVM.Attribute.Signature
 import           Language.JVM.Constant
 import           Language.JVM.ConstantPool               as CP
@@ -95,10 +97,19 @@ cEnclosingMethod :: ClassFile High -> Maybe (EnclosingMethod High)
 cEnclosingMethod =
   firstOne . caEnclosingMethod . cAttributes
 
+cInnerClasses' :: ClassFile High -> Maybe (InnerClasses High)
+cInnerClasses' =
+  firstOne . caInnerClasses . cAttributes
+
+cInnerClasses :: ClassFile High -> [InnerClass High]
+cInnerClasses =
+  maybe [] innerClasses . cInnerClasses'
+
 data ClassAttributes r = ClassAttributes
   { caBootstrapMethods :: [ BootstrapMethods r]
   , caSignature        :: [ Signature r ]
   , caEnclosingMethod  :: [ EnclosingMethod r ]
+  , caInnerClasses     :: [ InnerClasses r ]
   , caOthers           :: [ Attribute r ]
   }
 
@@ -125,12 +136,13 @@ instance Staged ClassFile where
       , cAttributes         = ca'
       }
     where
-      fromCollector = flip appEndo (ClassAttributes [] [] [] [])
+      fromCollector = flip appEndo (ClassAttributes [] [] [] [] [])
       collect' attr =
         collect (Endo (\ca -> ca {caOthers = attr: caOthers ca})) attr
           [ toC $ \e -> Endo (\ca -> ca {caSignature = e : caSignature ca})
           , toC $ \e -> Endo (\ca -> ca {caEnclosingMethod = e : caEnclosingMethod ca})
           , toC $ \e -> Endo (\ca -> ca {caBootstrapMethods = e : caBootstrapMethods ca})
+          , toC $ \e -> Endo (\ca -> ca {caInnerClasses = e : caInnerClasses ca})
           ]
 
   devolve cf = do
@@ -155,12 +167,14 @@ instance Staged ClassFile where
       , cAttributes         = SizedList ca'
       }
     where
-      fromClassAttributes (ClassAttributes cm cs cem at) = do
-        cm' <- mapM toAttribute cm
-        cs' <- mapM toAttribute cs
-        cem' <- mapM toAttribute cem
-        at' <- mapM devolve at
-        return (cm' ++ cs' ++ cem' ++ at')
+      fromClassAttributes (ClassAttributes cm cs cem cin at) = do
+        concat <$> sequence
+          [ mapM toAttribute cm
+          , mapM toAttribute cs
+          , mapM toAttribute cem
+          , mapM toAttribute cin
+          , mapM devolve at
+          ]
 
 $(deriveBase ''ClassAttributes)
 $(deriveBaseWithBinary ''ClassFile)

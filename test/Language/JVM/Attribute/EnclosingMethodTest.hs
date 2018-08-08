@@ -21,7 +21,7 @@ spec_enclosing = do
     cEnclosingMethod tc `shouldBe`
        Just (EnclosingMethod
              "com/google/common/collect/Streams"
-             $ Just ("mapWithIndex:(Ljava/util/stream/DoubleStream;Lcom/google/common/collect/Streams$DoubleFunctionWithIndex;)Ljava/util/stream/Stream;")
+             (Just ("mapWithIndex:(Ljava/util/stream/DoubleStream;Lcom/google/common/collect/Streams$DoubleFunctionWithIndex;)Ljava/util/stream/Stream;"))
             )
 
 -- test_real_signatures :: SpecWith ()
