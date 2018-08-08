@@ -18,6 +18,7 @@ module Language.JVM.ClassFile
   , cFields
   , cMethods
   , cSignature
+  , cEnclosingMethod
 
   -- * Attributes
   , ClassAttributes (..)
@@ -31,6 +32,7 @@ import           Data.Set
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
 import           Language.JVM.Attribute.BootstrapMethods
+import           Language.JVM.Attribute.EnclosingMethod
 -- import           Language.JVM.Attribute.Signature
 import           Language.JVM.Constant
 import           Language.JVM.ConstantPool               as CP
@@ -89,9 +91,14 @@ cSignature :: ClassFile High -> Maybe (Signature High)
 cSignature =
   firstOne . caSignature . cAttributes
 
+cEnclosingMethod :: ClassFile High -> Maybe (EnclosingMethod High)
+cEnclosingMethod =
+  firstOne . caEnclosingMethod . cAttributes
+
 data ClassAttributes r = ClassAttributes
   { caBootstrapMethods :: [ BootstrapMethods r]
   , caSignature        :: [ Signature r ]
+  , caEnclosingMethod  :: [ EnclosingMethod r ]
   , caOthers           :: [ Attribute r ]
   }
 
@@ -118,12 +125,13 @@ instance Staged ClassFile where
       , cAttributes         = ca'
       }
     where
-      fromCollector (a, b, c) =
-        ClassAttributes (appEndo a []) (appEndo b []) (appEndo c [])
+      fromCollector = flip appEndo (ClassAttributes [] [] [] [])
       collect' attr =
-        collect (mempty, mempty, Endo (attr:)) attr
-          [ toC $ \e -> (Endo (e:), mempty, mempty)
-          , toC $ \e -> (mempty, Endo (e:), mempty)]
+        collect (Endo (\ca -> ca {caOthers = attr: caOthers ca})) attr
+          [ toC $ \e -> Endo (\ca -> ca {caSignature = e : caSignature ca})
+          , toC $ \e -> Endo (\ca -> ca {caEnclosingMethod = e : caEnclosingMethod ca})
+          , toC $ \e -> Endo (\ca -> ca {caBootstrapMethods = e : caBootstrapMethods ca})
+          ]
 
   devolve cf = do
     tci' <- unlink (cThisClass cf)
@@ -147,11 +155,12 @@ instance Staged ClassFile where
       , cAttributes         = SizedList ca'
       }
     where
-      fromClassAttributes (ClassAttributes cm cs at) = do
+      fromClassAttributes (ClassAttributes cm cs cem at) = do
         cm' <- mapM toAttribute cm
         cs' <- mapM toAttribute cs
+        cem' <- mapM toAttribute cem
         at' <- mapM devolve at
-        return (cm' ++ cs' ++ at')
+        return (cm' ++ cs' ++ cem' ++ at')
 
 $(deriveBase ''ClassAttributes)
 $(deriveBaseWithBinary ''ClassFile)
