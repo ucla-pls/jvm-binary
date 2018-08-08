@@ -62,4 +62,4 @@ ex1 :: String
 ex1 = "test/data/project/Main.class"
 
 ex2 :: String
-ex2 = "test/data/java/util/zip/ZipOutputStream.class"
+ex2 = "test/data/SQLite.class"

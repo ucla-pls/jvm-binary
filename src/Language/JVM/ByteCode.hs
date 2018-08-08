@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleContexts   #-}
@@ -81,7 +82,7 @@ import           Data.Binary.Get       hiding (Get, label)
 import           Data.Binary.Put       hiding (Put)
 import qualified Data.ByteString.Lazy  as BL
 import           Data.Int
-import qualified Data.IntMap           as IM
+import qualified Data.IntMap.Strict           as IM
 import qualified Data.Vector           as V
 
 import           Language.JVM.Constant
@@ -179,8 +180,9 @@ data ByteCodeInst r = ByteCodeInst
 
 evolveByteCode :: EvolveM m => ByteCode Low -> m (OffsetMap, ByteCode High)
 evolveByteCode bc@(ByteCode (_, v)) = do
-  let om = offsetMap bc
-  (om,) . ByteCode <$> V.mapM (fmap opcode . evolveByteCodeInst (evolveOffset om)) v
+  let !om = offsetMap bc
+  x <- V.mapM (fmap opcode . evolveByteCodeInst (evolveOffset om)) v
+  return . (om,) . ByteCode $! x
 
 devolveByteCode :: DevolveM m => ByteCode High -> m (ByteCode Low)
 devolveByteCode (ByteCode bc) = do
@@ -239,10 +241,13 @@ evolveByteCodeInst g (ByteCodeInst ofs opr) = do
     TableSwitch i (SwitchTable l ofss) ->
       label "TableSwitch" $ (TableSwitch i . SwitchTable l <$> V.mapM calcOffset ofss)
     a                 -> return $ unsafeCoerce a
-  return (ByteCodeInst ofs x)
+  return $ seq x (ByteCodeInst ofs x)
   where
     calcOffset r =
       g (fromIntegral $ fromIntegral ofs + r)
+
+{-# INLINABLE evolveByteCodeInst #-}
+
 
 devolveByteCodeInst ::
   DevolveM m
@@ -322,8 +327,10 @@ instance Binary (ByteCode Low) where
     putLazyByteString bs
 
 instance Binary (ByteCodeInst Low) where
-  get =
-    ByteCodeInst <$> (fromIntegral <$> bytesRead) <*> get
+  get = do
+    i <- (fromIntegral <$> bytesRead)
+    x <- get
+    return $! ByteCodeInst i x
   put x =
     putByteCode (offset x) $ opcode x
 
@@ -350,17 +357,17 @@ data ArrayType
 
 data ExactArrayType r
   = EABoolean | EAByte | EAChar | EAShort | EAInt | EALong
-  | EAFloat | EADouble | EARef (Ref ClassName r)
+  | EAFloat | EADouble | EARef !(Ref ClassName r)
 
 data Invocation r
-  = InvkSpecial (DeepRef AbsVariableMethodId r)
+  = InvkSpecial !(DeepRef AbsVariableMethodId r)
   -- ^ Variable since 52.0
-  | InvkVirtual (DeepRef AbsMethodId r)
-  | InvkStatic (DeepRef AbsVariableMethodId r)
+  | InvkVirtual !(DeepRef AbsMethodId r)
+  | InvkStatic !(DeepRef AbsVariableMethodId r)
   -- ^ Variable since 52.0
-  | InvkInterface Word8 (DeepRef AbsInterfaceMethodId r)
+  | InvkInterface !Word8 !(DeepRef AbsInterfaceMethodId r)
   -- ^ Should be a positive number
-  | InvkDynamic (DeepRef InvokeDynamic r)
+  | InvkDynamic !(DeepRef InvokeDynamic r)
 
 data FieldAccess
   = FldStatic
@@ -371,7 +378,6 @@ data OneOrTwo = One | Two
   deriving (Show, Ord, Bounded, Eq, Enum, Generic, NFData)
 
 type WordSize = OneOrTwo
-
 
 evolveBConstant :: EvolveM m => BConstant Low -> m (BConstant High)
 evolveBConstant ccnst = do
@@ -511,80 +517,80 @@ switchHigh st =
     len = fromIntegral . V.length $ switchOffsets st
 
 data ByteCodeOpr r
-  = ArrayLoad ArrayType
+  = ArrayLoad !ArrayType
   -- ^ aaload baload ...
-  | ArrayStore ArrayType
+  | ArrayStore !ArrayType
   -- ^ aastore bastore ...
 
-  | Push (BConstant r)
+  | Push !(BConstant r)
 
-  | Load LocalType LocalAddress
+  | Load !LocalType !LocalAddress
   -- ^ aload_0, bload_2, iload 5 ...
-  | Store LocalType LocalAddress
+  | Store !LocalType !LocalAddress
   -- ^ aload, bload ...
 
-  | BinaryOpr BinOpr ArithmeticType
+  | BinaryOpr !BinOpr !ArithmeticType
   -- ^ iadd ...
-  | Neg ArithmeticType
+  | Neg !ArithmeticType
   -- ^ ineg ...
 
-  | BitOpr BitOpr WordSize
+  | BitOpr !BitOpr !WordSize
   -- ^ Exclusively on int and long, identified by the word-size
 
   | IncrLocal !LocalAddress !IncrementAmount
   -- ^ Only works on ints, increment local #1, with #2
 
-  | Cast CastOpr
+  | Cast !CastOpr
   -- ^ Only valid on different types
 
   | CompareLongs
 
-  | CompareFloating Bool WordSize
+  | CompareFloating !Bool !WordSize
   -- ^ Compare two floating values, #1 indicates if greater-than, #2
   -- is if float or double should be used.
 
-  | If CmpOpr OneOrTwo (ShortRelativeRef r)
+  | If !CmpOpr !OneOrTwo !(ShortRelativeRef r)
   -- ^ compare with 0 if #2 is False, and two ints from the stack if
   -- True. the last value is the offset
 
-  | IfRef Bool OneOrTwo (ShortRelativeRef r)
+  | IfRef !Bool !OneOrTwo !(ShortRelativeRef r)
   -- ^ check if two objects are equal, or not equal. If #2 is True, compare
   -- with null.
 
-  | Goto (LongRelativeRef r)
-  | Jsr (LongRelativeRef r)
-  | Ret LocalAddress
+  | Goto !(LongRelativeRef r)
+  | Jsr !(LongRelativeRef r)
+  | Ret !LocalAddress
 
-  | TableSwitch Int32 (SwitchTable r)
+  | TableSwitch !Int32 !(SwitchTable r)
   -- ^ a table switch has 2 values a `default` and a `SwitchTable`
-  | LookupSwitch Int32 (V.Vector (Int32, Int32))
+  | LookupSwitch !Int32 (V.Vector (Int32, Int32))
   -- ^ a lookup switch has a `default` value and a list of pairs.
 
-  | Get FieldAccess (DeepRef (InClass FieldId) r)
-  | Put FieldAccess (DeepRef (InClass FieldId) r)
+  | Get !FieldAccess !(DeepRef (InClass FieldId) r)
+  | Put !FieldAccess !(DeepRef (InClass FieldId) r)
 
-  | Invoke (Invocation r)
+  | Invoke !(Invocation r)
 
-  | New (Ref ClassName r)
+  | New !(Ref ClassName r)
 
-  | NewArray (ExactArrayType r)
+  | NewArray !(ExactArrayType r)
 
   | ArrayLength
 
   | Throw
 
-  | CheckCast (Ref ClassName r)
-  | InstanceOf (Ref ClassName r)
+  | CheckCast !(Ref ClassName r)
+  | InstanceOf !(Ref ClassName r)
 
-  | Monitor Bool
+  | Monitor !Bool
   -- ^ True => Enter, False => Exit
 
   -- TODO: Fix this so that its more clear what it points to.
-  | MultiNewArray (Ref ClassName r) Word8
+  | MultiNewArray !(Ref ClassName r) !Word8
   -- ^ Create a new multi array of #1 and with #2 dimensions
   -- ^ This might point to an array type.
 
-  | Return (Maybe LocalType)
+  | Return !(Maybe LocalType)
 
   | Nop
 
@@ -926,6 +932,8 @@ instance Binary (ByteCodeOpr Low) where
       0xc9 -> Jsr <$> getInt32be
 
       _ -> fail $ "I do not know this bytecode '0x" ++ showHex cmd "'."
+
+  {-# INLINABLE get#-}
 
   put = putByteCode 0
 
