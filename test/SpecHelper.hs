@@ -25,7 +25,7 @@ import Test.Hspec.Expectations.Pretty
 
 import Test.Tasty
 import Test.Tasty.Hspec hiding (shouldBe)
-import Test.Tasty.QuickCheck
+import Test.Tasty.QuickCheck 
 import qualified Test.QuickCheck.Property as P
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
@@ -34,7 +34,7 @@ import Data.Bifunctor
 
 import System.FilePath
 import System.Directory
-import           Generic.Random
+import           Generic.Random hiding (Field)
 
 import Control.Monad
 import Data.Binary
