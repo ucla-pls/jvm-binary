@@ -14,6 +14,7 @@ module SpecHelper
   , testAllFiles
   , hexStringS
   , hexString
+  , withTestClass
   , Spec
   , SpecWith
   , it
@@ -42,6 +43,7 @@ import Data.Bits
 import qualified Data.List as List
 
 import Language.JVM.ByteCode
+import Language.JVM.ClassFile
 import Language.JVM.Utils
 import Language.JVM.Staged
 import Language.JVM.ClassFileReader
@@ -67,6 +69,10 @@ testAllFiles spec = do
       takeExtension p == ".class"
       && p /= "test/data/SQLite.class"
 
+withTestClass :: String -> IO (ClassFile High)
+withTestClass str = do
+  Right rf <- readClassFile <$> (blReadFile $ "test/data/" ++ str ++ ".class")
+  return rf
 
 -- testSomeFiles :: SpecWith BL.ByteString -> IO [TestTree]
 -- testSomeFiles spec =
