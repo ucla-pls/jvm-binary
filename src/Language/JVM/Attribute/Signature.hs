@@ -23,14 +23,17 @@ module Language.JVM.Attribute.Signature
   -- * Top Level Definitions
 
   , ClassSignature (..)
-  , classSignatureP
   , classSignatureToText
+  , classSignatureFromText
+  , classSignatureP
   , MethodSignature (..)
-  , methodSignatureP
   , methodSignatureToText
+  , methodSignatureFromText
+  , methodSignatureP
   , FieldSignature (..)
-  , fieldSignatureP
   , fieldSignatureToText
+  , fieldSignatureFromText
+  , fieldSignatureP
 
   -- * Lower Level Definitions
   , ClassType (..)
@@ -101,6 +104,10 @@ classSignatureP = do
 classSignatureToText :: ClassSignature -> Text.Text
 classSignatureToText =
   LText.toStrict . toLazyText . classSignatureT
+
+classSignatureFromText :: Text.Text -> Either String ClassSignature
+classSignatureFromText =
+  parseOnly classSignatureP
 
 classSignatureT :: ClassSignature -> Builder
 classSignatureT (ClassSignature tp ct its)= do
@@ -304,6 +311,14 @@ methodSignatureToText :: MethodSignature -> Text.Text
 methodSignatureToText =
   LText.toStrict . toLazyText . methodSignatureT
 
+methodSignatureFromText :: Text.Text -> Either String MethodSignature
+methodSignatureFromText =
+  parseOnly methodSignatureP
+
+fieldSignatureFromText :: Text.Text -> Either String FieldSignature
+fieldSignatureFromText =
+  parseOnly fieldSignatureP
+
 methodSignatureT :: MethodSignature -> Builder
 methodSignatureT (MethodSignature tp args res thrws)= do
   typeParametersT tp
@@ -323,12 +338,14 @@ throwsSignatureP = do
   _ <- char '^'
   choice [ ThrowsClass <$> classTypeP, ThrowsTypeVariable <$> typeVariableP]
 
+
 throwsSignatureT :: ThrowsSignature -> Builder
 throwsSignatureT t =
   singleton '^'
     <> case t of
          ThrowsClass ct -> classTypeT ct
          ThrowsTypeVariable tt -> typeVariableT tt
+
 
 
 newtype FieldSignature =

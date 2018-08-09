@@ -22,19 +22,19 @@ prop_field_signature :: FieldSignature -> Property
 prop_field_signature sig =
   let txt = fieldSignatureToText sig in
     counterexample (Text.unpack txt) $
-      parseOnly fieldSignatureP txt === Right sig
+      fieldSignatureFromText txt === Right sig
 
 prop_method_signature :: MethodSignature -> Property
 prop_method_signature sig =
   let txt = methodSignatureToText sig in
     counterexample (Text.unpack txt) $
-      parseOnly methodSignatureP txt === Right sig
+      methodSignatureFromText txt === Right sig
 
 prop_class_signature :: ClassSignature -> Property
 prop_class_signature sig =
   let txt = classSignatureToText sig in
     counterexample (Text.unpack txt) $
-      parseOnly classSignatureP txt === Right sig
+      classSignatureFromText txt === Right sig
 
 spec_real_signatures :: SpecWith ()
 spec_real_signatures = do
