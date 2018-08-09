@@ -53,7 +53,6 @@ import           Control.DeepSeq             (NFData)
 -- import qualified Data.IntMap                 as IM
 import qualified Data.Text                   as Text
 import Data.Monoid
-import Data.Maybe
 
 import Data.Text.Lazy.Builder as Text
 import qualified Data.Text.Lazy as LText
@@ -117,6 +116,7 @@ typeSignatureP = do
   choice [ (ReferenceType <$> referenceTypeP) <?> "JRefereceType"
          , (BaseType <$> jBaseTypeP) <?> "JBaseType" ]
 
+typeSignatureT :: TypeSignature -> Builder
 typeSignatureT (ReferenceType t) = referenceTypeT t
 typeSignatureT (BaseType t) = singleton (jBaseTypeToChar t)
 
@@ -134,6 +134,7 @@ referenceTypeP = do
     , RefArrayType <$> (char '[' >> typeSignatureP)
     ]
 
+referenceTypeT :: ReferenceType -> Builder
 referenceTypeT t =
   case t of
     RefClassType ct -> classTypeT ct
@@ -165,6 +166,7 @@ classTypeP = nameit "ClassType" $ do
   _ <- char ';'
   return $ L.foldl' (\a (i,ta') -> InnerClassType i a ta') (ClassType cn ta) ict
 
+classTypeT :: ClassType -> Builder
 classTypeT t =
   go t <> singleton ';'
   where
@@ -272,6 +274,7 @@ typeParameterT (TypeParameter n cb ibs) =
   Text.fromText  n <> singleton ':' <> maybe mempty referenceTypeT cb <>
     foldMap (\i -> singleton ':' <> referenceTypeT i) ibs
 
+nameit :: String -> Parser a -> Parser a
 nameit str m = m <?> str
 
 identifierP :: Parser Text.Text
@@ -320,6 +323,7 @@ throwsSignatureP = do
   _ <- char '^'
   choice [ ThrowsClass <$> classTypeP, ThrowsTypeVariable <$> typeVariableP]
 
+throwsSignatureT :: ThrowsSignature -> Builder
 throwsSignatureT t =
   singleton '^'
     <> case t of
