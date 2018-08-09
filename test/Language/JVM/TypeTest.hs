@@ -4,32 +4,34 @@ module Language.JVM.TypeTest where
 
 import SpecHelper
 
+import Data.Attoparsec.Text
+import Data.Either
 import Language.JVM.Type
 
 -- import Text.Megaparsec
 -- import Test.Hspec.Megaparsec
 
--- spec_JType_parsing :: Spec
--- spec_JType_parsing = do
---   it "can parse \"[B\" as an array" $
---     parse parseJType "" "[B" `shouldParse` JTArray JTByte
---   it "can parse an array of strings" $
---     parse parseJType "" "[Ljava/lang/String;" `shouldParse`
---       JTArray (JTClass (ClassName "java/lang/String"))
+spec_JType_parsing :: Spec
+spec_JType_parsing = do
+  it "can parse \"[B\" as an array" $
+    parseOnly parseText "[B" `shouldBe` Right (JTArray (JTBase JTByte))
+  it "can parse an array of strings" $
+    parseOnly parseText "[Ljava/lang/String;" `shouldBe`
+      Right (JTArray (JTClass (ClassName "java/lang/String")))
 
--- spec_MethodDescriptor_parsing :: Spec
--- spec_MethodDescriptor_parsing = do
---   it "can parse the empty method" $
---     parse parseMethodDescriptor "" "()V" `shouldParse`
---       MethodDescriptor [] Nothing
---   it "can parse method arguments" $
---     parse parseMethodDescriptor "" "(BZ)B" `shouldParse`
---       MethodDescriptor [JTByte, JTBoolean] (Just JTByte)
---   it "does not parse if there is too much" $
---     methodDescriptorFromText "(BZ)Bx" `shouldBe` Nothing
+spec_MethodDescriptor_parsing :: Spec
+spec_MethodDescriptor_parsing = do
+  it "can parse the empty method" $
+    parseOnly parseText "()V" `shouldBe`
+      Right (MethodDescriptor [] Nothing)
+  it "can parse method arguments" $
+    parseOnly parseText "(BZ)B" `shouldBe`
+      Right (MethodDescriptor [JTBase JTByte, JTBase JTBoolean] (Just (JTBase JTByte)))
+  it "does not parse if there is too much" $
+    (fromText "(BZ)Bx" :: Either String MethodDescriptor) `shouldSatisfy` isLeft
 
 instance Arbitrary ClassName where
-  arbitrary = pure $ ClassName "package.Main"
+  arbitrary = pure $ ClassName "package/Main"
 
 instance Arbitrary JType where
   arbitrary = genericArbitrary uniform

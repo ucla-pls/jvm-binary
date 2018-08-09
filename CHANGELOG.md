@@ -5,6 +5,7 @@
 - Add EnclosingMethod Attribute
 - Add InnerClasses Attribute
 - Add ICAccessFlag 
+- Add parseing and writing of Signatures
 - General optimizations
 
 ## Version 0.1.0 

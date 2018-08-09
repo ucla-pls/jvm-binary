@@ -21,6 +21,8 @@ module Language.JVM.Type
   -- ** JType
   , JType (..)
   , JBaseType (..)
+  , jBaseTypeP
+  , jBaseTypeToChar
 
   -- ** MethodDescriptor
   , MethodDescriptor (..)
@@ -100,46 +102,55 @@ data NameAndType a = NameAndType
 
 class TypeParse a where
   fromText :: Text.Text -> Either String a
-  fromText = parseOnly parseText
+  fromText = parseOnly (parseText <* endOfInput)
   parseText :: Parser a
   toText :: a -> Text.Text
 
+jBaseTypeP :: Parser JBaseType
+jBaseTypeP = do
+  s <- satisfy (inClass "BCDFIJSZ") <?> "BaseType"
+  case s of
+    'B' -> return $ JTByte
+    'C' -> return $ JTChar
+    'D' -> return $ JTDouble
+    'F' -> return $ JTFloat
+    'I' -> return $ JTInt
+    'J' -> return $ JTLong
+    'S' -> return $ JTShort
+    'Z' -> return $ JTBoolean
+    _ -> error "should not happen"
+
+jBaseTypeToChar :: JBaseType -> Char
+jBaseTypeToChar y = do
+  case y of
+    JTByte    -> 'B'
+    JTChar    -> 'C'
+    JTDouble  -> 'D'
+    JTFloat   -> 'F'
+    JTInt     -> 'I'
+    JTLong    -> 'J'
+    JTShort   -> 'S'
+    JTBoolean -> 'Z'
+
 instance TypeParse JType where
-  parseText = try $ do
-    s <- anyChar
-    case s :: Char of
-      'B' -> return $ JTBase JTByte
-      'C' -> return $ JTBase JTChar
-      'D' -> return $ JTBase JTDouble
-      'F' -> return $ JTBase JTFloat
-      'I' -> return $ JTBase JTInt
-      'J' -> return $ JTBase JTLong
-      'L' -> do
-        txt <- takeWhile (/= ';')
-        _ <- char ';'
-        return $ JTClass (ClassName txt)
-      'S' -> return $ JTBase JTShort
-      'Z' -> return $ JTBase JTBoolean
-      '[' -> JTArray <$> parseText
-      _ -> fail $ "Unknown char " ++ show s
+  parseText = do
+    choice
+      [ JTBase <$> jBaseTypeP
+      , do
+          _ <- char 'L'
+          txt <- takeWhile (/= ';')
+          _ <- char ';'
+          return $ JTClass (ClassName txt)
+      , char '[' >> JTArray <$> parseText
+      ]
   toText tp =
     Text.pack $ go tp ""
     where
       go x =
         case x of
-          JTBase y               -> textbase y
+          JTBase y               -> (jBaseTypeToChar y :)
           JTClass (ClassName cn) -> ((('L':Text.unpack cn) ++ ";") ++)
           JTArray tp'            -> ('[':) . go tp'
-      textbase y =
-        case y of
-          JTByte    -> ('B':)
-          JTChar    -> ('C':)
-          JTDouble  -> ('D':)
-          JTFloat   -> ('F':)
-          JTInt     -> ('I':)
-          JTLong    -> ('J':)
-          JTShort   -> ('S':)
-          JTBoolean -> ('Z':)
 
 instance TypeParse MethodDescriptor where
   toText md =
