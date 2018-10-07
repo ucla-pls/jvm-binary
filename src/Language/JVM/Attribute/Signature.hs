@@ -55,7 +55,7 @@ import           Control.DeepSeq             (NFData)
 -- import           Data.Binary
 -- import qualified Data.IntMap                 as IM
 import qualified Data.Text                   as Text
-import Data.Monoid
+-- import Data.Monoid
 
 import Data.Text.Lazy.Builder as Text
 import qualified Data.Text.Lazy as LText
