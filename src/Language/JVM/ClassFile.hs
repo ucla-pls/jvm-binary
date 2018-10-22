@@ -125,7 +125,7 @@ instance Staged ClassFile where
     cii' <- mapM link $ cInterfaces cf
     cf' <- mapM evolve $ cFields' cf
     cm' <- mapM evolve $ cMethods' cf
-    ca' <- fromCollector <$> fromAttributes collect' (cAttributes cf)
+    ca' <- fromCollector <$> fromAttributes ClassAttribute collect' (cAttributes cf)
     return $ cf
       { cConstantPool = ()
       , cThisClass = tci'

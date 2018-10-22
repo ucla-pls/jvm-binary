@@ -86,7 +86,7 @@ instance Staged Code where
     (offsets, codeByteCode) <- evolveByteCode codeByteCode
     let evolver = (evolveOffset offsets)
     codeExceptionTable <- mapM (evolveBC evolver) codeExceptionTable
-    codeAttributes <- fromCollector <$> fromAttributes (collect' evolver) codeAttributes
+    codeAttributes <- fromCollector <$> fromAttributes CodeAttribute (collect' evolver) codeAttributes
     return $ Code {..}
     where
       fromCollector (a, b, c) =

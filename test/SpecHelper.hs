@@ -1,4 +1,3 @@
-
 module SpecHelper
   ( module Test.Tasty
   , module Test.Hspec.Expectations.Pretty
@@ -26,7 +25,7 @@ import Test.Hspec.Expectations.Pretty
 
 import Test.Tasty
 import Test.Tasty.Hspec hiding (shouldBe)
-import Test.Tasty.QuickCheck 
+import Test.Tasty.QuickCheck
 import qualified Test.QuickCheck.Property as P
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
@@ -35,7 +34,7 @@ import Data.Bifunctor
 
 import System.FilePath
 import System.Directory
-import           Generic.Random hiding (Field)
+import           Generic.Random
 
 import Control.Monad
 import Data.Binary
@@ -118,7 +117,7 @@ isoRoundtrip a =
       let bs = encode a'
       a'' <- bimap trd trd $ decodeOrFail bs
       cp' <- first show $ bootstrapConstantPool cp
-      a3 <- first show $ runEvolve cp' (evolve a'')
+      a3 <- first show $ runEvolve (EvolveConfig [] cp' (const True)) (evolve a'')
       return (bs, a3)
 
 -- | Test that a value can go from the Highest state to binary and back again
@@ -139,7 +138,7 @@ byteCodeRoundtrip a1 = do
   let bs = encode a'
   a'' <- bimap trd trd $ decodeOrFail bs
   cp' <- first show $ bootstrapConstantPool cp
-  a3 <- first show $ runEvolve cp' (evolveBC (return . fromIntegral) a'')
+  a3 <- first show $ runEvolve (EvolveConfig [] cp' (const True)) (evolveBC (return . fromIntegral) a'')
   return (bs, a3)
 
 folderContents :: FilePath -> IO [ FilePath ]

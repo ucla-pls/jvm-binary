@@ -41,11 +41,11 @@ test_reading_classfile = testAllFiles $ \bs -> do
     cp `shouldSatisfy` isRight
     let Right cp' = cp
     forM_ (cMethods' cls) $ \m -> do
-      case (runEvolve cp' (evolve m)) of
+      case (runEvolve (EvolveConfig [] cp' (const True)) (evolve m)) of
         Right _ -> return ()
         Left err -> do
           putStr (show err) >> putStr ": "
-          print . runEvolve cp' $ do
+          print . runEvolve (EvolveConfig [] cp' (const True)) $ do
             x <- link (mDescriptor m)
             n <- link (mName m)
             return ((n, x) :: (MethodDescriptor, Text.Text))
@@ -57,7 +57,7 @@ test_reading_classfile = testAllFiles $ \bs -> do
                   putStr " -> " >> print i
 
                 forM_ (C.codeAttributes c) $ \ca -> do
-                  print $ runEvolve cp' (evolve ca)
+                  print $ runEvolve (EvolveConfig [] cp' (const True)) (evolve ca)
                   putStrLn (hexStringS $ aInfo ca)
                   case fromAttribute' ca :: Either String (StackMapTable Low) of
                     Right x ->
@@ -76,7 +76,7 @@ test_reading_classfile = testAllFiles $ \bs -> do
       decodeClassFile e `shouldBe` Right cls
 
   describe "evolving/devolving" $ do
-    let me = evolveClassFile cls
+    let me = evolveClassFile (const True) cls
     it "can evolve the whole class file" $ do
       me `shouldSatisfy` isRight
 

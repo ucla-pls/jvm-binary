@@ -144,16 +144,23 @@ collect c attr options =
 -- monoid given an 'Attribute' calculate the monoid over all attributes.
 fromAttributes ::
   (Foldable f, EvolveM m, Monoid a)
-  => (Attribute High -> m a)
+  => AttributeLocation
+  -> (Attribute High -> m a)
   -> f (Attribute Low)
   -> m a
-fromAttributes f attrs =
-  Prelude.foldl g (return mempty) attrs
+fromAttributes al f attrs = do
+  afilter <- attributeFilter
+  Prelude.foldl (g afilter) (return mempty) attrs
   where
-    g m a' = do
+    g afilter m a' = do
       b <- m
-      x <- f =<< evolve a'
-      return $ b `mappend` x
+      ah <- evolve a'
+      if afilter (al, aName ah)
+        then do
+          x <- f ah
+          return $ b `mappend` x
+      else do
+        return b
 
 readFromStrict :: Binary a => Attribute r -> Either String a
 readFromStrict =

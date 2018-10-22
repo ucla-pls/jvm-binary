@@ -36,8 +36,10 @@ evolvebm :: FilePath -> Benchmark
 evolvebm fp =
   env (decodeClassFile' fp)$ \clf ->
     bgroup ("evolve " ++ fp)
-    [ bench "strict"
-        (nf evolveClassFile clf)
+    [ bench "filter false"
+        (nf (evolveClassFile (const False)) clf)
+    , bench "filter true"
+        (nf (evolveClassFile (const True)) clf)
     ]
 
 devolvebm :: FilePath -> Benchmark

@@ -15,10 +15,16 @@ module Language.JVM.Staged
   , LabelM (..)
   , EvolveM (..)
   , DevolveM (..)
+
+  -- * AttributeLocation
+  , AttributeLocation (..)
+
   -- * Re-exports
   , module Language.JVM.Stage
   , module Language.JVM.TH
   ) where
+
+import qualified Data.Text as Text
 
 import Language.JVM.Constant
 import Language.JVM.Stage
@@ -29,8 +35,16 @@ class Monad m => LabelM m where
   -- ^ label the current position in the class-file, good for debugging
   label _ = id
 
+data AttributeLocation
+  = ClassAttribute
+  | MethodAttribute
+  | CodeAttribute
+  | FieldAttribute
+  deriving (Show, Eq, Ord)
+
 class LabelM m => EvolveM m where
   link :: Referenceable r => Index -> m r
+  attributeFilter :: m ((AttributeLocation, Text.Text) -> Bool)
   attributeError :: String -> m r
 
 class LabelM m => DevolveM m where

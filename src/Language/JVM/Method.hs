@@ -85,7 +85,7 @@ instance Staged Method where
     mn' <- link mn
     md' <- link md
     mattr' <- label (Text.unpack (mn' <> ":" <> toText md'))
-      $ fromCollector <$> fromAttributes collect' mattr
+      $ fromCollector <$> fromAttributes MethodAttribute collect' mattr
     return $ Method mf mn' md' mattr'
     where
       fromCollector (a, b, c, d) =

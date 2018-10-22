@@ -64,7 +64,7 @@ instance Staged Field where
   evolve field = label "Field" $ do
     fi <- link (fName field)
     fd <- link (fDescriptor field)
-    fattr <- fromCollector <$> fromAttributes collect' (fAttributes field)
+    fattr <- fromCollector <$> fromAttributes FieldAttribute collect' (fAttributes field)
     return $ Field (fAccessFlags' field) fi fd fattr
     where
       fromCollector (cv, sig, others) =

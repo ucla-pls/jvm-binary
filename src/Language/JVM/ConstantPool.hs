@@ -91,6 +91,7 @@ access ref (ConstantPool cp) =
     Just x -> Right x
     Nothing -> Left $ PoolAccessError ref "No such element."
 
+
 -- | Append a constant to the constant pool, and get the offset.
 append :: Constant r -> ConstantPool r -> (Index, ConstantPool r)
 append c (ConstantPool cp) =

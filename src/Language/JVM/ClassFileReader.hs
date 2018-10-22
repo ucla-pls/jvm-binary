@@ -19,6 +19,7 @@ module Language.JVM.ClassFileReader
   -- * Evolve
   , Evolve
   , ClassFileError
+  , EvolveConfig (..)
   , runEvolve
   , bootstrapConstantPool
 
@@ -30,16 +31,18 @@ module Language.JVM.ClassFileReader
   , cpbEmpty
   ) where
 
-import           Control.DeepSeq           (NFData)
+import           Control.DeepSeq (NFData)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
-import qualified Data.ByteString.Lazy      as BL
-import qualified Data.IntMap               as IM
-import qualified Data.Map                  as Map
-import           Data.Monoid
 import           Data.Binary
-import           GHC.Generics              (Generic)
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.IntMap as IM
+import qualified Data.Map as Map
+import qualified Data.List as List
+import qualified Data.Text as Text
+import           Data.Monoid
+import           GHC.Generics (Generic)
 
 import           Language.JVM.ClassFile
 import           Language.JVM.Constant
@@ -66,11 +69,16 @@ encodeClassFile :: ClassFile Low -> BL.ByteString
 encodeClassFile clf = do
   encode clf
 
--- | Changed the stage from Index to Deref
-evolveClassFile :: ClassFile Low -> Either ClassFileError (ClassFile High)
-evolveClassFile cf = do
+-- | Evolve the class file to inline the references. A filter function is
+-- provided to remove some attributes. This will sometimes give faster loading
+-- times.
+evolveClassFile ::
+  ((AttributeLocation, Text.Text) -> Bool)
+  -> ClassFile Low
+  -> Either ClassFileError (ClassFile High)
+evolveClassFile fn cf = do
   cp <- bootstrapConstantPool (cConstantPool cf)
-  runEvolve cp (evolve cf)
+  runEvolve (EvolveConfig [] cp fn ) (evolve cf)
 
 -- | Devolve a ClassFile from High to Low. This might make the 'ClassFile' contain
 -- invalid attributes, since we can't read all attributes. If this this is a problem
@@ -89,12 +97,11 @@ devolveClassFile' cp cf =
   let (cf', cpb) = runConstantPoolBuilder (devolve cf) (builderFromConstantPool cp) in
   cf' { cConstantPool = cpbConstantPool cpb }
 
-
 -- | Top level command that combines 'decode' and 'evolve'.
 readClassFile :: BL.ByteString -> Either ClassFileError (ClassFile High)
 readClassFile bs = do
   clf <- decodeClassFile bs
-  evolveClassFile clf
+  evolveClassFile (const True) clf
 
 -- | Top level command that combines 'devolve' and 'encode'.
 writeClassFile :: ClassFile High -> BL.ByteString
@@ -123,31 +130,45 @@ data ClassFileError
 
 instance NFData ClassFileError
 
+data EvolveConfig =
+  EvolveConfig
+  { ecLabel :: [String]
+  , ecConstantPool :: ConstantPool High
+  , ecAttributeFilter :: ((AttributeLocation, Text.Text) -> Bool)
+  }
+
 newtype Evolve a =
-  Evolve (ReaderT (String, ConstantPool High) (Either ClassFileError) a)
+  Evolve (ReaderT EvolveConfig (Either ClassFileError) a)
   deriving
   ( Functor
   , Applicative
   , Monad
-  , MonadReader (String, ConstantPool High)
+  , MonadReader EvolveConfig
   , MonadError ClassFileError
   )
 
-runEvolve :: ConstantPool High -> Evolve a -> Either ClassFileError a
-runEvolve cp (Evolve m) = runReaderT m ("", cp)
+runEvolve :: EvolveConfig -> Evolve a -> Either ClassFileError a
+runEvolve ev (Evolve m) = runReaderT m ev
 
 instance LabelM Evolve where
   label str (Evolve m) = do
-    Evolve . withReaderT (\(x, cp) -> (x ++ "/" ++ str, cp)) $ m
+    Evolve . withReaderT (\ec -> ec { ecLabel = str : ecLabel ec}) $ m
+
+showLvl :: [String] -> String
+showLvl = List.intercalate "/" . reverse
 
 instance EvolveM Evolve where
   link w = do
-    (lvl, cp) <- ask
-    r <- either (throwError . CFEPoolAccessError lvl ) return $ access w cp
+    ec <- ask
+    let lvl = showLvl ( ecLabel ec )
+    r <- either (throwError . CFEPoolAccessError lvl)  return $ access w (ecConstantPool ec)
     fromConst (throwError . CFEInconsistentClassPool lvl) r
 
+  attributeFilter =
+    asks ecAttributeFilter
+
   attributeError msg = do
-    (lvl, _) <- ask
+    lvl <- asks (showLvl . ecLabel)
     throwError (CFEConversionError lvl msg)
 
 -- | Untie the constant pool, this requires a special operation as the constant pool
@@ -162,19 +183,23 @@ bootstrapConstantPool reffed =
            $ "Could not load all constants in the constant pool: " ++ (show xs)
   where
     stage' cp mis =
-      let (cp', mis') = foldMap (grow cp) mis in
-      case appEndo mis' [] of
-        [] | IM.null cp' -> Right cp
-        xs
-          | IM.null cp' ->
-            Left xs
-          | otherwise ->
-            stage' (cp `IM.union` cp') (map snd xs)
+      let (cp', mis') =
+            foldMap (grow (EvolveConfig [] (ConstantPool cp) (const True))) mis
+      in if IM.null cp'
+        then
+          case appEndo mis' [] of
+            [] -> Right cp
+            xs -> Left xs
+        else
+          stage' (cp `IM.union` cp') . map snd $ appEndo mis' []
 
-    grow cp (k,a) =
-      case runEvolve (ConstantPool cp) $ evolve a of
+    grow :: EvolveConfig -> (Int, Constant Low) -> (IM.IntMap (Constant High), Endo [(ClassFileError, (Int, Constant Low))])
+    grow ec (k,a) =
+      case runEvolve ec (evolve a) of
         Right c -> (IM.singleton k c, Endo id)
         Left msg  -> (IM.empty, Endo ((msg, (k,a)):))
+
+{-# SCC bootstrapConstantPool #-}
 
 -- $build
 
@@ -198,7 +223,7 @@ newtype ConstantPoolBuilder a =
   deriving (Monad, MonadState CPBuilder, Functor, Applicative)
 
 runConstantPoolBuilder :: ConstantPoolBuilder a -> CPBuilder -> (a, CPBuilder)
-runConstantPoolBuilder (ConstantPoolBuilder m) a=
+runConstantPoolBuilder (ConstantPoolBuilder m) a =
   runState m a
 
 instance LabelM ConstantPoolBuilder

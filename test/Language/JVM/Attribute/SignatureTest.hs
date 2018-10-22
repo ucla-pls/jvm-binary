@@ -13,8 +13,6 @@ import           Language.JVM
 import qualified Data.Text as Text
 import Data.Attoparsec.Text
 
-import Debug.Trace
-
 prop_roundtrip_SignatureTest :: Signature High -> Property
 prop_roundtrip_SignatureTest = isoRoundtrip
 
@@ -149,7 +147,7 @@ instance Arbitrary (ReferenceType) where
     n <- getSize
     if n == 0
       then pure (RefTypeVariable $ TypeVariable "X")
-      else scale (\n -> n `div` 2) $ genericArbitraryU
+      else scale (\s -> s `div` 2) $ genericArbitraryU
 
 instance Arbitrary (ClassType) where
   arbitrary = do
