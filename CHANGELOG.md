@@ -1,5 +1,9 @@
 # Change log
 
+## Version 0.2.0
+
+- Add filter to evolveClassFile
+
 ## Version 0.1.1
 
 - Add EnclosingMethod Attribute
