@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TupleSections      #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Language.JVM.Attribute.CodeTest where
 
@@ -95,8 +96,14 @@ genByteCodeOpr i = do
     IfRef b on _ -> IfRef b on <$> arbitraryRef i
     Goto _       -> Goto <$> arbitraryRef i
     Jsr _        -> Jsr <$> arbitraryRef i
-    TableSwitch r (SwitchTable l ofss) ->
-      TableSwitch r . SwitchTable l <$> V.mapM (const $ arbitraryRef i) ofss
+    TableSwitch _ (SwitchTable l ofss) ->
+      TableSwitch
+      <$> arbitraryRef i
+      <*> (SwitchTable l <$> V.mapM (const $ arbitraryRef i) ofss)
+    LookupSwitch _ ofss ->
+      LookupSwitch
+      <$> arbitraryRef i
+      <*> V.mapM (\(a, _) -> (a,) <$> arbitraryRef i) ofss
     _            -> return x
 
 instance Arbitrary a => Arbitrary (V.Vector a) where

@@ -238,8 +238,10 @@ evolveByteCodeInst g (ByteCodeInst ofs opr) = do
     IfRef b on r      -> label "IfRef" $ IfRef b on <$> calcOffset r
     Goto r            -> label "Goto" $ Goto <$> calcOffset r
     Jsr r             -> label "Jsr" $ Jsr <$> calcOffset r
-    TableSwitch i (SwitchTable l ofss) ->
-      label "TableSwitch" $ (TableSwitch i . SwitchTable l <$> V.mapM calcOffset ofss)
+    TableSwitch i (SwitchTable l ofss) -> label "TableSwitch" $
+        TableSwitch <$> calcOffset i <*> (SwitchTable l <$> V.mapM calcOffset ofss)
+    LookupSwitch i ofss -> label "LookupSwitch" $
+        LookupSwitch <$> calcOffset i <*> V.mapM (\(a, b) -> (a,) <$> calcOffset b) ofss
     a                 -> return $ unsafeCoerce a
   return $ seq x (ByteCodeInst ofs x)
   where
@@ -270,7 +272,9 @@ devolveByteCodeInst g (ByteCodeInst ofs opr) =
     Goto r            -> label "Goto" $ Goto <$> calcOffset r
     Jsr r             -> label "Jsr" $ Jsr <$> calcOffset r
     TableSwitch i (SwitchTable l ofss) -> label "TableSwitch" $
-        (TableSwitch i . SwitchTable l <$> V.mapM calcOffset ofss)
+        TableSwitch <$> calcOffset i <*> (SwitchTable l <$> V.mapM calcOffset ofss)
+    LookupSwitch i ofss -> label "LookupSwitch" $
+        LookupSwitch <$> calcOffset i <*> V.mapM (\(a, b) -> (a,) <$> calcOffset b) ofss
     a -> return $ unsafeCoerce a
   where
     calcOffset r = do
@@ -561,9 +565,9 @@ data ByteCodeOpr r
   | Jsr !(LongRelativeRef r)
   | Ret !LocalAddress
 
-  | TableSwitch !Int32 !(SwitchTable r)
+  | TableSwitch !(LongRelativeRef r) !(SwitchTable r)
   -- ^ a table switch has 2 values a `default` and a `SwitchTable`
-  | LookupSwitch !Int32 (V.Vector (Int32, Int32))
+  | LookupSwitch !(LongRelativeRef r) (V.Vector (Int32, (LongRelativeRef r)))
   -- ^ a lookup switch has a `default` value and a list of pairs.
 
   | Get !FieldAccess !(DeepRef (InClass FieldId) r)

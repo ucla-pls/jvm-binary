@@ -6,7 +6,6 @@
 module Language.JVM.ClassFileReader
   ( readClassFile
   , writeClassFile
-
   , writeClassFile'
 
   -- * Finer granularity commands
@@ -15,6 +14,9 @@ module Language.JVM.ClassFileReader
   , evolveClassFile
   , devolveClassFile
   , devolveClassFile'
+
+  -- * Helpers
+  , roundtripCopy
 
   -- * Evolve
   , Evolve
@@ -114,6 +116,13 @@ writeClassFile' :: ConstantPool Low -> ClassFile High -> BL.ByteString
 writeClassFile' cp =
   encodeClassFile . devolveClassFile' cp
 
+
+-- | A test function, essentially reading the classfile and then writing it
+-- to another file.
+roundtripCopy :: FilePath -> FilePath -> IO ()
+roundtripCopy f1 f2 = do
+  Right cf <- readClassFile <$> BL.readFile f1
+  BL.writeFile f2 $ writeClassFile cf
 
 -- $deref
 -- Dereffing is the flattening of the constant pool to get the values
