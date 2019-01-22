@@ -34,6 +34,8 @@ module Language.JVM.ByteCode
   , offsetIndex
   , offsetMap
 
+  , generateOffsets
+
   -- * ByteCode Operations
   , ByteCodeOpr (..)
 
@@ -174,8 +176,6 @@ data ByteCodeInst r = ByteCodeInst
   , opcode :: !(ByteCodeOpr r)
   }
 
-(...) :: (b -> c) -> (a1 -> a2 -> b) -> a1 -> a2 -> c
-(...) = (.) . (.)
 
 evolveByteCode :: EvolveM m => ByteCode Low -> m (OffsetMap, ByteCode High)
 evolveByteCode bc@(ByteCode (_, v)) = do
@@ -185,10 +185,16 @@ evolveByteCode bc@(ByteCode (_, v)) = do
 devolveByteCode :: DevolveM m => ByteCode High -> m (ByteCode Low)
 devolveByteCode (ByteCode bc) = do
   -- Devolving byte code is not straight forward.
-  (len, vect) <- V.foldM' acc (0,[]) bc
-  let offsets = V.fromList . reverse $ vect
+  (len, offsets) <- generateOffsets bc
   ByteCode . (fromIntegral len,)
-     <$> V.zipWithM (devolveByteCodeInst (devolveOffset' offsets) ... ByteCodeInst) offsets bc
+    <$> V.mapM 
+      (devolveByteCodeInst (devolveOffset' offsets))
+      (V.zipWith ByteCodeInst offsets bc)
+
+generateOffsets :: DevolveM m => V.Vector (ByteCodeOpr High) -> m (Word16, V.Vector ByteCodeOffset)
+generateOffsets bc = do
+  (len, vect) <- V.foldM' acc (0,[]) bc
+  return (len, V.fromList . reverse $ vect)
   where
     acc (off, lst) opr = do
       inst <- devolveByteCodeInst (const $ return 0) (ByteCodeInst off opr)
