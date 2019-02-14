@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE LambdaCase     #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE FlexibleInstances  #-}
@@ -59,7 +60,6 @@ module Language.JVM.ByteCode
   , SmallArithmeticType (..)
   , LocalType (..)
   , ArrayType (..)
-  , ExactArrayType (..)
 
   -- * Renames
   , WordSize
@@ -88,6 +88,7 @@ import qualified Data.Vector           as V
 
 import           Language.JVM.Constant
 import           Language.JVM.Staged
+import           Language.JVM.Type
 
 -- | ByteCode is a newtype wrapper around a list of ByteCode instructions.
 -- if the ByteCode is in the Low stage then the byte code instructions are
@@ -222,6 +223,16 @@ instance ByteCodeStaged ByteCodeInst where
   evolveBC = evolveByteCodeInst
   devolveBC = devolveByteCodeInst
 
+evolveRefType :: EvolveM m => RefType Low -> m JRefType
+evolveRefType = \case
+  ArrayBaseType bt -> return $ JTArray (JTBase bt)
+  Reference m _ -> link m
+
+devolveRefType :: DevolveM m => JRefType -> m (RefType Low)
+devolveRefType  = \case
+  JTArray (JTBase bt) -> return $ ArrayBaseType bt
+  c -> flip Reference (fromIntegral $ refTypeDepth c) <$> unlink c
+
 evolveByteCodeInst ::
   EvolveM m
   => (ByteCodeOffset -> m ByteCodeIndex)
@@ -233,9 +244,7 @@ evolveByteCodeInst g (ByteCodeInst ofs opr) = do
     Get fa r          -> label "Get" $ Get fa <$> link r
     Put fa r          -> label "Put" $ Put fa <$> link r
     Invoke r          -> label "Invoke" $ Invoke <$> evolve r
-    New r             -> label "New" $ New <$> link r
-    NewArray r        -> label "NewArray" $ NewArray <$> evolve r
-    MultiNewArray r u -> label "MultiNewArray" $ MultiNewArray <$> link r <*> pure u
+    New r             -> label "New" $ New <$> evolveRefType r
     CheckCast r       -> label "CheckCast" $ CheckCast <$> link r
     InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> link r
     If cp on r        -> label "If" $ If cp on <$> calcOffset r
@@ -261,9 +270,7 @@ devolveByteCodeInst g (ByteCodeInst ofs opr) =
     Get fa r          -> label "Get" $ Get fa <$> unlink r
     Put fa r          -> label "Put" $ Put fa <$> unlink r
     Invoke r          -> label "Invoke" $ Invoke <$> devolve r
-    New r             -> label "New" $ New <$> unlink r
-    NewArray r        -> label "NewArray" $ NewArray <$> devolve r
-    MultiNewArray r u -> label "MultiNewArray" $ MultiNewArray <$> unlink r <*> pure u
+    New r             -> label "New" $ New <$> devolveRefType r
     CheckCast r       -> label "CheckCast" $ CheckCast <$> unlink r
     InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> unlink r
     If cp on r        -> label "If" $ If cp on <$> calcOffset r
@@ -294,17 +301,6 @@ instance Staged Invocation where
       InvkStatic r      -> label "InvkStatic" $ InvkStatic <$> unlink r
       InvkInterface w r -> label "InvkInterface" $ InvkInterface w <$> unlink r
       InvkDynamic r     -> label "InvkDynamic" $ InvkDynamic <$> unlink r
-
-
-instance Staged ExactArrayType where
-  evolve x =
-    case x of
-      EARef r -> EARef <$> link r
-      a       -> return $ unsafeCoerce a
-  devolve x =
-    case x of
-      EARef r -> EARef <$> unlink r
-      a       -> return $ unsafeCoerce a
 
 
 instance Binary (ByteCode Low) where
@@ -346,6 +342,10 @@ data ArithmeticType = MInt | MLong | MFloat | MDouble
 data SmallArithmeticType = MByte | MChar | MShort
   deriving (Show, Ord, Eq, Enum, Bounded, Generic, NFData)
 
+data RefType r
+  = ArrayBaseType JBaseType
+  | Reference (Ref JRefType r) Word8
+
 data LocalType = LInt | LLong | LFloat | LDouble | LRef
   deriving (Show, Ord, Eq, Enum, Bounded, Generic, NFData)
 
@@ -353,10 +353,6 @@ data ArrayType
   = AByte | AChar | AShort | AInt | ALong
   | AFloat | ADouble | ARef
   deriving (Show, Eq, Ord, Generic, NFData)
-
-data ExactArrayType r
-  = EABoolean | EAByte | EAChar | EAShort | EAInt | EALong
-  | EAFloat | EADouble | EARef (Ref ClassName r)
 
 data Invocation r
   = InvkSpecial (DeepRef AbsVariableMethodId r)
@@ -571,9 +567,7 @@ data ByteCodeOpr r
 
   | Invoke (Invocation r)
 
-  | New (Ref ClassName r)
-
-  | NewArray (ExactArrayType r)
+  | New (Choice (RefType Low) JRefType r)
 
   | ArrayLength
 
@@ -584,11 +578,6 @@ data ByteCodeOpr r
 
   | Monitor Bool
   -- ^ True => Enter, False => Exit
-
-  -- TODO: Fix this so that its more clear what it points to.
-  | MultiNewArray (Ref ClassName r) Word8
-  -- ^ Create a new multi array of #1 and with #2 dimensions
-  -- ^ This might point to an array type.
 
   | Return (Maybe LocalType)
 
@@ -874,22 +863,22 @@ instance Binary (ByteCodeOpr Low) where
         zero <- getWord8
         when (zero /= 0) $ fail "Should be zero"
         return $ Invoke (InvkDynamic ref)
-      0xbb -> New <$> get
+      0xbb -> New . (flip Reference 0) <$> get
 
       0xbc -> do
         x <- getWord8
-        NewArray <$> case x of
-          4  -> return EABoolean
-          5  -> return EAChar
-          6  -> return EAFloat
-          7  -> return EADouble
-          8  -> return EAByte
-          9  -> return EAShort
-          10 -> return EAInt
-          11 -> return EALong
+        New . ArrayBaseType <$> case x of
+          4  -> return JTBoolean
+          5  -> return JTChar
+          6  -> return JTFloat
+          7  -> return JTDouble
+          8  -> return JTByte
+          9  -> return JTShort
+          10 -> return JTInt
+          11 -> return JTLong
           _  -> fail $ "Unknown type '0x" ++ showHex x "'."
 
-      0xbd -> NewArray . EARef <$> get
+      0xbd -> New . (flip Reference 1) <$> get
 
       0xbe -> return ArrayLength
 
@@ -923,7 +912,7 @@ instance Binary (ByteCodeOpr Low) where
           _ -> fail $ "Wide does not work for opcode '0x"
                 ++ showHex subopcode "'"
 
-      0xc5 -> MultiNewArray <$> get <*> get
+      0xc5 -> New <$> (Reference <$> get <*> get)
 
       0xc6 -> IfRef False One <$> get
       0xc7 -> IfRef True One <$> get
@@ -1292,18 +1281,21 @@ putByteCode n bc =
         InvkDynamic a ->
           putWord8 0xba >> put a >> putWord8 0 >> putWord8 0
 
-    New a -> putWord8 0xbb >> put a
-    NewArray x -> do
-      case x of
-        EABoolean -> putWord8 0xbc >> putWord8 4
-        EAChar    -> putWord8 0xbc >> putWord8 5
-        EAFloat   -> putWord8 0xbc >> putWord8 6
-        EADouble  -> putWord8 0xbc >> putWord8 7
-        EAByte    -> putWord8 0xbc >> putWord8 8
-        EAShort   -> putWord8 0xbc >> putWord8 9
-        EAInt     -> putWord8 0xbc >> putWord8 10
-        EALong    -> putWord8 0xbc >> putWord8 11
-        EARef a   -> putWord8 0xbd >> put a
+    New a ->
+      case a of
+        ArrayBaseType bt -> case bt of
+          JTBoolean -> putWord8 0xbc >> putWord8 4
+          JTChar    -> putWord8 0xbc >> putWord8 5
+          JTFloat   -> putWord8 0xbc >> putWord8 6
+          JTDouble  -> putWord8 0xbc >> putWord8 7
+          JTByte    -> putWord8 0xbc >> putWord8 8
+          JTShort   -> putWord8 0xbc >> putWord8 9
+          JTInt     -> putWord8 0xbc >> putWord8 10
+          JTLong    -> putWord8 0xbc >> putWord8 11
+        Reference p 0 -> putWord8 0xbb >> put p
+        Reference p 1 -> putWord8 0xbd >> put p
+        Reference p n -> putWord8 0xc5 >> put p >> put n
+
     ArrayLength -> putWord8 0xbe
     Throw -> putWord8 0xbf
 
@@ -1313,7 +1305,6 @@ putByteCode n bc =
     Monitor True -> putWord8 0xc2
     Monitor False -> putWord8 0xc3
 
-    MultiNewArray a b -> putWord8 0xc5 >> put a >> put b
 
     IfRef False One a -> putWord8 0xc6 >> put a
     IfRef True One a -> putWord8 0xc7 >> put a
@@ -1324,5 +1315,5 @@ $(deriveBase ''ByteCodeInst)
 $(deriveBase ''ByteCodeOpr)
 $(deriveBase ''SwitchTable)
 $(deriveBase ''Invocation)
+$(deriveBase ''RefType)
 $(deriveBase ''CConstant)
-$(deriveBase ''ExactArrayType)
