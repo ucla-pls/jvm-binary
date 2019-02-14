@@ -190,7 +190,7 @@ devolveByteCode (ByteCode bc) = do
   -- Devolving byte code is not straight forward.
   (len, offsets) <- generateOffsets bc
   ByteCode . (fromIntegral len,)
-    <$> V.mapM 
+    <$> V.mapM
       (devolveByteCodeInst (devolveOffset' offsets))
       (V.zipWith ByteCodeInst offsets bc)
 

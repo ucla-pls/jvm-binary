@@ -63,7 +63,6 @@ import           GHC.Generics                (Generic)
 import           Data.Attoparsec.Text
 
 import qualified Data.List                   as L
-import           Data.Semigroup hiding (option)
 
 import           Language.JVM.Attribute.Base
 import           Language.JVM.Staged
@@ -73,14 +72,14 @@ import           Language.JVM.Type
 instance IsAttribute (Signature Low) where
   attrName = Const "Signature"
 
-data Signature a =
+newtype Signature a =
   Signature (Ref Text.Text a)
 
 signatureToText :: Signature High -> Text.Text
 signatureToText (Signature s) = s
 
 signatureFromText :: Text.Text -> Signature High
-signatureFromText s = Signature s
+signatureFromText = Signature
 
 ----------------------
 -- Parsing

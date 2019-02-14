@@ -157,14 +157,14 @@ class TypeParse a where
 
 -- | Parse a type from text
 typeFromText :: TypeParse a => Text.Text -> Either String a
-typeFromText = parseOnly parseType
+typeFromText = parseOnly (parseType <* endOfInput)
 
 -- | Convert a type into text
 typeToText :: TypeParse a => a -> Text.Text
 typeToText = Lazy.toStrict . Builder.toLazyText . typeToBuilder
 
 instance TypeParse ClassName where
-  parseType = ClassName . Text.pack <$> many1 anyChar
+  parseType = ClassName <$> takeWhile1 (notInClass ".;[<>:") <?> "ClassName"
   typeToBuilder = Builder.fromText . classNameAsText
 
 instance TypeParse JBaseType where
