@@ -45,6 +45,7 @@ import Language.JVM.ByteCode
 import Language.JVM.Utils
 import Language.JVM.Staged
 import Language.JVM.ClassFileReader
+import Language.JVM.ConstantPool
 
 blReadFile :: FilePath -> IO BL.ByteString
 blReadFile = BL.readFile
@@ -104,7 +105,7 @@ isoRoundtrip ::
 isoRoundtrip a =
   case roundtrip a of
     Right (_, a') ->
-      a' === a
+      property $ a' `shouldBe` a
     Left msg -> property $ P.failed { P.reason = msg }
   where
     roundtrip a1 = do
@@ -118,23 +119,22 @@ isoRoundtrip a =
 -- | Test that a value can go from the Highest state to binary and back again
 -- without losing data.
 isoByteCodeRoundtrip ::
-  (ByteCodeStaged a, Eq (a High), Show (a High), Binary (a Low))
+  (ByteCodeStaged a, Eq (a High), Show (a Low), Show (a High), Binary (a Low))
   => (a High) -> Property
 isoByteCodeRoundtrip a =
   case byteCodeRoundtrip a of
-    Right (_, a') ->
-      a' === a
+    Right ((_, b, cp), a') ->
+      counterexample (show cp ++ "\n" ++ show b) $ a' `shouldBe` a
     Left msg -> property $ P.failed { P.reason = msg }
-  where
 
-byteCodeRoundtrip :: (ByteCodeStaged s, Binary (s Low)) => s High -> Either String (BL.ByteString, s High)
+byteCodeRoundtrip :: (ByteCodeStaged s, Binary (s Low)) => s High -> Either String ((BL.ByteString, s Low, ConstantPool High), s High)
 byteCodeRoundtrip a1 = do
   let (a', CPBuilder _ cp) = runConstantPoolBuilder (devolveBC (return . fromIntegral) a1) cpbEmpty
   let bs = encode a'
   a'' <- bimap trd trd $ decodeOrFail bs
   cp' <- first show $ bootstrapConstantPool cp
   a3 <- first show $ runEvolve cp' (evolveBC (return . fromIntegral) a'')
-  return (bs, a3)
+  return ((bs, a', cp'), a3)
 
 folderContents :: FilePath -> IO [ FilePath ]
 folderContents fp =
