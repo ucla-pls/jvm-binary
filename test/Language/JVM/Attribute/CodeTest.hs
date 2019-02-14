@@ -105,20 +105,6 @@ instance Arbitrary a => Arbitrary (V.Vector a) where
 instance Arbitrary ArrayType where
   arbitrary = genericArbitrary uniform
 
--- instance Arbitrary (ExactArrayType High) where
---   arbitrary =
---     oneof
---     [ pure EABoolean
---     , pure EAByte
---     , pure EAChar
---     , pure EAShort
---     , pure EAInt
---     , pure EALong
---     , pure EAFloat
---     , pure EADouble
---     , EARef <$> arbitrary
---     ]
-
 instance Arbitrary BinOpr where
   arbitrary = genericArbitrary uniform
 
