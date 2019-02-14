@@ -289,12 +289,12 @@ instance Referenceable (Constant High) where
 
 instance TypeParse a => Referenceable (NameAndType a) where
   fromConst err (CNameAndType rn txt) = do
-    md <- either err return $ fromText txt
+    md <- either err return $ typeFromText txt
     return $ NameAndType rn md
   fromConst e c = expected "CNameAndType" e c
 
   toConst (NameAndType rn md) =
-    return $ CNameAndType rn (toText md)
+    return $ CNameAndType rn (typeToText md)
 
 -- TODO: Find good encoding of string.
 instance Referenceable Text.Text where
@@ -329,20 +329,29 @@ instance Referenceable ClassName where
   toConst (ClassName txt) = do
     return . CClassRef $ txt
 
+instance Referenceable JRefType where
+  fromConst err (CClassRef r) =
+    either err return $ parseOnly parseFlatJRefType r
+  fromConst err a =
+    err $ wrongType "ClassRef" a
+
+  toConst =
+    return . CClassRef . jRefTypeToFlatText
+
 instance Referenceable MethodDescriptor where
   fromConst err =
-    fromConst err >=> either err pure . fromText
-  toConst = toConst . toText
+    fromConst err >=> either err pure . typeFromText
+  toConst = toConst . typeToText
 
 instance Referenceable FieldDescriptor where
   fromConst err =
-    fromConst err >=> either err pure . fromText
-  toConst = toConst . toText
+    fromConst err >=> either err pure . typeFromText
+  toConst = toConst . typeToText
 
 -- instance TypeParse f => Referenceable (NameAndType f) where
 --   fromConst err =
 --     fromConst err >=> either err pure . fromText
---   toConst = toConst . toText
+--   toConst = toConst . typeToText
 
 instance Referenceable MethodId where
   fromConst err x = MethodId <$> fromConst err x

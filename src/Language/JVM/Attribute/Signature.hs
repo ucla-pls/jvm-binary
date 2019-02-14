@@ -52,23 +52,23 @@ module Language.JVM.Attribute.Signature
   ) where
 
 import           Control.DeepSeq             (NFData)
--- import           Data.Binary
--- import qualified Data.IntMap                 as IM
 import qualified Data.Text                   as Text
--- import Data.Monoid
 
-import Data.Text.Lazy.Builder as Text
-import qualified Data.Text.Lazy as LText
+import qualified Data.Text.Lazy              as LText
+import           Data.Text.Lazy.Builder      as Text
 
-import Data.Functor
+import           Data.Functor
 import           GHC.Generics                (Generic)
+
+import           Data.Attoparsec.Text
+
+import qualified Data.List                   as L
+import           Data.Semigroup hiding (option)
+
 import           Language.JVM.Attribute.Base
 import           Language.JVM.Staged
 import           Language.JVM.Type
 
-import qualified Data.List                   as L
-
-import           Data.Attoparsec.Text
 
 instance IsAttribute (Signature Low) where
   attrName = Const "Signature"
@@ -81,7 +81,6 @@ signatureToText (Signature s) = s
 
 signatureFromText :: Text.Text -> Signature High
 signatureFromText s = Signature s
-
 
 ----------------------
 -- Parsing
@@ -121,11 +120,11 @@ data TypeSignature
 typeSignatureP :: Parser TypeSignature
 typeSignatureP = do
   choice [ (ReferenceType <$> referenceTypeP) <?> "JRefereceType"
-         , (BaseType <$> jBaseTypeP) <?> "JBaseType" ]
+         , (BaseType <$> parseType) <?> "JBaseType" ]
 
 typeSignatureT :: TypeSignature -> Builder
 typeSignatureT (ReferenceType t) = referenceTypeT t
-typeSignatureT (BaseType t) = singleton (jBaseTypeToChar t)
+typeSignatureT (BaseType t)      = singleton (jBaseTypeToChar t)
 
 data ReferenceType
   = RefClassType ClassType
@@ -144,9 +143,9 @@ referenceTypeP = do
 referenceTypeT :: ReferenceType -> Builder
 referenceTypeT t =
   case t of
-    RefClassType ct -> classTypeT ct
+    RefClassType ct    -> classTypeT ct
     RefTypeVariable tv -> typeVariableT tv
-    RefArrayType at -> singleton '[' <> typeSignatureT at
+    RefArrayType at    -> singleton '[' <> typeSignatureT at
 
 data ClassType
   = ClassType
@@ -163,7 +162,7 @@ data ClassType
 classTypeP :: Parser ClassType
 classTypeP = nameit "ClassType" $ do
   _ <- char 'L'
-  cn <- (ClassName <$> takeWhile1 (notInClass ".;[<>:")) <?> "ClassName"
+  cn <- parseType
   ta <- option [] typeArgumentsP
   ict <- many' $ do
       _ <- char '.'
@@ -222,8 +221,8 @@ typeArgumentT a = do
     Just (TypeArgument w rt) ->
       (case w of
         Just WildMinus -> singleton '-'
-        Just WildPlus -> singleton '+'
-        Nothing -> mempty) <> referenceTypeT rt
+        Just WildPlus  -> singleton '+'
+        Nothing        -> mempty) <> referenceTypeT rt
 
 data Wildcard =
   WildPlus | WildMinus
@@ -343,10 +342,8 @@ throwsSignatureT :: ThrowsSignature -> Builder
 throwsSignatureT t =
   singleton '^'
     <> case t of
-         ThrowsClass ct -> classTypeT ct
+         ThrowsClass ct        -> classTypeT ct
          ThrowsTypeVariable tt -> typeVariableT tt
-
-
 
 newtype FieldSignature =
   FieldSignature {fsRefType :: ReferenceType}

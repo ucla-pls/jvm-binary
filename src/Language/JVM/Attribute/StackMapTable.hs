@@ -21,6 +21,7 @@ module Language.JVM.Attribute.StackMapTable
   , DeltaOffset
   , StackMapFrame (..)
   , StackMapFrameType (..)
+  , emptyStackMapTable
 
   , VerificationTypeInfo (..)
 
