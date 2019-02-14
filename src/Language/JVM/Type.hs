@@ -1,3 +1,7 @@
+{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-|
 Module      : Language.JVM.Type
 Copyright   : (c) Christian Gram Kalhauge, 2018
@@ -7,9 +11,6 @@ Maintainer  : kalhuage@cs.ucla.edu
 This module contains the 'JType', 'ClassName', 'MethodDescriptor', and
 'FieldDescriptor'.
 -}
-{-# LANGUAGE DeriveAnyClass       #-}
-{-# LANGUAGE DeriveGeneric        #-}
-{-# LANGUAGE OverloadedStrings    #-}
 module Language.JVM.Type
   (
   -- * Base types
@@ -21,8 +22,10 @@ module Language.JVM.Type
   -- ** JType
   , JType (..)
   , JBaseType (..)
-  , jBaseTypeP
   , jBaseTypeToChar
+
+  , JRefType (..)
+  , refTypeDepth
 
   -- ** MethodDescriptor
   , MethodDescriptor (..)
@@ -34,15 +37,37 @@ module Language.JVM.Type
   , NameAndType (..)
   , (<:>)
 
+  -- * TypeParse
   , TypeParse (..)
+  , typeFromText
+  , typeToText
+  , parseOnly
+
+  , parseFlatJRefType
+  , jRefTypeToFlatText
   ) where
 
-import           Control.DeepSeq      (NFData)
-import           Data.Attoparsec.Text
+-- base
 import           Data.String
-import qualified Data.Text            as Text
-import           GHC.Generics         (Generic)
-import           Prelude              hiding (takeWhile)
+import           Control.Applicative
+import           Data.Semigroup
+import           GHC.Generics           (Generic)
+import           Prelude                hiding (takeWhile)
+
+-- deepseq
+import           Control.DeepSeq        (NFData)
+
+-- attoparsec
+import           Data.Attoparsec.Text
+
+-- mtl
+import           Control.Monad.Writer hiding ((<>))
+
+-- text
+import qualified Data.Text              as Text
+import qualified Data.Text.Lazy         as Lazy
+import qualified Data.Text.Lazy.Builder as Builder
+
 
 -- | A class name
 newtype ClassName = ClassName
@@ -73,12 +98,35 @@ data JBaseType
   | JTBoolean
   deriving (Show, Eq, Ord, Generic, NFData)
 
--- | The JVM types
+data JRefType
+  = JTClass !ClassName
+  | JTArray !JType
+  deriving (Show, Eq, Ord, Generic, NFData)
+
+-- | The number of nested arrays
+refTypeDepth :: JRefType -> Int
+refTypeDepth = \case
+  JTArray (JTRef a) -> 1 + (refTypeDepth a)
+  JTArray _ -> 1
+  JTClass _ -> 0
+
 data JType
   = JTBase JBaseType
-  | JTClass ClassName
-  | JTArray JType
+  | JTRef JRefType
   deriving (Show, Eq, Ord, Generic, NFData)
+
+
+-- | Get the corresponding `Char` of a `JBaseType`
+jBaseTypeToChar :: JBaseType -> Char
+jBaseTypeToChar = \case
+    JTByte    -> 'B'
+    JTChar    -> 'C'
+    JTDouble  -> 'D'
+    JTFloat   -> 'F'
+    JTInt     -> 'I'
+    JTLong    -> 'J'
+    JTShort   -> 'S'
+    JTBoolean -> 'Z'
 
 -- | Method Descriptor
 data MethodDescriptor = MethodDescriptor
@@ -101,93 +149,115 @@ data NameAndType a = NameAndType
 (<:>) = NameAndType
 
 class TypeParse a where
-  fromText :: Text.Text -> Either String a
-  fromText = parseOnly (parseText <* endOfInput)
-  parseText :: Parser a
-  toText :: a -> Text.Text
+  -- | A `TypeParse` should be parsable
+  parseType :: Parser a
 
-jBaseTypeP :: Parser JBaseType
-jBaseTypeP = do
-  s <- satisfy (inClass "BCDFIJSZ") <?> "BaseType"
-  case s of
-    'B' -> return $ JTByte
-    'C' -> return $ JTChar
-    'D' -> return $ JTDouble
-    'F' -> return $ JTFloat
-    'I' -> return $ JTInt
-    'J' -> return $ JTLong
-    'S' -> return $ JTShort
-    'Z' -> return $ JTBoolean
-    _ -> error "should not happen"
+  -- | A `TypeParse` should be printable
+  typeToBuilder :: a -> Builder.Builder
 
-jBaseTypeToChar :: JBaseType -> Char
-jBaseTypeToChar y = do
-  case y of
-    JTByte    -> 'B'
-    JTChar    -> 'C'
-    JTDouble  -> 'D'
-    JTFloat   -> 'F'
-    JTInt     -> 'I'
-    JTLong    -> 'J'
-    JTShort   -> 'S'
-    JTBoolean -> 'Z'
+-- | Parse a type from text
+typeFromText :: TypeParse a => Text.Text -> Either String a
+typeFromText = parseOnly (parseType <* endOfInput)
+
+-- | Convert a type into text
+typeToText :: TypeParse a => a -> Text.Text
+typeToText = Lazy.toStrict . Builder.toLazyText . typeToBuilder
+
+instance TypeParse ClassName where
+  parseType = ClassName <$> takeWhile1 (notInClass ".;[<>:") <?> "ClassName"
+  typeToBuilder = Builder.fromText . classNameAsText
+
+instance TypeParse JBaseType where
+  parseType = try . (<?> "BaseType") $ do
+    anyChar >>= \case
+      'B' -> return $ JTByte
+      'C' -> return $ JTChar
+      'D' -> return $ JTDouble
+      'F' -> return $ JTFloat
+      'I' -> return $ JTInt
+      'J' -> return $ JTLong
+      'S' -> return $ JTShort
+      'Z' -> return $ JTBoolean
+      s -> fail $ "Unknown char " ++ show s
+
+  typeToBuilder = Builder.singleton . jBaseTypeToChar
+
+instance TypeParse JRefType where
+  parseType = try . (<?> "RefType") $ do
+    anyChar >>= \case
+      'L' -> do
+        txt <- takeWhile (/= ';')
+        _ <- char ';'
+        return $ JTClass (ClassName txt)
+      '[' -> JTArray <$> parseType
+      s -> fail $ "Unknown char " ++ show s
+
+  typeToBuilder = \case
+    JTClass cn ->
+      Builder.singleton 'L' <> typeToBuilder cn <> Builder.singleton ';'
+    JTArray t -> do
+      Builder.singleton '[' <> typeToBuilder t
+
+parseFlatJRefType :: Parser (JRefType)
+parseFlatJRefType =
+  JTArray <$> (char '[' *> parseType)
+  <|> JTClass <$> parseType
+
+jRefTypeToFlatText :: JRefType -> Text.Text
+jRefTypeToFlatText = \case
+  JTClass t' -> classNameAsText t'
+  JTArray t' -> Lazy.toStrict . Builder.toLazyText $ Builder.singleton '[' <> typeToBuilder t'
 
 instance TypeParse JType where
-  parseText = do
-    choice
-      [ JTBase <$> jBaseTypeP
-      , do
-          _ <- char 'L'
-          txt <- takeWhile (/= ';')
-          _ <- char ';'
-          return $ JTClass (ClassName txt)
-      , char '[' >> JTArray <$> parseText
-      ]
-  toText tp =
-    Text.pack $ go tp ""
-    where
-      go x =
-        case x of
-          JTBase y               -> (jBaseTypeToChar y :)
-          JTClass (ClassName cn) -> ((('L':Text.unpack cn) ++ ";") ++)
-          JTArray tp'            -> ('[':) . go tp'
+  parseType =
+    (JTRef <$> parseType <|> JTBase <$> parseType)
+    <?> "JType"
+
+  typeToBuilder = \case
+    JTRef r  -> typeToBuilder r
+    JTBase r -> typeToBuilder r
 
 instance TypeParse MethodDescriptor where
-  toText md =
-    Text.concat (
-      ["("]
-      ++ map toText (methodDescriptorArguments md)
-      ++ [")", maybe "V" toText $ methodDescriptorReturnType md ]
-    )
-  parseText = do
+  typeToBuilder md =
+    execWriter $ do
+      tell $ Builder.singleton '('
+      mapM_ (tell . typeToBuilder) (methodDescriptorArguments md)
+      tell $ Builder.singleton ')'
+      tell . maybe (Builder.singleton 'V') typeToBuilder $ methodDescriptorReturnType md
+
+  parseType = do
     _ <- char '('
-    args <- many' parseText <?> "method arguments"
+    args <- many' parseType <?> "method arguments"
     _ <- char ')'
     returnType <- choice
       [ char 'V' >> return Nothing
-      , Just <$> parseText
+      , Just <$> parseType
       ] <?> "return type"
     return $ MethodDescriptor args returnType
 
 instance TypeParse FieldDescriptor where
-  parseText = FieldDescriptor <$> parseText
-  toText (FieldDescriptor t) = toText t
+  parseType = FieldDescriptor <$> parseType
+  typeToBuilder (FieldDescriptor t) = typeToBuilder t
 
 instance TypeParse t => TypeParse (NameAndType t)  where
-  parseText = do
+
+  parseType = do
     name <- many1 $ notChar ':'
     _ <- char ':'
-    _type <- parseText
+    _type <- parseType
     return $ NameAndType (Text.pack name) _type
-  toText (NameAndType name _type) =
-    Text.concat [ name , ":" , toText _type ]
+
+  typeToBuilder (NameAndType name _type) =
+    Builder.fromText name
+    <> Builder.singleton ':'
+    <> typeToBuilder _type
 
 fromString' ::
   TypeParse t
   => String
   -> t
 fromString' =
-  either (error . ("Failed " ++)) id . fromText . Text.pack
+  either (error . ("Failed " ++)) id . typeFromText . Text.pack
 
 instance IsString ClassName where
   fromString = strCls

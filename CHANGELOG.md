@@ -1,5 +1,10 @@
 # Change log
 
+## Version 0.3.0
+
+- Change API of TypeParse
+- Merge together the New* commands
+
 ## Version 0.2.0
 
 - Add filter to evolveClassFile

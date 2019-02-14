@@ -21,6 +21,7 @@ module Language.JVM.Attribute.StackMapTable
   , DeltaOffset
   , StackMapFrame (..)
   , StackMapFrameType (..)
+  , emptyStackMapTable
 
   , VerificationTypeInfo (..)
 
@@ -52,6 +53,9 @@ instance IsAttribute (StackMapTable Low) where
 newtype StackMapTable r = StackMapTable
   { stackMapTable :: Choice (SizedList16 (StackMapFrame Low)) [StackMapFrame High] r
   }
+
+emptyStackMapTable :: StackMapTable High
+emptyStackMapTable = StackMapTable []
 
 -- | A delta offset
 type DeltaOffset i = Choice Word16 Int i
@@ -148,6 +152,7 @@ instance Binary (StackMapFrame Low) where
         put ls1
         put ls2
 
+-- TODO: Fix that ClassName can be an array.
 -- | The types info of the stack map frame.
 data VerificationTypeInfo r
   = VTTop
