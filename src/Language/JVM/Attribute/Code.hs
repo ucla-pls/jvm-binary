@@ -45,7 +45,7 @@ instance IsAttribute (Code Low) where
 data Code r = Code
   { codeMaxStack       :: !(Word16)
   , codeMaxLocals      :: !(Word16)
-  , codeByteCode       :: !((ByteCode r))
+  , codeByteCode       :: !(ByteCode r)
   , codeExceptionTable :: !(SizedList16 (ExceptionTable r))
   , codeAttributes     :: !(Attributes CodeAttributes r)
   }
@@ -63,10 +63,10 @@ data ExceptionTable r = ExceptionTable
 -- | Extracts a list of bytecode operation
 codeByteCodeOprs :: Code High -> V.Vector (ByteCodeOpr High)
 codeByteCodeOprs =
-  V.map opcode . snd . unByteCode . codeByteCode
+  V.map opcode . codeByteCodeInsts
 
 -- | Extracts a list of bytecode instructions
-codeByteCodeInsts :: Code Low -> V.Vector (ByteCodeInst Low)
+codeByteCodeInsts :: Code i -> V.Vector (ByteCodeInst i)
 codeByteCodeInsts =
   snd . unByteCode . codeByteCode
 

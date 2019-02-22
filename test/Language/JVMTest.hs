@@ -3,12 +3,15 @@ module Language.JVMTest where
 
 import           SpecHelper
 
+import qualified Data.ByteString.Lazy                 as BL
 import           Data.Either
+import           Data.Foldable
 import qualified Data.IntMap                          as IM
 import           Data.List                            as List
 import qualified Data.Text                            as Text
-import qualified Data.ByteString.Lazy                 as BL
-import           Data.Foldable
+
+-- vector
+import qualified Data.Vector                          as V
 
 import           Language.JVM
 import qualified Language.JVM.Attribute.Code          as C
@@ -139,9 +142,9 @@ shouldMatchMethod' ym xm = do
       (Right yc, Right xc) -> do
         cmpOn C.codeMaxStack yc xc
         cmpOn C.codeMaxLocals yc xc
-        cmpOn C.codeByteCodeInsts yc xc
+        cmpOn (C.codeByteCodeInsts :: Code Low -> V.Vector (ByteCodeInst Low)) yc xc
         cmpOn C.codeExceptionTable yc xc
-        cmpOver (List.sort . unSizedList .C.codeAttributes) yc xc $ \ yca xca -> do
+        cmpOver (List.sort . unSizedList . C.codeAttributes) yc xc $ \ yca xca -> do
           case (fromAttribute' yca, fromAttribute' xca)
              :: (Either String (StackMapTable Low), Either String (StackMapTable Low)) of
             (Right yst, Right xst) -> do

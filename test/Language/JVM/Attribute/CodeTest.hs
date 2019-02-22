@@ -87,7 +87,6 @@ instance Arbitrary ArithmeticType where
 instance Arbitrary LocalType where
   arbitrary = elements [ LInt, LLong, LFloat, LDouble, LRef ]
 
-
 genByteCodeOpr :: Int -> Gen (ByteCodeOpr High)
 genByteCodeOpr i = do
   x <- (genericArbitraryU :: Gen (ByteCodeOpr High))
@@ -118,26 +117,26 @@ instance Arbitrary BinOpr where
 instance Arbitrary CastOpr where
   arbitrary =
     oneof . map pure $
-      [ CastTo MInt MLong
-      , CastTo MInt MFloat
-      , CastTo MInt MDouble
+     [ CastTo MInt MLong
+     , CastTo MInt MFloat
+     , CastTo MInt MDouble
 
-      , CastTo MLong MInt
-      , CastTo MLong MFloat
-      , CastTo MLong MDouble
+     , CastTo MLong MInt
+     , CastTo MLong MFloat
+     , CastTo MLong MDouble
 
-      , CastTo MFloat MInt
-      , CastTo MFloat MLong
-      , CastTo MFloat MDouble
+     , CastTo MFloat MInt
+     , CastTo MFloat MLong
+     , CastTo MFloat MDouble
 
-      , CastTo MDouble MInt
-      , CastTo MDouble MLong
-      , CastTo MDouble MFloat
+     , CastTo MDouble MInt
+     , CastTo MDouble MLong
+     , CastTo MDouble MFloat
 
-      , CastDown MByte
-      , CastDown MChar
-      , CastDown MShort
-      ]
+     , CastDown MByte
+     , CastDown MChar
+     , CastDown MShort
+     ]
 
 instance Arbitrary BitOpr where
   arbitrary = genericArbitraryU
