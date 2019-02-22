@@ -63,7 +63,7 @@ data ExceptionTable r = ExceptionTable
 -- | Extracts a list of bytecode operation
 codeByteCodeOprs :: Code High -> V.Vector (ByteCodeOpr High)
 codeByteCodeOprs =
-  unByteCode . codeByteCode
+  V.map opcode . snd . unByteCode . codeByteCode
 
 -- | Extracts a list of bytecode instructions
 codeByteCodeInsts :: Code Low -> V.Vector (ByteCodeInst Low)
@@ -86,7 +86,8 @@ instance Staged Code where
     (offsets, codeByteCode) <- evolveByteCode codeByteCode
     let evolver = (evolveOffset offsets)
     codeExceptionTable <- mapM (evolveBC evolver) codeExceptionTable
-    codeAttributes <- fromCollector <$> fromAttributes CodeAttribute (collect' evolver) codeAttributes
+    codeAttributes <- fromCollector <$>
+      fromAttributes CodeAttribute (collect' evolver) codeAttributes
     return $ Code {..}
     where
       fromCollector (a, b, c) =

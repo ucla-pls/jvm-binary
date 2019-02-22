@@ -1,5 +1,9 @@
 # Change log
 
+## Version 0.4.0
+
+- Add Offsets to ByteCode
+
 ## Version 0.3.0
 
 - Change API of TypeParse

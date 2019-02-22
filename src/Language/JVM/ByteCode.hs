@@ -95,9 +95,7 @@ import           Language.JVM.Type
 -- if the ByteCode is in the Low stage then the byte code instructions are
 -- annotated with the byte code offsets.
 newtype ByteCode i = ByteCode
-  { unByteCode ::
-      Choice (Word32, V.Vector (ByteCodeInst Low)) (V.Vector (ByteCodeOpr High)) i
-  }
+  { unByteCode :: (Word32, V.Vector (ByteCodeInst i)) }
 
 -- | The offset in the byte code
 type ByteCodeOffset = Word16
@@ -178,21 +176,20 @@ data ByteCodeInst r = ByteCodeInst
   , opcode :: !(ByteCodeOpr r)
   }
 
-
 evolveByteCode :: EvolveM m => ByteCode Low -> m (OffsetMap, ByteCode High)
-evolveByteCode bc@(ByteCode (_, v)) = do
+evolveByteCode bc@(ByteCode (ln, v)) = do
   let !om = offsetMap bc
-  x <- V.mapM (fmap opcode . evolveByteCodeInst (evolveOffset om)) v
-  return . (om,) . ByteCode $! x
+  x <- V.mapM (evolveByteCodeInst (evolveOffset om)) v
+  return . (om,) . ByteCode $ (ln, x)
 
 devolveByteCode :: DevolveM m => ByteCode High -> m (ByteCode Low)
-devolveByteCode (ByteCode bc) = do
+devolveByteCode (ByteCode (_, bc)) = do
   -- Devolving byte code is not straight forward.
-  (len, offsets) <- generateOffsets bc
+  (len, offsets) <- generateOffsets (V.map opcode bc)
   ByteCode . (fromIntegral len,)
     <$> V.mapM
       (devolveByteCodeInst (devolveOffset' offsets))
-      (V.zipWith ByteCodeInst offsets bc)
+      (V.zipWith (flip ByteCodeInst . opcode) bc offsets)
 
 generateOffsets :: DevolveM m => V.Vector (ByteCodeOpr High) -> m (Word16, V.Vector ByteCodeOffset)
 generateOffsets bc = do

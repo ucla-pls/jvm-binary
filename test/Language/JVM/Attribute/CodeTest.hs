@@ -50,7 +50,7 @@ instance Arbitrary (Code High) where
       <$> arbitrary
       <*> arbitrary
       <*> pure bc
-      <*> (SizedList <$> listOf (genExceptionTable (fromIntegral . V.length . unByteCode $ bc)))
+      <*> (SizedList <$> listOf (genExceptionTable (fromIntegral . V.length . snd . unByteCode $ bc)))
       <*> pure (CodeAttributes [] [] [])
 
 genExceptionTable :: Int -> Gen (ExceptionTable High)
@@ -75,11 +75,11 @@ instance Arbitrary (ExceptionTable High) where
 instance Arbitrary (ByteCode High) where
   arbitrary = do
     s <- getSize
-    ByteCode . V.fromList <$> vectorOf s (genByteCodeOpr s)
+    ByteCode . (0,) . V.map (ByteCodeInst 0) . V.fromList <$> vectorOf s (genByteCodeOpr s)
 
 instance Arbitrary (ByteCodeInst High) where
   arbitrary =
-    ByteCodeInst <$> pure 0 <*> genByteCodeOpr 0xffff
+    ByteCodeInst 0 <$> genByteCodeOpr 0xffff
 
 instance Arbitrary ArithmeticType where
   arbitrary = elements [ MInt, MLong, MFloat, MDouble ]
