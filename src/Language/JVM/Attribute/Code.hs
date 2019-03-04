@@ -68,7 +68,7 @@ codeByteCodeOprs =
 -- | Extracts a list of bytecode instructions
 codeByteCodeInsts :: Code i -> V.Vector (ByteCodeInst i)
 codeByteCodeInsts =
-  snd . unByteCode . codeByteCode
+  byteCodeInstructions . codeByteCode
 
 -- | Returns the StackMapTable attribute if any
 codeStackMapTable :: Code High -> Maybe (StackMapTable High)

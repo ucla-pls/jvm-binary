@@ -14,6 +14,7 @@ This module contains some Template Haskell functions for internal use.
 module Language.JVM.TH
   ( deriveBase
   , deriveBases
+  , deriveThese
   , deriveBaseWithBinary
   ) where
 
@@ -24,6 +25,19 @@ import Control.DeepSeq
 import Data.Binary
 
 import Language.JVM.Stage
+
+
+-- | Derives the 'NFData', 'Show', 'Eq', and 'Generic'
+-- from something that is 'Staged'
+deriveThese :: Name -> [Name] -> Q [Dec]
+deriveThese name items =
+  return . concat $ do
+  x <- ConT <$> items
+  return
+    [ StandaloneDerivD Nothing [] (AppT x (AppT n (ConT ''High)))
+    , StandaloneDerivD Nothing [] (AppT x (AppT n (ConT ''Low)))
+    ]
+  where n = ConT name
 
 -- | Derives the 'NFData', 'Show', 'Eq', and 'Generic'
 -- from something that is 'Staged'

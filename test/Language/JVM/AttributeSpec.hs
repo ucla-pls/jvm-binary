@@ -1,19 +1,20 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Language.JVM.AttributeTest where
+module Language.JVM.AttributeSpec where
 
 import           SpecHelper
 
 import           Language.JVM
 
 import           Language.JVM.Attribute    (Attribute (..))
-import           Language.JVM.ConstantTest ()
-import           Language.JVM.UtilsTest    ()
+import           Language.JVM.ConstantSpec ()
+import           Language.JVM.UtilsSpec    ()
 
 import qualified Data.ByteString           as BS
 
-prop_roundtrip_Attribute :: Attribute High -> Property
-prop_roundtrip_Attribute = isoRoundtrip
+spec :: Spec
+spec = do
+ it "roundtrip" $ property $ (isoRoundtrip :: Attribute High -> Property)
 
 instance Arbitrary (Attribute High) where
   arbitrary = do

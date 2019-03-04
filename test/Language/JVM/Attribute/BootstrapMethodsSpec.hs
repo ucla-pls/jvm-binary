@@ -1,13 +1,17 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-module Language.JVM.Attribute.BootstrapMethodsTest where
+module Language.JVM.Attribute.BootstrapMethodsSpec where
 
 import           SpecHelper
 
-import           Language.JVM.ConstantTest               ()
+import           Language.JVM.ConstantSpec               ()
 
 import           Language.JVM.Attribute.BootstrapMethods
 import           Language.JVM
+
+spec :: Spec
+spec =
+  it "can do a roundtrip" $ property $ prop_roundtrip_BootstrapMethods
 
 prop_roundtrip_BootstrapMethods :: BootstrapMethods High -> Property
 prop_roundtrip_BootstrapMethods = isoRoundtrip

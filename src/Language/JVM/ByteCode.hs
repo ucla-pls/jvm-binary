@@ -17,6 +17,7 @@ Maintainer  : kalhuage@cs.ucla.edu
 -}
 module Language.JVM.ByteCode
   ( ByteCode (..)
+  , unByteCode
 
   -- * evolve and devolve
   , evolveByteCode
@@ -91,11 +92,16 @@ import           Language.JVM.Constant
 import           Language.JVM.Staged
 import           Language.JVM.Type
 
--- | ByteCode is a newtype wrapper around a list of ByteCode instructions.
+-- | ByteCode constains a list of ByteCode instructions and the size of the bytecode.
 -- if the ByteCode is in the Low stage then the byte code instructions are
 -- annotated with the byte code offsets.
-newtype ByteCode i = ByteCode
-  { unByteCode :: (Word32, V.Vector (ByteCodeInst i)) }
+data ByteCode i = ByteCode
+  { byteCodeSize :: !Word32
+  , byteCodeInstructions :: V.Vector (ByteCodeInst i)
+  }
+
+unByteCode :: ByteCode i -> V.Vector (ByteCodeInst i)
+unByteCode = byteCodeInstructions
 
 -- | The offset in the byte code
 type ByteCodeOffset = Word16
@@ -128,7 +134,7 @@ evolveOffset o i =
 
 -- | Given low byte code we can create an `OffsetMap`
 offsetMap :: ByteCode Low -> OffsetMap
-offsetMap (ByteCode (l, v)) =
+offsetMap (ByteCode l v) =
   IM.fromList
     . ((fromIntegral l, V.length v):)
     . V.ifoldl' (\ls idx i -> (fromIntegral $ offset i, idx) : ls) []
@@ -149,7 +155,7 @@ devolveOffset v i = do
 
 -- | Return the bytecode offset from the bytecode.
 indexOffset :: ByteCode Low -> ByteCodeIndex -> Maybe (ByteCodeOffset)
-indexOffset (ByteCode (x, bc)) i =
+indexOffset (ByteCode x bc) i =
   if i == V.length bc
     then return (fromIntegral x)
     else offset <$> bc V.!? i
@@ -177,16 +183,16 @@ data ByteCodeInst r = ByteCodeInst
   }
 
 evolveByteCode :: EvolveM m => ByteCode Low -> m (OffsetMap, ByteCode High)
-evolveByteCode bc@(ByteCode (ln, v)) = do
+evolveByteCode bc@(ByteCode ln v) = do
   let !om = offsetMap bc
   x <- V.mapM (evolveByteCodeInst (evolveOffset om)) v
-  return . (om,) . ByteCode $ (ln, x)
+  return . (om,) $ ByteCode ln x
 
 devolveByteCode :: DevolveM m => ByteCode High -> m (ByteCode Low)
-devolveByteCode (ByteCode (_, bc)) = do
+devolveByteCode (ByteCode _ bc) = do
   -- Devolving byte code is not straight forward.
   (len, offsets) <- generateOffsets (V.map opcode bc)
-  ByteCode . (fromIntegral len,)
+  ByteCode (fromIntegral len)
     <$> V.mapM
       (devolveByteCodeInst (devolveOffset' offsets))
       (V.zipWith (flip ByteCodeInst . opcode) bc offsets)
@@ -314,7 +320,7 @@ instance Binary (ByteCode Low) where
     x <- getWord32be
     bs <- getLazyByteString (fromIntegral x)
     case runGetOrFail go bs of
-      Right (_,_,bcs) -> return . ByteCode . (x,) . V.fromList $ bcs
+      Right (_,_,bcs) -> return . ByteCode x . V.fromList $ bcs
       Left (_,_,msg)  -> fail msg
     where
       go = isEmpty >>= \t ->
@@ -324,7 +330,7 @@ instance Binary (ByteCode Low) where
             x <- get
             (x:) <$> go
 
-  put (ByteCode (_, lst))= do
+  put (ByteCode _ lst)= do
     let bs = runPut (mapM_ put lst)
     putWord32be (fromIntegral $ BL.length bs)
     putLazyByteString bs
@@ -1318,9 +1324,28 @@ putByteCode n bc =
     IfRef False One a -> putWord8 0xc6 >> put a
     IfRef True One a -> putWord8 0xc7 >> put a
 
+instance Eq (ByteCode High) where
+  ByteCode _ a == ByteCode _ b =
+    a == b
 
-$(deriveBase ''ByteCode)
-$(deriveBase ''ByteCodeInst)
+instance Eq (ByteCode Low) where
+  ByteCode i a == ByteCode j b =
+    i == j && a == b
+
+deriving instance Ord (ByteCode Low)
+
+instance Eq (ByteCodeInst High) where
+  ByteCodeInst _ a == ByteCodeInst _ b =
+    a == b
+
+instance Eq (ByteCodeInst Low) where
+  ByteCodeInst i a == ByteCodeInst j b =
+    i == j && a == b
+
+deriving instance Ord (ByteCodeInst Low)
+
+$(deriveThese ''ByteCode [''Show, ''Generic, ''NFData])
+$(deriveThese ''ByteCodeInst [''Show, ''Generic, ''NFData])
 $(deriveBase ''ByteCodeOpr)
 $(deriveBase ''SwitchTable)
 $(deriveBase ''Invocation)

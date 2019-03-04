@@ -4,7 +4,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections      #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Language.JVM.Attribute.CodeTest where
+module Language.JVM.Attribute.CodeSpec where
 
 import qualified Data.Vector                                as V
 import           Generic.Random
@@ -12,13 +12,21 @@ import           Generic.Random
 
 import           SpecHelper
 
-import           Language.JVM.Attribute.LineNumberTableTest ()
-import           Language.JVM.Attribute.StackMapTableTest   ()
-import           Language.JVM.AttributeTest                 ()
-import           Language.JVM.UtilsTest                     ()
+import           Language.JVM.Attribute.LineNumberTableSpec ()
+import           Language.JVM.Attribute.StackMapTableSpec   ()
+import           Language.JVM.AttributeSpec                 ()
+import           Language.JVM.UtilsSpec                     ()
 
 import           Language.JVM
 import           Language.JVM.Attribute.Code
+
+
+spec :: Spec
+spec = do
+  it "can do a roundtrip on Code" $ property $ prop_roundtrip_Code
+  it "can do a roundtrip on ExceptionTable" $ property $ prop_roundtrip_ExceptionTable
+  it "can do a roundtrip on ByteCodeInst" $ property $ prop_roundtrip_ByteCodeInst
+  spec_ByteCode_examples
 
 prop_roundtrip_Code :: Code High -> Property
 prop_roundtrip_Code = isoRoundtrip
@@ -50,7 +58,7 @@ instance Arbitrary (Code High) where
       <$> arbitrary
       <*> arbitrary
       <*> pure bc
-      <*> (SizedList <$> listOf (genExceptionTable (fromIntegral . V.length . snd . unByteCode $ bc)))
+      <*> (SizedList <$> listOf (genExceptionTable (fromIntegral . V.length . byteCodeInstructions $ bc)))
       <*> pure (CodeAttributes [] [] [])
 
 genExceptionTable :: Int -> Gen (ExceptionTable High)
@@ -75,7 +83,7 @@ instance Arbitrary (ExceptionTable High) where
 instance Arbitrary (ByteCode High) where
   arbitrary = do
     s <- getSize
-    ByteCode . (0,) . V.map (ByteCodeInst 0) . V.fromList <$> vectorOf s (genByteCodeOpr s)
+    ByteCode 0 . V.map (ByteCodeInst 0) . V.fromList <$> vectorOf s (genByteCodeOpr s)
 
 instance Arbitrary (ByteCodeInst High) where
   arbitrary =

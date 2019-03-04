@@ -1,7 +1,7 @@
 module SpecHelper
-  ( module Test.Tasty
-  , module Test.Hspec.Expectations.Pretty
-  , module Test.Tasty.QuickCheck
+  ( module Test.Hspec.Expectations.Pretty
+  , module Test.Hspec.QuickCheck
+  , module Test.QuickCheck
   , module Generic.Random
   , decode
   , encode
@@ -23,9 +23,9 @@ module SpecHelper
 
 import Test.Hspec.Expectations.Pretty
 
-import Test.Tasty
-import Test.Tasty.Hspec hiding (shouldBe)
-import Test.Tasty.QuickCheck
+import Test.Hspec hiding (shouldBe)
+import Test.Hspec.QuickCheck
+import Test.QuickCheck
 import qualified Test.QuickCheck.Property as P
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
@@ -58,12 +58,12 @@ toHex x =
   ]
   where alpha = "0123456789abcdef"
 
-testAllFiles :: (BL.ByteString -> Spec) -> IO [TestTree]
+testAllFiles :: (BL.ByteString -> Spec) -> Spec
 testAllFiles spec = do
-  files <- filter isClass <$> recursiveContents "test/data"
-  forM files $ \file -> do
-    bs <- blReadFile file
-    testSpec file $ spec bs
+  files <- runIO $ filter isClass <$> recursiveContents "test/data"
+  forM_ files $ \file -> do
+    bs <- runIO $ blReadFile file
+    describe file $ spec bs
   where
     isClass p =
       takeExtension p == ".class"
@@ -96,22 +96,22 @@ hexString :: BL.ByteString -> String
 hexString =
   List.intercalate " " . group 8 . concat . map toHex . BL.unpack
 
-isoBinary :: (Binary a, Eq a, Show a) => a -> Property
+isoBinary :: (Binary a, Eq a, Show a) => a -> P.Property
 isoBinary a =
   let bs = encode a
-  in counterexample (hexString bs) $
-      decode bs === a
+  in P.counterexample (hexString bs) $
+      decode bs P.=== a
 
 -- | Test that a value can go from the Highest state to binary and back again
 -- without losing data.
 isoRoundtrip ::
   (Staged a, Eq (a High), Show (a High), Binary (a Low))
-  => (a High) -> Property
+  => (a High) -> P.Property
 isoRoundtrip a =
   case roundtrip a of
     Right (_, a') ->
-      property $ a' `shouldBe` a
-    Left msg -> property $ P.failed { P.reason = msg }
+      P.property $ a' `shouldBe` a
+    Left msg -> P.property $ P.failed { P.reason = msg }
   where
     roundtrip a1 = do
       let (a', CPBuilder _ cp) = runConstantPoolBuilder (devolve a1) cpbEmpty
@@ -125,12 +125,12 @@ isoRoundtrip a =
 -- without losing data.
 isoByteCodeRoundtrip ::
   (ByteCodeStaged a, Eq (a High), Show (a Low), Show (a High), Binary (a Low))
-  => (a High) -> Property
+  => (a High) -> P.Property
 isoByteCodeRoundtrip a =
   case byteCodeRoundtrip a of
     Right ((_, b, cp), a') ->
-      counterexample (show cp ++ "\n" ++ show b) $ a' `shouldBe` a
-    Left msg -> property $ P.failed { P.reason = msg }
+      P.counterexample (show cp ++ "\n" ++ show b) $ a' `shouldBe` a
+    Left msg -> P.property $ P.failed { P.reason = msg }
 
 byteCodeRoundtrip :: (ByteCodeStaged s, Binary (s Low)) => s High -> Either String ((BL.ByteString, s Low, ConstantPool High), s High)
 byteCodeRoundtrip a1 = do

@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Language.JVM.ConstantTest where
+module Language.JVM.ConstantSpec where
 
 import SpecHelper
 
@@ -13,23 +13,21 @@ import Language.JVM.Constant
 import Language.JVM.Staged
 import Language.JVM.ConstantPool
 import Language.JVM.ClassFileReader
-import Language.JVM.UtilsTest ()
-import Language.JVM.TypeTest ()
+import Language.JVM.UtilsSpec ()
+import Language.JVM.TypeSpec ()
 
-prop_encode_and_decode :: ConstantPool Low -> Property
-prop_encode_and_decode = isoBinary
+spec :: Spec
+spec = do
+  it "can encode and decode" $ property $
+    (isoBinary :: ConstantPool Low -> Property)
+  it "can do a roundtrip" $ property $
+    (isoRoundtrip :: Constant High -> Property)
 
 instance Arbitrary (ConstantPool Low) where
   arbitrary = do
     lst <- arbitrary :: Gen [Constant High]
     let (_, x) = runConstantPoolBuilder (mapM devolve lst) cpbEmpty
     return (cpbConstantPool x)
-
--- prop_Constant_encode_and_decode :: Constant Low -> Property
--- prop_Constant_encode_and_decode = isoBinary
-
-prop_roundtrip_Constant :: Constant High -> Property
-prop_roundtrip_Constant = isoRoundtrip
 
 instance Arbitrary Text.Text where
   arbitrary =

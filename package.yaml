@@ -40,22 +40,19 @@ tests:
   jvm-binary-test:
     dependencies:
     - jvm-binary
-    - tasty
-    - tasty-hspec
-    - tasty-discover
-    - tasty-quickcheck
     - QuickCheck
-    - filepath
     - directory
-    - text
+    - filepath
     - generic-random
+    - hspec
+    - hspec-discover
     - hspec-expectations-pretty-diff
     ghc-options:
     - -rtsopts
     - -threaded
     - -with-rtsopts=-N
     - -fno-warn-orphans
-    main: Test.hs
+    main: Main.hs
     source-dirs: test
 
 benchmarks:
