@@ -363,10 +363,10 @@ data ArrayType
   deriving (Show, Eq, Ord, Generic, NFData)
 
 data Invocation r
-  = InvkSpecial !(DeepRef AbsVariableMethodId r)
+  = InvkSpecial !(DeepRef AbsMethodId r)
   -- ^ Variable since 52.0
   | InvkVirtual !(DeepRef AbsMethodId r)
-  | InvkStatic !(DeepRef AbsVariableMethodId r)
+  | InvkStatic !(DeepRef AbsMethodId r)
   -- ^ Variable since 52.0
   | InvkInterface !Word8 !(DeepRef AbsInterfaceMethodId r)
   -- ^ Should be a positive number
