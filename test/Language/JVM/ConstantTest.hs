@@ -114,8 +114,8 @@ instance Arbitrary (MethodHandleMethod High) where
   arbitrary =
     genericArbitraryU
 
-instance Arbitrary (AbsVariableMethodId High) where
-  arbitrary = genericArbitraryU
+-- instance Arbitrary (AbsVariableMethodId High) where
+--   arbitrary = genericArbitraryU
 
 instance Arbitrary (InvokeDynamic High) where
   arbitrary = InvokeDynamic <$> arbitrary <*> arbitrary

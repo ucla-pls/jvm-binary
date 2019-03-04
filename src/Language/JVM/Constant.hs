@@ -196,7 +196,7 @@ instance Binary (Constant Low) where
       15 -> CMethodHandle <$> get
       16 -> CMethodType <$> get
       18 -> CInvokeDynamic <$> get
-      _  -> fail $ "Unkown identifier " ++ show ident
+      _  -> fail $ "Unknown identifier " ++ show ident
 
   put x =
     case x of
