@@ -21,4 +21,4 @@ instance Arbitrary (BootstrapMethods High) where
 
 instance Arbitrary (BootstrapMethod High) where
   arbitrary =
-    BootstrapMethod <$> arbitrary <*> (SizedList <$> listOf (resize 1 arbitrary))
+    BootstrapMethod <$> arbitrary <*> (SizedList <$> pure [])
