@@ -30,6 +30,7 @@ module Language.JVM.ClassFileReader
   , runConstantPoolBuilder
   , CPBuilder (..)
   , builderFromConstantPool
+  , constantPoolFromBuilder
   , cpbEmpty
   ) where
 
@@ -39,11 +40,9 @@ import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.Binary
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.IntMap as IM
 import qualified Data.Map as Map
 import qualified Data.List as List
 import qualified Data.Text as Text
-import           Data.Monoid
 import           GHC.Generics (Generic)
 
 import           Language.JVM.ClassFile
@@ -88,7 +87,7 @@ evolveClassFile fn cf = do
 devolveClassFile :: ClassFile High -> ClassFile Low
 devolveClassFile cf =
   let (cf', cpb) = runConstantPoolBuilder (devolve cf) cpbEmpty in
-  cf' { cConstantPool = cpbConstantPool cpb }
+  cf' { cConstantPool = fromConstants (reverse $ cpbConstants cpb)}
 
 -- | Devolve a 'ClassFile' form 'High' to 'Low', while maintaining the class
 -- pool of the original class file. This is useful if we care that unread
@@ -97,7 +96,7 @@ devolveClassFile cf =
 devolveClassFile' :: ConstantPool Low -> ClassFile High -> ClassFile Low
 devolveClassFile' cp cf =
   let (cf', cpb) = runConstantPoolBuilder (devolve cf) (builderFromConstantPool cp) in
-  cf' { cConstantPool = cpbConstantPool cpb }
+  cf' { cConstantPool = constantPoolFromBuilder cpb } 
 
 -- | Top level command that combines 'decode' and 'evolve'.
 readClassFile :: BL.ByteString -> Either ClassFileError (ClassFile High)
@@ -184,29 +183,15 @@ instance EvolveM Evolve where
 -- might reference itself.
 bootstrapConstantPool :: ConstantPool Low -> Either ClassFileError (ConstantPool High)
 bootstrapConstantPool reffed =
-  case stage' IM.empty (IM.toList $ unConstantPool reffed) of
-    Right cp ->
-      Right $ ConstantPool cp
-    Left xs ->
+  case growPool improve reffed of
+    (cp, []) ->
+      Right cp
+    (_, xs) ->
       Left . CFEInconsistentClassPool "ConstantPool"
            $ "Could not load all constants in the constant pool: " ++ (show xs)
   where
-    stage' cp mis =
-      let (cp', mis') =
-            foldMap (grow (EvolveConfig [] (ConstantPool cp) (const True))) mis
-      in if IM.null cp'
-        then
-          case appEndo mis' [] of
-            [] -> Right cp
-            xs -> Left xs
-        else
-          stage' (cp `IM.union` cp') . map snd $ appEndo mis' []
-
-    grow :: EvolveConfig -> (Int, Constant Low) -> (IM.IntMap (Constant High), Endo [(ClassFileError, (Int, Constant Low))])
-    grow ec (k,a) =
-      case runEvolve ec (evolve a) of
-        Right c -> (IM.singleton k c, Endo id)
-        Left msg  -> (IM.empty, Endo ((msg, (k,a)):))
+    improve cp low =
+      runEvolve (EvolveConfig [] cp (const True)) (evolve low)
 
 {-# SCC bootstrapConstantPool #-}
 
@@ -214,17 +199,23 @@ bootstrapConstantPool reffed =
 
 data CPBuilder = CPBuilder
    { cpbMapper       :: Map.Map (Constant Low) Index
-   , cpbConstantPool :: ConstantPool Low
-   }
+   , cpbNextIndex    :: Index
+   , cpbConstants    :: [Constant Low]
+   } deriving (Show)
 
 cpbEmpty :: CPBuilder
-cpbEmpty = CPBuilder Map.empty CP.empty
+cpbEmpty = CPBuilder Map.empty 1 []
 
 builderFromConstantPool :: ConstantPool Low -> CPBuilder
 builderFromConstantPool cp =
-  CPBuilder (Map.fromList . map change . IM.toList $ unConstantPool cp) cp
+  CPBuilder (Map.fromList . map change . listConstants $ cp) (nextIndex cp)  (map snd constants)
   where
+    constants = listConstants cp
     change (a, b) = (b, fromIntegral a)
+
+constantPoolFromBuilder :: CPBuilder -> ConstantPool Low
+constantPoolFromBuilder cpb =
+ fromConstants (reverse $ cpbConstants cpb)
 
 
 newtype ConstantPoolBuilder a =
@@ -251,9 +242,12 @@ instance DevolveM ConstantPoolBuilder where
 stateCPBuilder
   :: Constant Low
   -> CPBuilder
-  -> (Word16, CPBuilder)
+  -> (Index, CPBuilder)
 stateCPBuilder c' cpb =
-  let (w, cp') = append c' . cpbConstantPool $ cpb in
-  (w, cpb { cpbConstantPool = cp'
-          , cpbMapper = Map.insert c' w . cpbMapper $ cpb
-          })
+  let w = cpbNextIndex cpb
+  in ( w
+     , cpb
+       { cpbNextIndex = w + constantSize c'
+       , cpbConstants = c' : cpbConstants cpb
+       , cpbMapper = Map.insert c' w . cpbMapper $ cpb
+       })

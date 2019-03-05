@@ -19,6 +19,7 @@ module SpecHelper
   , it
   , xit
   , describe
+  , focus
   ) where
 
 import Test.Hspec.Expectations.Pretty
@@ -105,7 +106,7 @@ isoBinary a =
 -- | Test that a value can go from the Highest state to binary and back again
 -- without losing data.
 isoRoundtrip ::
-  (Staged a, Eq (a High), Show (a High), Binary (a Low))
+  (Staged a, Eq (a High), Show (a High), Binary (a Low), Show (a Low))
   => (a High) -> P.Property
 isoRoundtrip a =
   case roundtrip a of
@@ -114,7 +115,9 @@ isoRoundtrip a =
     Left msg -> P.property $ P.failed { P.reason = msg }
   where
     roundtrip a1 = do
-      let (a', CPBuilder _ cp) = runConstantPoolBuilder (devolve a1) cpbEmpty
+      let
+        (a', cpb) = runConstantPoolBuilder (devolve a1) cpbEmpty
+        cp = constantPoolFromBuilder cpb
       let bs = encode a'
       a'' <- bimap trd trd $ decodeOrFail bs
       cp' <- first show $ bootstrapConstantPool cp
@@ -134,7 +137,9 @@ isoByteCodeRoundtrip a =
 
 byteCodeRoundtrip :: (ByteCodeStaged s, Binary (s Low)) => s High -> Either String ((BL.ByteString, s Low, ConstantPool High), s High)
 byteCodeRoundtrip a1 = do
-  let (a', CPBuilder _ cp) = runConstantPoolBuilder (devolveBC (return . fromIntegral) a1) cpbEmpty
+  let
+    (a', cbp) = runConstantPoolBuilder (devolveBC (return . fromIntegral) a1) cpbEmpty
+    cp = constantPoolFromBuilder cbp
   let bs = encode a'
   a'' <- bimap trd trd $ decodeOrFail bs
   cp' <- first show $ bootstrapConstantPool cp

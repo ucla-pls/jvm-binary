@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.JVM.Attribute.ConstantValueSpec where
 
@@ -7,9 +8,12 @@ import SpecHelper
 import Language.JVM.ConstantSpec ()
 
 import Language.JVM
+import Language.JVM.Attribute.ConstantValue
 
 spec :: Spec
-spec =
+spec = do
+  it "can do a roundtrip on a VClass" $
+    prop_roundtrip_ConstantValue (ConstantValue (VClass "this/class"))
   it "can do a roundtrip" $ property $ prop_roundtrip_ConstantValue
 
 prop_roundtrip_ConstantValue :: ConstantValue High -> Property

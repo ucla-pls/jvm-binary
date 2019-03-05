@@ -3,10 +3,11 @@ module Language.JVMSpec where
 
 import           SpecHelper
 
+import Test.Hspec hiding (shouldBe, shouldSatisfy, shouldMatchList)
+
 import qualified Data.ByteString.Lazy                 as BL
 import           Data.Either
 import           Data.Foldable
-import qualified Data.IntMap                          as IM
 import           Data.List                            as List
 import qualified Data.Text                            as Text
 
@@ -20,19 +21,24 @@ import           Language.JVM.Attribute.StackMapTable
 
 spec :: Spec
 spec = do
-  spec_testing_example
-  spec_reading_classfile
+  describe "Main.class" $ do
+    fl <- runIO $ BL.readFile "test/data/project/Main.class"
 
-spec_testing_example :: SpecWith ()
-spec_testing_example =
-  it "can read classfile from file" $ do
-    eclf <- readClassFile <$> BL.readFile "test/data/project/Main.class"
-    case eclf of
-      Right clf -> do
-        cThisClass clf `shouldBe` ClassName "Main"
-        cSuperClass clf `shouldBe` ClassName "java/lang/Object"
-      Left msg ->
-        fail $ show msg
+    it "can read classfile from file" $ do
+      case readClassFile fl of
+        Right clf -> do
+          cThisClass clf `shouldBe` "Main"
+          cSuperClass clf `shouldBe` "java/lang/Object"
+        Left msg ->
+          fail $ show msg
+    it "can decode a classfile from file" $ do
+      case decodeClassFile fl of
+        Right _ ->
+          True `shouldBe` True
+        Left msg ->
+          fail $ show msg
+
+  -- spec_reading_classfile
 
 spec_reading_classfile :: Spec
 spec_reading_classfile = testAllFiles $ \bs -> do
@@ -92,8 +98,8 @@ spec_reading_classfile = testAllFiles $ \bs -> do
     let Right x = me
     it "has same or smaller constant pool" $ do
       let d' = devolveClassFile x
-      (IM.size . unConstantPool $ cConstantPool d') `shouldSatisfy`
-        (<= (IM.size . unConstantPool $ cConstantPool cls))
+      (poolCount $ cConstantPool d') `shouldSatisfy`
+        (<= (poolCount $ cConstantPool cls))
 
     -- it "is the same when devolving with the original constant pool" $
     --   devolveClassFile' (cConstantPool cls) x `shouldMatchClass'` cls

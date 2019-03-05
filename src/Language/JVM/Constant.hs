@@ -258,7 +258,7 @@ instance Binary (MethodHandle Low) where
 -- 32, but is still awarded value 1. This is due to an
 -- [inconsistency](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4.5)
 -- in JVM.
-constantSize :: Constant r -> Int
+constantSize :: Constant r -> Index
 constantSize x =
   case x of
     CDouble _ -> 2

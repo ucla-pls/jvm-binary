@@ -1,6 +1,4 @@
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE DeriveFunctor #-}
--- {-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -9,6 +7,8 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE ViewPatterns               #-}
 {-|
 Copyright   : (c) Christian Gram Kalhauge, 2018
 License     : MIT
@@ -21,21 +21,35 @@ module Language.JVM.ConstantPool
   (
   -- * Constant Pool
   -- $ConstantPool
-    ConstantPool (..)
+    ConstantPool
   , access
-  , append
+
+  , growPool
+
+  , poolCount
+  , nextIndex
+  , listConstants
+  , fromConstants
+
   , empty
   , PoolAccessError (..)
+
+  , Index
   ) where
 
-import           Control.DeepSeq          (NFData)
+import           Control.DeepSeq       (NFData)
 import           Control.Monad.Except
 import           Data.Binary
 -- import           Debug.Trace
 import           Data.Binary.Get
 import           Data.Binary.Put
-import qualified Data.IntMap              as IM
-import           GHC.Generics             (Generic)
+import           GHC.Generics          (Generic)
+
+-- base
+import Data.Monoid
+
+-- containers
+import qualified Data.IntMap           as IM
 
 import           Language.JVM.Constant
 import           Language.JVM.Stage
@@ -62,12 +76,12 @@ instance Binary (ConstantPool Low) where
       go len n | len > n = do
         constant <- get
         rest <- go len (n + constantSize constant)
-        return $ (n, constant) : rest
+        return $ (fromIntegral n, constant) : rest
       go _ _ = return []
   put (ConstantPool p) = do
     case IM.maxViewWithKey p of
       Just ((key, e), _) -> do
-        putInt16be (fromIntegral (key + constantSize e))
+        putWord16be (fromIntegral key + constantSize e)
         forM_ (IM.toAscList p) (put . snd)
       Nothing -> do
         putInt16be 0
@@ -88,19 +102,57 @@ empty = ConstantPool (IM.empty)
 access :: Index -> ConstantPool r -> Either PoolAccessError (Constant r)
 access ref (ConstantPool cp) =
   case IM.lookup (fromIntegral ref) cp of
-    Just x -> Right x
+    Just x  -> Right x
     Nothing -> Left $ PoolAccessError ref "No such element."
 
+poolCount :: ConstantPool r -> Int
+poolCount =
+  IM.size . unConstantPool
+
+listConstants :: ConstantPool r -> [(Index, Constant r)]
+listConstants =
+  map (\(i, a) -> (fromIntegral i, a)) . IM.toList . unConstantPool
+
+nextIndex :: ConstantPool r -> Index
+nextIndex (ConstantPool im) =
+  fromIntegral $ case IM.toDescList im of
+    (k, a):_ -> fromIntegral k + constantSize a
+    _        -> 1
+
+fromConstants :: Foldable f => f (Constant r) -> ConstantPool r
+fromConstants =
+  foldl (\b a -> snd . append a $ b) empty
+
+growPool ::
+  forall b.
+  (ConstantPool High -> Constant Low -> Either b (Constant High))
+  -> ConstantPool Low
+  -> (ConstantPool High, [(b, (Index, Constant Low))])
+growPool f reffed =
+  stage' IM.empty (listConstants reffed)
+  where
+    stage' :: IM.IntMap (Constant High) -> [(Index, Constant Low)] -> (ConstantPool High, [(b, (Index, Constant Low))])
+    stage' cp mis =
+      case foldMap (grow (ConstantPool cp)) mis of
+        (cp', flip appEndo [] -> mis')
+          | IM.null cp' ->
+              (ConstantPool cp, mis')
+          | otherwise ->
+          stage' (cp `IM.union` cp') . map snd $ mis'
+
+    grow cp (k,a) =
+      case f cp a of
+        Right c -> (IM.singleton (fromIntegral k) c, mempty)
+        Left b  -> (IM.empty, Endo ((b, (k,a)):) )
+
+
+{-# INLINE growPool #-}
 
 -- | Append a constant to the constant pool, and get the offset.
 append :: Constant r -> ConstantPool r -> (Index, ConstantPool r)
-append c (ConstantPool cp) =
-  (fromIntegral i, ConstantPool $ IM.insert i c cp)
+append c cp@(ConstantPool im) =
+  (i, ConstantPool $ IM.insert (fromIntegral i) c im)
   where
-    i =
-      case IM.toDescList cp of
-        (k, a):_ ->
-          k + constantSize a
-        _ -> 1
+    i = nextIndex cp
 
 $(deriveBase ''ConstantPool)
