@@ -445,6 +445,8 @@ instance Referenceable JValue where
       CMethodHandle m -> return $ VMethodHandle m
       CMethodType t   -> return $ VMethodType t
       x               -> expected "Expected a Value" err x
+  {-# INLINE fromConst #-}
+
 
   toConst c =
     return $ case c of
@@ -456,3 +458,4 @@ instance Referenceable JValue where
       VClass (ClassName r) -> CClassRef r
       VMethodHandle m      -> CMethodHandle m
       VMethodType t        -> CMethodType t
+  {-# INLINE toConst #-}

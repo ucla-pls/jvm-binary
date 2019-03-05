@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-{-# OPTIONS_GHC -funbox-strict-fields #-}
+-- {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE StrictData     #-}
 {-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE BangPatterns       #-}
 {-# LANGUAGE DeriveGeneric      #-}
@@ -239,6 +240,7 @@ devolveRefType  = \case
   JTArray (JTBase bt) -> return $ ArrayBaseType bt
   c -> flip Reference (fromIntegral $ refTypeDepth c) <$> unlink c
 
+
 evolveByteCodeInst ::
   EvolveM m
   => (ByteCodeOffset -> m ByteCodeIndex)
@@ -266,8 +268,6 @@ evolveByteCodeInst g (ByteCodeInst ofs opr) = do
   where
     calcOffset r =
       g (fromIntegral $ fromIntegral ofs + r)
-
-{-# INLINABLE evolveByteCodeInst #-}
 
 
 devolveByteCodeInst ::
@@ -340,7 +340,8 @@ instance Binary (ByteCodeInst Low) where
   get = do
     i <- (fromIntegral <$> bytesRead)
     x <- get
-    return $! ByteCodeInst i x
+    return (ByteCodeInst i x)
+
   put x =
     putByteCode (offset x) $ opcode x
 
@@ -936,9 +937,11 @@ instance Binary (ByteCodeOpr Low) where
 
       _ -> fail $ "I do not know this bytecode '0x" ++ showHex cmd "'."
 
-  {-# INLINABLE get#-}
+  {-# INLINABLE get #-}
 
   put = putByteCode 0
+
+  {-# INLINE put #-}
 
 putByteCode :: Word16 -> ByteCodeOpr Low -> Put
 putByteCode n bc =

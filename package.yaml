@@ -62,6 +62,7 @@ benchmarks:
     - criterion
     ghc-options:
     - -rtsopts
+    - -O2
     - -threaded
     - -funbox-strict-fields
     - -with-rtsopts=-N
