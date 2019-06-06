@@ -1,7 +1,9 @@
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-{-# OPTIONS_GHC -funbox-strict-fields #-}
+-- {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE LambdaCase     #-}
+{-# LANGUAGE StrictData     #-}
+{-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE BangPatterns       #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE FlexibleInstances  #-}
@@ -17,6 +19,7 @@ Maintainer  : kalhuage@cs.ucla.edu
 -}
 module Language.JVM.ByteCode
   ( ByteCode (..)
+  , unByteCode
 
   -- * evolve and devolve
   , evolveByteCode
@@ -91,13 +94,16 @@ import           Language.JVM.Constant
 import           Language.JVM.Staged
 import           Language.JVM.Type
 
--- | ByteCode is a newtype wrapper around a list of ByteCode instructions.
+-- | ByteCode constains a list of ByteCode instructions and the size of the bytecode.
 -- if the ByteCode is in the Low stage then the byte code instructions are
 -- annotated with the byte code offsets.
-newtype ByteCode i = ByteCode
-  { unByteCode ::
-      Choice (Word32, V.Vector (ByteCodeInst Low)) (V.Vector (ByteCodeOpr High)) i
+data ByteCode i = ByteCode
+  { byteCodeSize :: !Word32
+  , byteCodeInstructions :: V.Vector (ByteCodeInst i)
   }
+
+unByteCode :: ByteCode i -> V.Vector (ByteCodeInst i)
+unByteCode = byteCodeInstructions
 
 -- | The offset in the byte code
 type ByteCodeOffset = Word16
@@ -130,7 +136,7 @@ evolveOffset o i =
 
 -- | Given low byte code we can create an `OffsetMap`
 offsetMap :: ByteCode Low -> OffsetMap
-offsetMap (ByteCode (l, v)) =
+offsetMap (ByteCode l v) =
   IM.fromList
     . ((fromIntegral l, V.length v):)
     . V.ifoldl' (\ls idx i -> (fromIntegral $ offset i, idx) : ls) []
@@ -151,7 +157,7 @@ devolveOffset v i = do
 
 -- | Return the bytecode offset from the bytecode.
 indexOffset :: ByteCode Low -> ByteCodeIndex -> Maybe (ByteCodeOffset)
-indexOffset (ByteCode (x, bc)) i =
+indexOffset (ByteCode x bc) i =
   if i == V.length bc
     then return (fromIntegral x)
     else offset <$> bc V.!? i
@@ -178,21 +184,20 @@ data ByteCodeInst r = ByteCodeInst
   , opcode :: !(ByteCodeOpr r)
   }
 
-
 evolveByteCode :: EvolveM m => ByteCode Low -> m (OffsetMap, ByteCode High)
-evolveByteCode bc@(ByteCode (_, v)) = do
+evolveByteCode bc@(ByteCode ln v) = do
   let !om = offsetMap bc
-  x <- V.mapM (fmap opcode . evolveByteCodeInst (evolveOffset om)) v
-  return . (om,) . ByteCode $! x
+  x <- V.mapM (evolveByteCodeInst (evolveOffset om)) v
+  return . (om,) $ ByteCode ln x
 
 devolveByteCode :: DevolveM m => ByteCode High -> m (ByteCode Low)
-devolveByteCode (ByteCode bc) = do
+devolveByteCode (ByteCode _ bc) = do
   -- Devolving byte code is not straight forward.
-  (len, offsets) <- generateOffsets bc
-  ByteCode . (fromIntegral len,)
+  (len, offsets) <- generateOffsets (V.map opcode bc)
+  ByteCode (fromIntegral len)
     <$> V.mapM
       (devolveByteCodeInst (devolveOffset' offsets))
-      (V.zipWith ByteCodeInst offsets bc)
+      (V.zipWith (flip ByteCodeInst . opcode) bc offsets)
 
 generateOffsets :: DevolveM m => V.Vector (ByteCodeOpr High) -> m (Word16, V.Vector ByteCodeOffset)
 generateOffsets bc = do
@@ -235,6 +240,7 @@ devolveRefType  = \case
   JTArray (JTBase bt) -> return $ ArrayBaseType bt
   c -> flip Reference (fromIntegral $ refTypeDepth c) <$> unlink c
 
+
 evolveByteCodeInst ::
   EvolveM m
   => (ByteCodeOffset -> m ByteCodeIndex)
@@ -262,8 +268,6 @@ evolveByteCodeInst g (ByteCodeInst ofs opr) = do
   where
     calcOffset r =
       g (fromIntegral $ fromIntegral ofs + r)
-
-{-# INLINABLE evolveByteCodeInst #-}
 
 
 devolveByteCodeInst ::
@@ -317,7 +321,7 @@ instance Binary (ByteCode Low) where
     x <- getWord32be
     bs <- getLazyByteString (fromIntegral x)
     case runGetOrFail go bs of
-      Right (_,_,bcs) -> return . ByteCode . (x,) . V.fromList $ bcs
+      Right (_,_,bcs) -> return . ByteCode x . V.fromList $ bcs
       Left (_,_,msg)  -> fail msg
     where
       go = isEmpty >>= \t ->
@@ -327,7 +331,7 @@ instance Binary (ByteCode Low) where
             x <- get
             (x:) <$> go
 
-  put (ByteCode (_, lst))= do
+  put (ByteCode _ lst)= do
     let bs = runPut (mapM_ put lst)
     putWord32be (fromIntegral $ BL.length bs)
     putLazyByteString bs
@@ -336,7 +340,8 @@ instance Binary (ByteCodeInst Low) where
   get = do
     i <- (fromIntegral <$> bytesRead)
     x <- get
-    return $! ByteCodeInst i x
+    return (ByteCodeInst i x)
+
   put x =
     putByteCode (offset x) $ opcode x
 
@@ -366,10 +371,10 @@ data ArrayType
   deriving (Show, Eq, Ord, Generic, NFData)
 
 data Invocation r
-  = InvkSpecial !(DeepRef AbsVariableMethodId r)
+  = InvkSpecial !(DeepRef AbsMethodId r)
   -- ^ Variable since 52.0
   | InvkVirtual !(DeepRef AbsMethodId r)
-  | InvkStatic !(DeepRef AbsVariableMethodId r)
+  | InvkStatic !(DeepRef AbsMethodId r)
   -- ^ Variable since 52.0
   | InvkInterface !Word8 !(DeepRef AbsInterfaceMethodId r)
   -- ^ Should be a positive number
@@ -932,9 +937,11 @@ instance Binary (ByteCodeOpr Low) where
 
       _ -> fail $ "I do not know this bytecode '0x" ++ showHex cmd "'."
 
-  {-# INLINABLE get#-}
+  {-# INLINABLE get #-}
 
   put = putByteCode 0
+
+  {-# INLINE put #-}
 
 putByteCode :: Word16 -> ByteCodeOpr Low -> Put
 putByteCode n bc =
@@ -1321,9 +1328,28 @@ putByteCode n bc =
     IfRef False One a -> putWord8 0xc6 >> put a
     IfRef True One a -> putWord8 0xc7 >> put a
 
+instance Eq (ByteCode High) where
+  ByteCode _ a == ByteCode _ b =
+    a == b
 
-$(deriveBase ''ByteCode)
-$(deriveBase ''ByteCodeInst)
+instance Eq (ByteCode Low) where
+  ByteCode i a == ByteCode j b =
+    i == j && a == b
+
+deriving instance Ord (ByteCode Low)
+
+instance Eq (ByteCodeInst High) where
+  ByteCodeInst _ a == ByteCodeInst _ b =
+    a == b
+
+instance Eq (ByteCodeInst Low) where
+  ByteCodeInst i a == ByteCodeInst j b =
+    i == j && a == b
+
+deriving instance Ord (ByteCodeInst Low)
+
+$(deriveThese ''ByteCode [''Show, ''Generic, ''NFData])
+$(deriveThese ''ByteCodeInst [''Show, ''Generic, ''NFData])
 $(deriveBase ''ByteCodeOpr)
 $(deriveBase ''SwitchTable)
 $(deriveBase ''Invocation)

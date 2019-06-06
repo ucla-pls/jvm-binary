@@ -2,18 +2,22 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Language.JVM.ClassFileTest where
+module Language.JVM.ClassFileSpec where
 
 import           SpecHelper
 
 import           Language.JVM
 
-import           Language.JVM.Attribute.BootstrapMethodsTest ()
-import           Language.JVM.AttributeTest                  ()
-import           Language.JVM.ConstantTest                   ()
-import           Language.JVM.FieldTest                      ()
-import           Language.JVM.MethodTest                     ()
-import           Language.JVM.UtilsTest                      ()
+import           Language.JVM.Attribute.BootstrapMethodsSpec ()
+import           Language.JVM.AttributeSpec                  ()
+import           Language.JVM.ConstantSpec                   ()
+import           Language.JVM.FieldSpec                      ()
+import           Language.JVM.MethodSpec                     ()
+import           Language.JVM.UtilsSpec                      ()
+
+spec :: Spec
+spec =
+  it "can do a roundtrip" $ property $ prop_roundtrip_ClassFile
 
 prop_roundtrip_ClassFile :: ClassFile High -> Property
 prop_roundtrip_ClassFile = isoRoundtrip

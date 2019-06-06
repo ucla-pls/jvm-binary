@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Language.JVM.UtilsTest where
+module Language.JVM.UtilsSpec where
 
 import SpecHelper
 
@@ -8,32 +8,32 @@ import qualified Data.ByteString as BS
 
 import Data.Set as Set
 import qualified Data.Text.Encoding as TE
-import qualified Data.Text as Text
+
 import Language.JVM.Utils
 
-prop_test_our_zero_decoder :: Text.Text -> Bool
-prop_test_our_zero_decoder a =
-   tryDecode (TE.encodeUtf8 a) == Right a
+spec :: Spec
+spec = do
+  describe "zero decoder" $ do
+    -- it "can decode encoded text" $ property $
+    --   \a -> tryDecode (TE.encodeUtf8 a) == Right a
 
-spec_parse_zero_text :: SpecWith ()
-spec_parse_zero_text = do
-  it "can read zero" $ do
-    sizedByteStringToText "\192\128" `shouldBe` Right "\0"
+    it "can read zero" $ do
+      sizedByteStringToText "\192\128" `shouldBe` Right "\0"
 
-  it "can read zero padded with text" $ do
-    sizedByteStringToText "Some text \192\128 a x" `shouldBe` Right "Some text \0 a x"
+    it "can read zero padded with text" $ do
+      sizedByteStringToText "Some text \192\128 a x" `shouldBe` Right "Some text \0 a x"
 
-  it "can convert a zero back again" $ do
-    sizedByteStringFromText "\0" `shouldBe` "\192\128"
+    it "can convert a zero back again" $ do
+      sizedByteStringFromText "\0" `shouldBe` "\192\128"
 
-  it "can convert a padded zero back again" $ do
-    sizedByteStringFromText "Some text \0 a x" `shouldBe` "Some text \192\128 a x"
+    it "can convert a padded zero back again" $ do
+      sizedByteStringFromText "Some text \0 a x" `shouldBe` "Some text \192\128 a x"
 
-  it "works on wierd strings" $ do
-    tryDecode (TE.encodeUtf8 "\0  asd ßåæ∂ø∆œ˜˜¬å˚¬") `shouldBe` Right "\0  asd ßåæ∂ø∆œ˜˜¬å˚¬"
+    it "works on wierd strings" $ do
+      tryDecode (TE.encodeUtf8 "\0  asd ßåæ∂ø∆œ˜˜¬å˚¬") `shouldBe` Right "\0  asd ßåæ∂ø∆œ˜˜¬å˚¬"
 
-  it "works on chinese characters" $ do
-    tryDecode (TE.encodeUtf8 "试一试中文") `shouldBe` Right "试一试中文"
+    it "works on chinese characters" $ do
+      tryDecode (TE.encodeUtf8 "试一试中文") `shouldBe` Right "试一试中文"
 
   -- xit "works on http:/foo/p\237\160\128" $ do
   --   -- I don't know exactly the right result of this string, but it should be a correct java byte-string

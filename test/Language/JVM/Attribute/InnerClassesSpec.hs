@@ -1,18 +1,23 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.JVM.Attribute.InnerClassesTest where
+module Language.JVM.Attribute.InnerClassesSpec where
 
 import           SpecHelper
 import qualified Data.Set as S
 
-import           Language.JVM.ConstantTest               ()
+import           Language.JVM.ConstantSpec               ()
 
 import           Language.JVM.Attribute.InnerClasses
 import           Language.JVM
 
-prop_roundtrip_InnerClassesTest :: InnerClasses High -> Property
-prop_roundtrip_InnerClassesTest = isoRoundtrip
+spec :: Spec
+spec = do
+  it "can do a roundtrip" $ property $ prop_roundtrip_InnerClassesSpec
+  spec_inner_classes
+
+prop_roundtrip_InnerClassesSpec :: InnerClasses High -> Property
+prop_roundtrip_InnerClassesSpec = isoRoundtrip
 
 spec_inner_classes ::  SpecWith ()
 spec_inner_classes = do

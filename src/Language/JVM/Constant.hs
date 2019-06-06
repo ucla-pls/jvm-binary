@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -32,7 +33,6 @@ module Language.JVM.Constant
   , AbsMethodId
   , AbsFieldId
   , AbsInterfaceMethodId (..)
-  , AbsVariableMethodId (..)
 
   , MethodId (..)
   , FieldId (..)
@@ -123,12 +123,6 @@ instance IsString FieldId where
 instance IsString MethodId where
   fromString = MethodId . fromString
 
--- | In some cases we can both point to interface methods and
--- regular methods.
-data AbsVariableMethodId r
-  = VInterfaceMethodId !(AbsInterfaceMethodId r)
-  | VMethodId !(AbsMethodId r)
-
 -- | The union type over the different method handles.
 data MethodHandle r
   = MHField !(MethodHandleField r)
@@ -150,9 +144,9 @@ data MethodHandleFieldKind
 
 data MethodHandleMethod r
   = MHInvokeVirtual !(DeepRef AbsMethodId r)
-  | MHInvokeStatic !(DeepRef AbsVariableMethodId r)
+  | MHInvokeStatic !(DeepRef AbsMethodId r)
   -- ^ Since version 52.0
-  | MHInvokeSpecial !(DeepRef AbsVariableMethodId r)
+  | MHInvokeSpecial !(DeepRef AbsMethodId r)
   -- ^ Since version 52.0
   | MHNewInvokeSpecial !(DeepRef AbsMethodId r)
 
@@ -202,7 +196,7 @@ instance Binary (Constant Low) where
       15 -> CMethodHandle <$> get
       16 -> CMethodType <$> get
       18 -> CInvokeDynamic <$> get
-      _  -> fail $ "Unkown identifier " ++ show ident
+      _  -> fail $ "Unknown identifier " ++ show ident
 
   put x =
     case x of
@@ -264,7 +258,7 @@ instance Binary (MethodHandle Low) where
 -- 32, but is still awarded value 1. This is due to an
 -- [inconsistency](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4.5)
 -- in JVM.
-constantSize :: Constant r -> Int
+constantSize :: Constant r -> Index
 constantSize x =
   case x of
     CDouble _ -> 2
@@ -401,21 +395,6 @@ instance Referenceable (AbsInterfaceMethodId High) where
   toConst (AbsInterfaceMethodId s) =
     return $ CInterfaceMethodRef s
 
-instance Referenceable (AbsVariableMethodId High) where
-  fromConst _ (CInterfaceMethodRef s) = do
-    return . VInterfaceMethodId . AbsInterfaceMethodId $ s
-
-  fromConst _ (CMethodRef s) = do
-    return . VMethodId $ s
-
-  fromConst err c = expected "CInterfaceMethodRef or CMethodRef" err c
-
-  toConst (VInterfaceMethodId (AbsInterfaceMethodId s)) =
-    return $ CInterfaceMethodRef s
-
-  toConst (VMethodId s) =
-    return $ CMethodRef s
-
 expected :: String -> (String -> a) -> (Constant r) -> a
 expected name err c =
   err $ wrongType name c
@@ -441,7 +420,6 @@ $(deriveBaseWithBinary ''InvokeDynamic)
 $(deriveBaseWithBinary ''AbsMethodId)
 $(deriveBaseWithBinary ''AbsFieldId)
 $(deriveBaseWithBinary ''AbsInterfaceMethodId)
-$(deriveBaseWithBinary ''AbsVariableMethodId)
 
 -- | A constant pool value in java
 data JValue
@@ -467,6 +445,8 @@ instance Referenceable JValue where
       CMethodHandle m -> return $ VMethodHandle m
       CMethodType t   -> return $ VMethodType t
       x               -> expected "Expected a Value" err x
+  {-# INLINE fromConst #-}
+
 
   toConst c =
     return $ case c of
@@ -478,3 +458,4 @@ instance Referenceable JValue where
       VClass (ClassName r) -> CClassRef r
       VMethodHandle m      -> CMethodHandle m
       VMethodType t        -> CMethodType t
+  {-# INLINE toConst #-}

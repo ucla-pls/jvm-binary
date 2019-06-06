@@ -1,32 +1,47 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Language.JVMTest where
+module Language.JVMSpec where
 
 import           SpecHelper
 
+import Test.Hspec hiding (shouldBe, shouldSatisfy, shouldMatchList)
+
+import qualified Data.ByteString.Lazy                 as BL
 import           Data.Either
-import qualified Data.IntMap                          as IM
+import           Data.Foldable
 import           Data.List                            as List
 import qualified Data.Text                            as Text
-import qualified Data.ByteString.Lazy                 as BL
-import           Data.Foldable
+
+-- vector
+import qualified Data.Vector                          as V
 
 import           Language.JVM
 import qualified Language.JVM.Attribute.Code          as C
 import           Language.JVM.Attribute.StackMapTable
 
-spec_testing_example :: SpecWith ()
-spec_testing_example =
-  it "can read classfile from file" $ do
-    eclf <- readClassFile <$> BL.readFile "test/data/project/Main.class"
-    case eclf of
-      Right clf -> do
-        cThisClass clf `shouldBe` ClassName "Main"
-        cSuperClass clf `shouldBe` ClassName "java/lang/Object"
-      Left msg ->
-        fail $ show msg
 
-test_reading_classfile :: IO [TestTree]
-test_reading_classfile = testAllFiles $ \bs -> do
+spec :: Spec
+spec = do
+  describe "Main.class" $ do
+    fl <- runIO $ BL.readFile "test/data/project/Main.class"
+
+    it "can read classfile from file" $ do
+      case readClassFile fl of
+        Right clf -> do
+          cThisClass clf `shouldBe` "Main"
+          cSuperClass clf `shouldBe` "java/lang/Object"
+        Left msg ->
+          fail $ show msg
+    it "can decode a classfile from file" $ do
+      case decodeClassFile fl of
+        Right _ ->
+          True `shouldBe` True
+        Left msg ->
+          fail $ show msg
+
+  -- spec_reading_classfile
+
+spec_reading_classfile :: Spec
+spec_reading_classfile = testAllFiles $ \bs -> do
   let d = decodeClassFile bs
   it "can parse the bytestring" $ do
     d `shouldSatisfy` isRight
@@ -53,7 +68,7 @@ test_reading_classfile = testAllFiles $ \bs -> do
             -- Assume code
             case fromAttribute' a :: Either String (C.Code Low) of
               Right c -> do
-                forM_ (unByteCode . C.codeByteCode $ c) $ \i ->
+                forM_ (byteCodeInstructions . C.codeByteCode $ c) $ \i ->
                   putStr " -> " >> print i
 
                 forM_ (C.codeAttributes c) $ \ca -> do
@@ -83,8 +98,8 @@ test_reading_classfile = testAllFiles $ \bs -> do
     let Right x = me
     it "has same or smaller constant pool" $ do
       let d' = devolveClassFile x
-      (IM.size . unConstantPool $ cConstantPool d') `shouldSatisfy`
-        (<= (IM.size . unConstantPool $ cConstantPool cls))
+      (poolCount $ cConstantPool d') `shouldSatisfy`
+        (<= (poolCount $ cConstantPool cls))
 
     -- it "is the same when devolving with the original constant pool" $
     --   devolveClassFile' (cConstantPool cls) x `shouldMatchClass'` cls
@@ -139,9 +154,9 @@ shouldMatchMethod' ym xm = do
       (Right yc, Right xc) -> do
         cmpOn C.codeMaxStack yc xc
         cmpOn C.codeMaxLocals yc xc
-        cmpOn C.codeByteCodeInsts yc xc
+        cmpOn (C.codeByteCodeInsts :: Code Low -> V.Vector (ByteCodeInst Low)) yc xc
         cmpOn C.codeExceptionTable yc xc
-        cmpOver (List.sort . unSizedList .C.codeAttributes) yc xc $ \ yca xca -> do
+        cmpOver (List.sort . unSizedList . C.codeAttributes) yc xc $ \ yca xca -> do
           case (fromAttribute' yca, fromAttribute' xca)
              :: (Either String (StackMapTable Low), Either String (StackMapTable Low)) of
             (Right yst, Right xst) -> do

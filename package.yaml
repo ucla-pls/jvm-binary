@@ -1,5 +1,5 @@
 name: jvm-binary
-version: '0.3.0'
+version: '0.4.0'
 author: Christian Gram Kalhauge
 maintainer: Christian Gram Kalhauge <kalhauge@cs.ucla.edu>
 synopsis: A library for reading Java class-files
@@ -19,7 +19,7 @@ extra-source-files:
 - stack.yaml
 
 dependencies:
-- base >= 4.9 && < 4.12
+- base >= 4.9 && < 4.13
 - binary
 - bytestring
 - containers
@@ -40,22 +40,19 @@ tests:
   jvm-binary-test:
     dependencies:
     - jvm-binary
-    - tasty
-    - tasty-hspec
-    - tasty-discover
-    - tasty-quickcheck
     - QuickCheck
-    - filepath
     - directory
-    - text
+    - filepath
     - generic-random
+    - hspec >= 2.5.5
+    - hspec-discover
     - hspec-expectations-pretty-diff
     ghc-options:
     - -rtsopts
     - -threaded
     - -with-rtsopts=-N
     - -fno-warn-orphans
-    main: Test.hs
+    main: Main.hs
     source-dirs: test
 
 benchmarks:
@@ -65,6 +62,7 @@ benchmarks:
     - criterion
     ghc-options:
     - -rtsopts
+    - -O2
     - -threaded
     - -funbox-strict-fields
     - -with-rtsopts=-N

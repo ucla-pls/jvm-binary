@@ -1,11 +1,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.JVM.Attribute.SignatureTest where
+module Language.JVM.Attribute.SignatureSpec where
 
 import           SpecHelper
 
-import           Language.JVM.ConstantTest               ()
+import           Language.JVM.ConstantSpec               ()
 
 import           Language.JVM.Attribute.Signature
 import           Language.JVM
@@ -13,8 +13,14 @@ import           Language.JVM
 import qualified Data.Text as Text
 import Data.Attoparsec.Text
 
-prop_roundtrip_SignatureTest :: Signature High -> Property
-prop_roundtrip_SignatureTest = isoRoundtrip
+spec :: Spec
+spec = do
+  it "can do a roundtrip" $ property $ prop_roundtrip_SignatureSpec
+
+  spec_real_signatures
+
+prop_roundtrip_SignatureSpec :: Signature High -> Property
+prop_roundtrip_SignatureSpec = isoRoundtrip
 
 prop_field_signature :: FieldSignature -> Property
 prop_field_signature sig =

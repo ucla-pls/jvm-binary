@@ -45,7 +45,7 @@ instance IsAttribute (Code Low) where
 data Code r = Code
   { codeMaxStack       :: !(Word16)
   , codeMaxLocals      :: !(Word16)
-  , codeByteCode       :: !((ByteCode r))
+  , codeByteCode       :: !(ByteCode r)
   , codeExceptionTable :: !(SizedList16 (ExceptionTable r))
   , codeAttributes     :: !(Attributes CodeAttributes r)
   }
@@ -63,12 +63,12 @@ data ExceptionTable r = ExceptionTable
 -- | Extracts a list of bytecode operation
 codeByteCodeOprs :: Code High -> V.Vector (ByteCodeOpr High)
 codeByteCodeOprs =
-  unByteCode . codeByteCode
+  V.map opcode . codeByteCodeInsts
 
 -- | Extracts a list of bytecode instructions
-codeByteCodeInsts :: Code Low -> V.Vector (ByteCodeInst Low)
+codeByteCodeInsts :: Code i -> V.Vector (ByteCodeInst i)
 codeByteCodeInsts =
-  snd . unByteCode . codeByteCode
+  byteCodeInstructions . codeByteCode
 
 -- | Returns the StackMapTable attribute if any
 codeStackMapTable :: Code High -> Maybe (StackMapTable High)
@@ -86,7 +86,8 @@ instance Staged Code where
     (offsets, codeByteCode) <- evolveByteCode codeByteCode
     let evolver = (evolveOffset offsets)
     codeExceptionTable <- mapM (evolveBC evolver) codeExceptionTable
-    codeAttributes <- fromCollector <$> fromAttributes CodeAttribute (collect' evolver) codeAttributes
+    codeAttributes <- fromCollector <$>
+      fromAttributes CodeAttribute (collect' evolver) codeAttributes
     return $ Code {..}
     where
       fromCollector (a, b, c) =

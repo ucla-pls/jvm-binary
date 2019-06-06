@@ -1,35 +1,55 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Language.JVM.ConstantTest where
+module Language.JVM.ConstantSpec where
 
 import SpecHelper
 
-import qualified Data.IntMap as IM
 import qualified Data.Text as Text
 import qualified Data.ByteString as BS
 
-import Language.JVM.Constant
-import Language.JVM.Staged
-import Language.JVM.ConstantPool
-import Language.JVM.ClassFileReader
-import Language.JVM.UtilsTest ()
-import Language.JVM.TypeTest ()
+import Language.JVM
+import Language.JVM.UtilsSpec ()
+import Language.JVM.TypeSpec ()
 
-prop_encode_and_decode :: ConstantPool Low -> Property
-prop_encode_and_decode = isoBinary
+spec :: Spec
+spec = do
+  it "can build a class pool" $ do
+    let
+      (a', cpb) = runConstantPoolBuilder (devolve (CClassRef "class/Name")) cpbEmpty
+      cp = constantPoolFromBuilder cpb
+    cp `shouldBe` fromConstants [CString "class/Name"]
+    a' `shouldBe` (CClassRef 1)
+
+    let cp' = bootstrapConstantPool cp
+    cp' `shouldBe` Right (fromConstants [CString "class/Name"])
+
+  it "can build a complex class pool" $ do
+    let
+      a = CMethodRef (InClass "class/Name" "method:()V")
+      (a', cpb) = runConstantPoolBuilder (devolve a) cpbEmpty
+      cp = constantPoolFromBuilder cpb
+    cp `shouldBe` fromConstants [CString "class/Name", CClassRef 1, CString "method", CString "()V", CNameAndType 3 4]
+    a' `shouldBe` (CMethodRef (InClass 2 5))
+
+    let cp' = bootstrapConstantPool cp
+    cp' `shouldBe` Right (fromConstants
+                          [ CString "class/Name", CClassRef "class/Name", CString "method"
+                          , CString "()V", CNameAndType "method" "()V"])
+
+    let Right cp'' = cp'
+    runEvolve (EvolveConfig [] cp'' (const True)) (evolve a') `shouldBe` Right a
+
+  it "can encode and decode" $ property $
+    (isoBinary :: ConstantPool Low -> Property)
+  it "can do a roundtrip" $ property $
+    (isoRoundtrip :: Constant High -> Property)
 
 instance Arbitrary (ConstantPool Low) where
   arbitrary = do
     lst <- arbitrary :: Gen [Constant High]
     let (_, x) = runConstantPoolBuilder (mapM devolve lst) cpbEmpty
-    return (cpbConstantPool x)
-
--- prop_Constant_encode_and_decode :: Constant Low -> Property
--- prop_Constant_encode_and_decode = isoBinary
-
-prop_roundtrip_Constant :: Constant High -> Property
-prop_roundtrip_Constant = isoRoundtrip
+    return (constantPoolFromBuilder x)
 
 instance Arbitrary Text.Text where
   arbitrary =
@@ -53,11 +73,7 @@ instance Arbitrary BS.ByteString where
 
 instance Arbitrary (ConstantPool High) where
   arbitrary =
-    ConstantPool . IM.fromList . go 1 <$> arbitrary
-    where
-      go n (e : lst) =
-        (n, e) : go (n + constantSize e) lst
-      go _ [] = []
+    fromConstants <$> (arbitrary :: Gen [Constant High])
 
 instance Arbitrary (AbsInterfaceMethodId High) where
   arbitrary = genericArbitraryU
@@ -114,8 +130,8 @@ instance Arbitrary (MethodHandleMethod High) where
   arbitrary =
     genericArbitraryU
 
-instance Arbitrary (AbsVariableMethodId High) where
-  arbitrary = genericArbitraryU
+-- instance Arbitrary (AbsVariableMethodId High) where
+--   arbitrary = genericArbitraryU
 
 instance Arbitrary (InvokeDynamic High) where
   arbitrary = InvokeDynamic <$> arbitrary <*> arbitrary

@@ -1,18 +1,21 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.JVM.Attribute.EnclosingMethodTest where
+module Language.JVM.Attribute.EnclosingMethodSpec where
 
 import           SpecHelper
 
-import           Language.JVM.ConstantTest               ()
+import           Language.JVM.ConstantSpec               ()
 
 import           Language.JVM.Attribute.EnclosingMethod
 import           Language.JVM
 
-prop_roundtrip_EnclosingMethodTest :: EnclosingMethod High -> Property
-prop_roundtrip_EnclosingMethodTest = isoRoundtrip
+prop_roundtrip_EnclosingMethodSpec :: EnclosingMethod High -> Property
+prop_roundtrip_EnclosingMethodSpec = isoRoundtrip
 
+spec :: Spec
+spec =
+  spec_enclosing
 
 spec_enclosing ::  SpecWith ()
 spec_enclosing = do

@@ -34,6 +34,7 @@ class Monad m => LabelM m where
   label :: String -> m a -> m a
   -- ^ label the current position in the class-file, good for debugging
   label _ = id
+  {-# INLINE label #-}
 
 data AttributeLocation
   = ClassAttribute
@@ -54,12 +55,15 @@ class Staged s where
   {-# MINIMAL stage | evolve, devolve #-}
   stage :: LabelM m => (forall s'. Staged s' => s' r -> m (s' r')) -> s r -> m (s r')
   stage f a = f a
+  {-# INLINE stage #-}
 
   evolve ::  EvolveM m => s Low -> m (s High)
   evolve = stage evolve
+  {-# INLINE evolve #-}
 
   devolve :: DevolveM m => s High -> m (s Low)
   devolve = stage devolve
+  {-# INLINE devolve #-}
 
 instance Staged Constant where
   evolve c =
@@ -75,7 +79,7 @@ instance Staged Constant where
       CMethodRef r -> label "CMethodRef" $ CMethodRef <$> evolve r
       CInterfaceMethodRef r -> label "CInterfaceMethodRef" $ CInterfaceMethodRef <$> evolve r
       CNameAndType r1 r2 -> label "CNameAndType" $ CNameAndType <$> link r1 <*> link r2
-      CMethodHandle mh -> label "CMetho" $ CMethodHandle <$> evolve mh
+      CMethodHandle mh -> label "CMethodHandle" $ CMethodHandle <$> evolve mh
       CMethodType r -> label "CMethodType" $ CMethodType <$> link r
       CInvokeDynamic i -> label "CInvokeDynamic" $ CInvokeDynamic <$> evolve i
 

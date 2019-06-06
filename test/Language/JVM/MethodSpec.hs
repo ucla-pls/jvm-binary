@@ -1,17 +1,21 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
-module Language.JVM.MethodTest where
+module Language.JVM.MethodSpec where
 
 import           SpecHelper
 
-import           Language.JVM.Attribute.CodeTest       ()
-import           Language.JVM.Attribute.ExceptionsTest ()
-import           Language.JVM.AttributeTest            ()
-import           Language.JVM.ConstantTest             ()
-import           Language.JVM.UtilsTest                ()
+import           Language.JVM.Attribute.CodeSpec       ()
+import           Language.JVM.Attribute.ExceptionsSpec ()
+import           Language.JVM.AttributeSpec            ()
+import           Language.JVM.ConstantSpec             ()
+import           Language.JVM.UtilsSpec                ()
 
 import           Language.JVM
+
+spec :: Spec
+spec =
+  it "can do a roundtrip" $ property $ prop_roundtrip_Method
 
 prop_roundtrip_Method :: Method High -> Property
 prop_roundtrip_Method = isoRoundtrip
