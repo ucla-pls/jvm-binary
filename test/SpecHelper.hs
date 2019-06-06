@@ -19,7 +19,6 @@ module SpecHelper
   , it
   , xit
   , describe
-  , focus
   ) where
 
 import Test.Hspec.Expectations.Pretty
