@@ -60,8 +60,8 @@ readClassFile' fp = do
   Right clf <- readClassFile <$> BL.readFile fp
   return clf
 
-ex1 :: String
-ex1 = "test/data/project/Main.class"
-
+-- ex1 :: String
+-- ex1 = "test/data/project/Main.class"
+--
 ex2 :: String
 ex2 = "test/data/SQLite.class"

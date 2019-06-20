@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 module Language.JVMSpec where
 
 import           SpecHelper
@@ -11,8 +12,17 @@ import           Data.Foldable
 import           Data.List                            as List
 import qualified Data.Text                            as Text
 
+-- prelude
+import System.Environment
+
+-- filepath
+import System.FilePath
+
 -- vector
 import qualified Data.Vector                          as V
+
+-- zip-archive
+import           Codec.Archive.Zip
 
 import           Language.JVM
 import qualified Language.JVM.Attribute.Code          as C
@@ -37,6 +47,45 @@ spec = do
           True `shouldBe` True
         Left msg ->
           fail $ show msg
+
+  describe "the standard library" $ do
+    runIO (lookupEnv "JAVA_HOME") >>= \case
+      Just home -> do
+        Right archive <- runIO $ readZipFile (home </> "jre/lib/rt.jar")
+
+        let priorities =
+              [ "java/lang/Class.class"
+              ]
+
+        forM_ priorities $ \priority -> do
+          let Just entry = findEntryByPath priority archive
+          it ("can read priority " ++ priority) $ do
+            case readClassFile (fromEntry entry) of
+              Right _ ->
+                True `shouldBe` True
+              Left msg ->
+                fail $ show msg
+
+        let classes =
+              filter (\entry -> takeExtension (eRelativePath entry) == ".class")
+              (zEntries archive)
+        forM_ classes $ \entry -> do
+          it ("can read " ++ eRelativePath entry) $ do
+            case readClassFile (fromEntry entry) of
+              Right _ ->
+                True `shouldBe` True
+              Left msg ->
+                fail $ show msg
+
+        forM_ classes $ \entry -> do
+          it ("can read " ++ eRelativePath entry) $ do
+            case readClassFile (fromEntry entry) of
+              Right _ ->
+                True `shouldBe` True
+              Left msg ->
+                fail $ show msg
+      Nothing -> do
+        fail $ "Expecting JAVA_HOME to be set"
 
   -- spec_reading_classfile
 
@@ -177,3 +226,7 @@ cmpOver g ta tb f =
 cmpPrefixes :: (Foldable t) => (a -> t b) -> a -> a -> ([b] -> [b] -> IO ()) -> IO ()
 cmpPrefixes g ta tb f =
   forM_ (zip (inits . toList . g $ ta) (inits . toList . g $ tb)) (uncurry f)
+
+readZipFile :: FilePath -> IO (Either String Archive)
+readZipFile =
+  fmap toArchiveOrFail . BL.readFile

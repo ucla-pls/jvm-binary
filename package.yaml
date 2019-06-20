@@ -1,5 +1,5 @@
 name: jvm-binary
-version: '0.4.0'
+version: '0.5.0'
 author: Christian Gram Kalhauge
 maintainer: Christian Gram Kalhauge <kalhauge@cs.ucla.edu>
 synopsis: A library for reading Java class-files
@@ -47,6 +47,7 @@ tests:
     - hspec >= 2.5.5
     - hspec-discover
     - hspec-expectations-pretty-diff
+    - zip-archive
     ghc-options:
     - -rtsopts
     - -threaded

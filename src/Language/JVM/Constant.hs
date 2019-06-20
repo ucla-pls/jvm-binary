@@ -33,6 +33,7 @@ module Language.JVM.Constant
   , AbsMethodId
   , AbsFieldId
   , AbsInterfaceMethodId (..)
+  , AbsVariableMethodId (..)
 
   , MethodId (..)
   , FieldId (..)
@@ -111,6 +112,12 @@ newtype AbsInterfaceMethodId r = AbsInterfaceMethodId
   { interfaceMethodId :: InClass MethodId r
   }
 
+-- | An variable method, which is a class in a method.
+data AbsVariableMethodId r = AbsVariableMethodId
+  { absVarIsInterface :: Bool
+  , absVarMethodId :: InClass MethodId r
+  }
+
 newtype MethodId = MethodId (NameAndType MethodDescriptor)
   deriving (Eq, Show, NFData, Ord, Generic)
 
@@ -144,9 +151,9 @@ data MethodHandleFieldKind
 
 data MethodHandleMethod r
   = MHInvokeVirtual !(DeepRef AbsMethodId r)
-  | MHInvokeStatic !(DeepRef AbsMethodId r)
+  | MHInvokeStatic !(DeepRef AbsVariableMethodId r)
   -- ^ Since version 52.0
-  | MHInvokeSpecial !(DeepRef AbsMethodId r)
+  | MHInvokeSpecial !(DeepRef AbsVariableMethodId r)
   -- ^ Since version 52.0
   | MHNewInvokeSpecial !(DeepRef AbsMethodId r)
 
@@ -371,6 +378,21 @@ instance Referenceable (InClass MethodId High) where
   toConst s =
     return $ CMethodRef s
 
+
+instance Referenceable (AbsVariableMethodId High) where
+  fromConst _ (CMethodRef s) = do
+    return $ AbsVariableMethodId False s
+  fromConst _ (CInterfaceMethodRef s) = do
+    return $ AbsVariableMethodId True s
+  fromConst err c = expected "CMethodRef or CInterfaceMethodRef" err c
+
+  toConst (AbsVariableMethodId t s)
+    | t =
+      return $ CInterfaceMethodRef s
+    | otherwise =
+      return $ CMethodRef s
+
+
 instance Referenceable (InvokeDynamic High) where
   fromConst _ (CInvokeDynamic c) = do
     return $ c
@@ -399,6 +421,7 @@ expected :: String -> (String -> a) -> (Constant r) -> a
 expected name err c =
   err $ wrongType name c
 
+
 wrongType :: String -> Constant r -> String
 wrongType n c =
   "Expected '" ++ n ++ "', but found '" ++ typeToStr c ++ "'."
@@ -420,6 +443,7 @@ $(deriveBaseWithBinary ''InvokeDynamic)
 $(deriveBaseWithBinary ''AbsMethodId)
 $(deriveBaseWithBinary ''AbsFieldId)
 $(deriveBaseWithBinary ''AbsInterfaceMethodId)
+$(deriveBaseWithBinary ''AbsVariableMethodId)
 
 -- | A constant pool value in java
 data JValue

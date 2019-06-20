@@ -1,5 +1,8 @@
 # Change log
 
+## Version 0.5.0
+- Reintroduce AbsVariableMethodId
+
 ## Version 0.4.0
 
 - Add Offsets to ByteCode

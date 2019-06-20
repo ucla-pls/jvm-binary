@@ -78,6 +78,9 @@ instance Arbitrary (ConstantPool High) where
 instance Arbitrary (AbsInterfaceMethodId High) where
   arbitrary = genericArbitraryU
 
+instance Arbitrary (AbsVariableMethodId High) where
+  arbitrary = genericArbitraryU
+
 instance Arbitrary (Constant High) where
   arbitrary = sized $ \n ->
     if n < 2
