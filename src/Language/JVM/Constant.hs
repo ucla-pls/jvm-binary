@@ -107,15 +107,15 @@ type AbsMethodId = InClass MethodId
 -- | A field id in a class
 type AbsFieldId = InClass FieldId
 
--- | An interface method, which is a class in a method.
+-- | An method which is from an interface
 newtype AbsInterfaceMethodId r = AbsInterfaceMethodId
   { interfaceMethodId :: InClass MethodId r
   }
 
--- | An variable method, which is a class in a method.
+-- | An method which can be from an interface
 data AbsVariableMethodId r = AbsVariableMethodId
-  { absVarIsInterface :: Bool
-  , absVarMethodId :: InClass MethodId r
+  { variableIsInterface :: !Bool
+  , variableMethodId    :: !(InClass MethodId r)
   }
 
 newtype MethodId = MethodId (NameAndType MethodDescriptor)
