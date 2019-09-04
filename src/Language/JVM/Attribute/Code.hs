@@ -15,6 +15,7 @@ Maintainer  : kalhuage@cs.ucla.edu
 module Language.JVM.Attribute.Code
   ( Code (..)
   , CodeAttributes (..)
+  , emptyCodeAttributes
   , ExceptionTable (..)
   , codeStackMapTable
   , codeByteCodeOprs
@@ -81,22 +82,21 @@ data CodeAttributes r = CodeAttributes
   , caOthers          :: [ Attribute r ]
   }
 
+emptyCodeAttributes :: CodeAttributes High
+emptyCodeAttributes = CodeAttributes [] [] []
+
 instance Staged Code where
   evolve Code{..} = label "Code" $ do
     (offsets, codeByteCode) <- evolveByteCode codeByteCode
     let evolver = (evolveOffset offsets)
     codeExceptionTable <- mapM (evolveBC evolver) codeExceptionTable
-    codeAttributes <- fromCollector <$>
-      fromAttributes CodeAttribute (collect' evolver) codeAttributes
+    codeAttributes <- fmap (`appEndo` emptyCodeAttributes) . fromAttributes CodeAttribute codeAttributes
+      $ collectBC evolver
+      [ BCAttr (\e a -> a {caStackMapTable = e : caStackMapTable a})
+      , BCAttr (\e a -> a {caLineNumberTable = e : caLineNumberTable a})
+      ]
+      (\e a -> a {caOthers = e : caOthers a})
     return $ Code {..}
-    where
-      fromCollector (a, b, c) =
-        CodeAttributes (appEndo a []) (appEndo b []) (appEndo c [])
-      collect' evolver attr =
-        collect (mempty, mempty, Endo (attr:)) attr
-          [ toC' (evolveBC evolver) $ \e -> (Endo (e:), mempty, mempty)
-          , toC' (evolveBC evolver) $ \e -> (mempty, Endo (e:), mempty)
-          ]
 
   devolve Code{..} = do
     codeByteCode <- devolveByteCode codeByteCode
@@ -106,16 +106,17 @@ instance Staged Code where
     codeAttributes <- SizedList <$> fromCodeAttributes bcdevolver codeAttributes
     return $ Code {..}
     where
-      fromCodeAttributes bcdevolver (CodeAttributes a b c) = do
-        a' <- mapM (devolveAttribute (devolveBC bcdevolver)) a
-        b' <- mapM (devolveAttribute (devolveBC bcdevolver)) b
-        c' <- mapM devolve c
-        return (a' ++ b' ++ c')
+      fromCodeAttributes bcdevolver CodeAttributes {..} =
+        concat <$> sequence
+          [ mapM (toBCAttribute bcdevolver) caStackMapTable
+          , mapM (toBCAttribute bcdevolver) caLineNumberTable
+          , mapM devolve caOthers
+          ]
 
 instance ByteCodeStaged ExceptionTable where
   evolveBC f ExceptionTable{..} = label "ExceptionTable" $ do
     catchType <- case catchType of
-      0 -> return $ Nothing
+      0 -> return Nothing
       n -> Just <$> link n
     start <- f start
     end <- f end

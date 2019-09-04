@@ -1,22 +1,24 @@
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE TemplateHaskell    #-}
 {-|
 Module      : Language.JVM.Method
 Copyright   : (c) Christian Gram Kalhauge, 2017
 License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
 -}
-
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveGeneric        #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE RecordWildCards   #-}
 module Language.JVM.Method
   ( Method (..)
   , mAccessFlags
 
   -- * Attributes
   , MethodAttributes (..)
+  , emptyMethodAttributes
   , mCode
   , mExceptions'
   , mExceptions
@@ -24,9 +26,13 @@ module Language.JVM.Method
 
   ) where
 
-import           Data.Maybe
+-- base
 import           Data.Monoid
+
+-- containers
 import           Data.Set                          (Set)
+
+-- text
 import qualified Data.Text                         as Text
 
 import           Language.JVM.AccessFlag
@@ -51,11 +57,19 @@ mAccessFlags :: Method r -> Set MAccessFlag
 mAccessFlags = toSet . mAccessFlags'
 
 data MethodAttributes r = MethodAttributes
-  { maCode       :: [Code r]
-  , maExceptions :: [Exceptions r]
-  , maSignatures :: [Signature r]
-  , maOthers     :: [Attribute r]
+  { maCode                          :: [Code r]
+  , maExceptions                    :: [Exceptions r]
+  , maSignatures                    :: [Signature r]
+  , maVisibleAnnotations            :: [RuntimeVisibleAnnotations r]
+  , maInvisibleAnnotations          :: [RuntimeInvisibleAnnotations r]
+  , maVisibleParameterAnnotations   :: [RuntimeVisibleParameterAnnotations r]
+  , maInvisibleParamterAnnotations  :: [RuntimeInvisibleParameterAnnotations r]
+  , maOthers               :: [Attribute r]
   }
+
+emptyMethodAttributes :: MethodAttributes High
+emptyMethodAttributes =
+  MethodAttributes [] [] [] [] [] [] [] []
 
 -- | Fetch the 'Code' attribute, if any.
 -- There can only be one code attribute in a method.
@@ -73,7 +87,7 @@ mExceptions' =
 -- If no exceptions field where found the empty list is returned
 mExceptions :: Method High -> [ClassName]
 mExceptions =
-  fromMaybe [] . fmap (unSizedList . exceptions) . mExceptions'
+  maybe [] (unSizedList . exceptions) . mExceptions'
 
 -- | Fetches the 'Signature' attribute, if any.
 mSignature :: Method High -> Maybe (Signature High)
@@ -81,34 +95,40 @@ mSignature =
   firstOne . maSignatures . mAttributes
 
 instance Staged Method where
-  evolve (Method mf mn md mattr) = do
+  evolve (Method mf mn md mattr) = label "Method" $ do
     mn' <- link mn
     md' <- link md
-    mattr' <- label (Text.unpack.typeToText $ NameAndType mn' md')
-      $ fromCollector <$> fromAttributes MethodAttribute collect' mattr
-    return $ Method mf mn' md' mattr'
-    where
-      fromCollector (a, b, c, d) =
-        MethodAttributes (appEndo a []) (appEndo b []) (appEndo c []) (appEndo d [])
-      collect' attr =
-        collect (mempty, mempty, mempty, Endo (attr:)) attr
-          [ toC $ \e -> (Endo (e:), mempty, mempty, mempty)
-          , toC $ \e -> (mempty, Endo (e:), mempty, mempty)
-          , toC $ \e -> (mempty, mempty, Endo (e:), mempty)
+    label (Text.unpack.typeToText $ NameAndType mn' md') $ do
+      mattr' <- fmap (`appEndo` emptyMethodAttributes) . fromAttributes MethodAttribute mattr
+        $ collect
+          [ Attr (\e a -> a { maCode = e : maCode a })
+          , Attr (\e a -> a { maExceptions = e : maExceptions a })
+          , Attr (\e a -> a { maSignatures = e : maSignatures a })
+          , Attr (\e a -> a { maVisibleAnnotations = e : maVisibleAnnotations a })
+          , Attr (\e a -> a { maInvisibleAnnotations = e : maInvisibleAnnotations a })
+          , Attr (\e a -> a { maVisibleParameterAnnotations = e : maVisibleParameterAnnotations a })
+          , Attr (\e a -> a { maInvisibleParamterAnnotations = e : maInvisibleParamterAnnotations a })
           ]
+          (\e a -> a { maOthers = e : maOthers a })
+      return $ Method mf mn' md' mattr'
 
   devolve (Method mf mn md mattr) = do
     mn' <- unlink mn
     md' <- unlink md
-    mattr' <- fromMethodAttributes $ mattr
+    mattr' <- fromMethodAttributes mattr
     return $ Method mf mn' md' (SizedList mattr')
     where
-      fromMethodAttributes (MethodAttributes a b c d) = do
-        a' <- mapM toAttribute a
-        b' <- mapM toAttribute b
-        c' <- mapM toAttribute c
-        d' <- mapM devolve d
-        return (a' ++ b' ++ c' ++ d')
+      fromMethodAttributes MethodAttributes {..} =
+        concat <$> sequence
+          [ mapM toAttribute maCode
+          , mapM toAttribute maExceptions
+          , mapM toAttribute maSignatures
+          , mapM toAttribute maVisibleAnnotations
+          , mapM toAttribute maInvisibleAnnotations
+          , mapM toAttribute maVisibleParameterAnnotations
+          , mapM toAttribute maInvisibleParamterAnnotations
+          , mapM devolve maOthers
+          ]
 
 $(deriveBase ''MethodAttributes)
 $(deriveBaseWithBinary ''Method)

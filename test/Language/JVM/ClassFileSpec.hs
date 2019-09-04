@@ -17,13 +17,13 @@ import           Language.JVM.UtilsSpec                      ()
 
 spec :: Spec
 spec =
-  it "can do a roundtrip" $ property $ prop_roundtrip_ClassFile
+  prop "can do a roundtrip" prop_roundtrip_ClassFile
 
 prop_roundtrip_ClassFile :: ClassFile High -> Property
 prop_roundtrip_ClassFile = isoRoundtrip
 
 instance Arbitrary (ClassAttributes High) where
-  arbitrary = pure $ ClassAttributes [] [] [] [] []
+  arbitrary = pure emptyClassAttributes
 
 instance Arbitrary (ClassFile High) where
   arbitrary = ClassFile

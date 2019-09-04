@@ -1,5 +1,10 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 {-|
 Module      : Language.JVM.ClassFile
 Copyright   : (c) Christian Gram Kalhauge, 2017
@@ -8,10 +13,6 @@ Maintainer  : kalhuage@cs.ucla.edu
 
 The class file is described in this module.
 -}
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE StandaloneDeriving #-}
 module Language.JVM.ClassFile
   ( ClassFile (..)
   , cAccessFlags
@@ -23,6 +24,7 @@ module Language.JVM.ClassFile
 
   -- * Attributes
   , ClassAttributes (..)
+  , emptyClassAttributes
   , cBootstrapMethods
   ) where
 
@@ -106,12 +108,18 @@ cInnerClasses =
   maybe [] innerClasses . cInnerClasses'
 
 data ClassAttributes r = ClassAttributes
-  { caBootstrapMethods :: [ BootstrapMethods r]
-  , caSignature        :: [ Signature r ]
-  , caEnclosingMethod  :: [ EnclosingMethod r ]
-  , caInnerClasses     :: [ InnerClasses r ]
-  , caOthers           :: [ Attribute r ]
+  { caBootstrapMethods     :: [ BootstrapMethods r]
+  , caSignature            :: [ Signature r ]
+  , caEnclosingMethod      :: [ EnclosingMethod r ]
+  , caInnerClasses         :: [ InnerClasses r ]
+  , caVisibleAnnotations   :: [ RuntimeVisibleAnnotations r ]
+  , caInvisibleAnnotations :: [ RuntimeInvisibleAnnotations r ]
+  , caOthers               :: [ Attribute r ]
   }
+
+emptyClassAttributes :: ClassAttributes High
+emptyClassAttributes =
+  ClassAttributes [] [] [] [] [] [] []
 
 instance Staged ClassFile where
   evolve cf = label "ClassFile" $ do
@@ -125,7 +133,16 @@ instance Staged ClassFile where
     cii' <- mapM link $ cInterfaces cf
     cf' <- mapM evolve $ cFields' cf
     cm' <- mapM evolve $ cMethods' cf
-    ca' <- fromCollector <$> fromAttributes ClassAttribute collect' (cAttributes cf)
+    ca' <- fmap (`appEndo` emptyClassAttributes) . fromAttributes ClassAttribute (cAttributes cf)
+      $ collect
+      [ Attr $ \e ca -> ca {caSignature = e : caSignature ca}
+      , Attr $ \e ca -> ca {caEnclosingMethod = e : caEnclosingMethod ca}
+      , Attr $ \e ca -> ca {caBootstrapMethods = e : caBootstrapMethods ca}
+      , Attr $ \e ca -> ca {caVisibleAnnotations = e : caVisibleAnnotations ca}
+      , Attr $ \e ca -> ca {caInvisibleAnnotations = e : caInvisibleAnnotations ca}
+      , Attr $ \e ca -> ca {caInnerClasses = e : caInnerClasses ca}
+      ]
+      (\e ca -> ca {caOthers = e : caOthers ca})
     return $ cf
       { cConstantPool = ()
       , cThisClass = tci'
@@ -135,15 +152,6 @@ instance Staged ClassFile where
       , cMethods'           = cm'
       , cAttributes         = ca'
       }
-    where
-      fromCollector = flip appEndo (ClassAttributes [] [] [] [] [])
-      collect' attr =
-        collect (Endo (\ca -> ca {caOthers = attr: caOthers ca})) attr
-          [ toC $ \e -> Endo (\ca -> ca {caSignature = e : caSignature ca})
-          , toC $ \e -> Endo (\ca -> ca {caEnclosingMethod = e : caEnclosingMethod ca})
-          , toC $ \e -> Endo (\ca -> ca {caBootstrapMethods = e : caBootstrapMethods ca})
-          , toC $ \e -> Endo (\ca -> ca {caInnerClasses = e : caInnerClasses ca})
-          ]
 
   devolve cf = do
     tci' <- unlink (cThisClass cf)
@@ -167,13 +175,15 @@ instance Staged ClassFile where
       , cAttributes         = SizedList ca'
       }
     where
-      fromClassAttributes (ClassAttributes cm cs cem cin at) = do
+      fromClassAttributes (ClassAttributes {..}) = do
         concat <$> sequence
-          [ mapM toAttribute cm
-          , mapM toAttribute cs
-          , mapM toAttribute cem
-          , mapM toAttribute cin
-          , mapM devolve at
+          [ mapM toAttribute caBootstrapMethods
+          , mapM toAttribute caSignature
+          , mapM toAttribute caEnclosingMethod
+          , mapM toAttribute caInnerClasses
+          , mapM toAttribute caVisibleAnnotations
+          , mapM toAttribute caInvisibleAnnotations
+          , mapM devolve caOthers
           ]
 
 $(deriveBase ''ClassAttributes)

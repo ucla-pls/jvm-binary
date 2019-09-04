@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
+{-# LANGUAGE RecordWildCards #-}
 module Language.JVM.MethodSpec where
 
 import           SpecHelper
@@ -15,16 +16,16 @@ import           Language.JVM
 
 spec :: Spec
 spec =
-  it "can do a roundtrip" $ property $ prop_roundtrip_Method
+  prop "can do a roundtrip" prop_roundtrip_Method
 
 prop_roundtrip_Method :: Method High -> Property
 prop_roundtrip_Method = isoRoundtrip
 
 instance Arbitrary (MethodAttributes High) where
   arbitrary =
-    MethodAttributes <$> pure [] <*> arbitrary <*> pure [] <*> pure []
-  shrink (MethodAttributes a b c d )  =
-    MethodAttributes <$> shrink a <*> shrink b <*> pure c <*> pure d
+    (\a -> emptyMethodAttributes { maExceptions = a }) <$> arbitrary
+  shrink a@MethodAttributes {..} =
+    (\e -> a { maExceptions = e }) <$> shrink maExceptions
 
 instance Arbitrary (Method High) where
   arbitrary =

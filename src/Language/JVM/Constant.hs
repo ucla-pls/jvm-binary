@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass        #-}
-{-# LANGUAGE StrictData #-}
+{-# LANGUAGE StrictData            #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -24,6 +25,11 @@ module Language.JVM.Constant
   , Referenceable (..)
 
   , JValue (..)
+  , VInteger
+  , VLong
+  , VDouble
+  , VFloat
+  , VString
 
     -- * Special constants
   , ClassName (..)
@@ -285,8 +291,8 @@ class Referenceable a where
     -> m (Constant High)
 
 instance Referenceable (Constant High) where
-  fromConst _ a = return a
-  toConst a = return a
+  fromConst _ = return
+  toConst = return
 
 instance TypeParse a => Referenceable (NameAndType a) where
   fromConst err (CNameAndType rn txt) = do
@@ -335,9 +341,13 @@ instance Referenceable JRefType where
     either err return $ parseOnly parseFlatJRefType r
   fromConst err a =
     err $ wrongType "ClassRef" a
-
   toConst =
     return . CClassRef . jRefTypeToFlatText
+
+instance Referenceable ReturnDescriptor where
+  fromConst err =
+    fromConst err >=> either err return . typeFromText
+  toConst = toConst . typeToText
 
 instance Referenceable MethodDescriptor where
   fromConst err =
@@ -394,23 +404,21 @@ instance Referenceable (AbsVariableMethodId High) where
 
 
 instance Referenceable (InvokeDynamic High) where
-  fromConst _ (CInvokeDynamic c) = do
-    return $ c
+  fromConst _ (CInvokeDynamic c) = return c
   fromConst err c = expected "CInvokeDynamic" err c
 
   toConst s =
     return $ CInvokeDynamic s
 
 instance Referenceable (MethodHandle High) where
-  fromConst _ (CMethodHandle c) = do
-    return $ c
+  fromConst _ (CMethodHandle c) = return c
   fromConst err c = expected "CMethodHandle" err c
 
   toConst s =
     return $ CMethodHandle s
 
 instance Referenceable (AbsInterfaceMethodId High) where
-  fromConst _ (CInterfaceMethodRef s) = do
+  fromConst _ (CInterfaceMethodRef s) =
     return . AbsInterfaceMethodId $ s
   fromConst err c = expected "CInterfaceMethodRef" err c
 
@@ -445,41 +453,74 @@ $(deriveBaseWithBinary ''AbsFieldId)
 $(deriveBaseWithBinary ''AbsInterfaceMethodId)
 $(deriveBaseWithBinary ''AbsVariableMethodId)
 
+type VInteger = Int32
+type VLong = Int64
+type VFloat = Float
+type VDouble = Double
+type VString = BS.ByteString
+
+instance Referenceable VInteger where
+  fromConst err = \case
+    CInteger i -> return i
+    x -> expected "Integer" err x
+  toConst = return . CInteger
+
+instance Referenceable VLong where
+  fromConst err = \case
+    CLong i -> return i
+    x -> expected "Long" err x
+  toConst = return . CLong
+
+instance Referenceable VFloat where
+  fromConst err = \case
+    CFloat i -> return i
+    x -> expected "Float" err x
+  toConst = return . CFloat
+
+instance Referenceable VDouble where
+  fromConst err = \case
+    CDouble i -> return i
+    x -> expected "Double" err x
+  toConst = return . CDouble
+
+-- instance Referenceable VString where
+--   fromConst err = \case
+--     CStringRef i -> return i
+--     x -> expected "StringRef" err x
+--   toConst = return . CStringRef
+
 -- | A constant pool value in java
 data JValue
-  = VInteger Int32
-  | VLong Int64
-  | VFloat Float
-  | VDouble Double
-  | VString BS.ByteString
+  = VInteger VInteger
+  | VLong VLong
+  | VFloat VFloat
+  | VDouble VDouble
+  | VString VString
   | VClass ClassName
-  | VMethodType (MethodDescriptor)
+  | VMethodType MethodDescriptor
   | VMethodHandle (MethodHandle High)
   deriving (Show, Eq, Generic, NFData)
 
 instance Referenceable JValue where
-  fromConst err c = do
-    case c of
-      CStringRef s    -> return $ VString s
-      CInteger i      -> return $ VInteger i
-      CFloat f        -> return $ VFloat f
-      CLong l         -> return $ VLong l
-      CDouble d       -> return $ VDouble d
-      CClassRef r     -> return $ VClass (ClassName r)
-      CMethodHandle m -> return $ VMethodHandle m
-      CMethodType t   -> return $ VMethodType t
-      x               -> expected "Expected a Value" err x
+  fromConst err = \case
+    CStringRef s    -> return $ VString s
+    CInteger i      -> return $ VInteger i
+    CFloat f        -> return $ VFloat f
+    CLong l         -> return $ VLong l
+    CDouble d       -> return $ VDouble d
+    CClassRef r     -> return $ VClass (ClassName r)
+    CMethodHandle m -> return $ VMethodHandle m
+    CMethodType t   -> return $ VMethodType t
+    x               -> expected "Value" err x
   {-# INLINE fromConst #-}
 
-
-  toConst c =
-    return $ case c of
-      VString s            -> CStringRef s
-      VInteger i           -> CInteger i
-      VFloat f             -> CFloat f
-      VLong l              -> CLong l
-      VDouble d            -> CDouble d
-      VClass (ClassName r) -> CClassRef r
-      VMethodHandle m      -> CMethodHandle m
-      VMethodType t        -> CMethodType t
+  toConst = return . \case
+    VString s            -> CStringRef s
+    VInteger i           -> CInteger i
+    VFloat f             -> CFloat f
+    VLong l              -> CLong l
+    VDouble d            -> CDouble d
+    VClass (ClassName r) -> CClassRef r
+    VMethodHandle m      -> CMethodHandle m
+    VMethodType t        -> CMethodType t
   {-# INLINE toConst #-}

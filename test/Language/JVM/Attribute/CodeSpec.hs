@@ -23,9 +23,9 @@ import           Language.JVM.Attribute.Code
 
 spec :: Spec
 spec = do
-  it "can do a roundtrip on Code" $ property $ prop_roundtrip_Code
-  it "can do a roundtrip on ExceptionTable" $ property $ prop_roundtrip_ExceptionTable
-  it "can do a roundtrip on ByteCodeInst" $ property $ prop_roundtrip_ByteCodeInst
+  prop "can do a roundtrip on Code" prop_roundtrip_Code
+  prop "can do a roundtrip on ExceptionTable" prop_roundtrip_ExceptionTable
+  prop "can do a roundtrip on ByteCodeInst"  prop_roundtrip_ByteCodeInst
   spec_ByteCode_examples
 
 prop_roundtrip_Code :: Code High -> Property

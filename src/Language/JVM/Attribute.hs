@@ -23,6 +23,11 @@ module Language.JVM.Attribute
   , LineNumberTable
   , StackMapTable
   , Signature
+
+  , RuntimeVisibleAnnotations
+  , RuntimeInvisibleAnnotations
+  , RuntimeVisibleParameterAnnotations
+  , RuntimeInvisibleParameterAnnotations
   ) where
 
 import           Language.JVM.Attribute.Base
@@ -33,3 +38,8 @@ import           Language.JVM.Attribute.Exceptions       (Exceptions)
 import           Language.JVM.Attribute.LineNumberTable  (LineNumberTable)
 import           Language.JVM.Attribute.Signature        (Signature)
 import           Language.JVM.Attribute.StackMapTable    (StackMapTable)
+import           Language.JVM.Attribute.Annotations      ( RuntimeVisibleAnnotations
+                                                         , RuntimeInvisibleAnnotations
+                                                         , RuntimeVisibleParameterAnnotations
+                                                         , RuntimeInvisibleParameterAnnotations
+                                                         )

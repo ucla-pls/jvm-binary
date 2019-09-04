@@ -23,6 +23,7 @@ module Language.JVM.Utils
   , byteStringSize
 
     -- ** Specific sizes
+  , SizedList8
   , SizedList16
   , SizedByteString32
   , SizedByteString16
@@ -45,22 +46,29 @@ module Language.JVM.Utils
   , trd
   ) where
 
+-- binary
 import           Data.Binary
-import           Data.Binary.Get
+import           Data.Binary.Get as Get
 import           Data.Binary.Put
+
+-- base
 import           Data.Bits
 import           Data.List                as List
-import           Data.Set                 as Set
 import           Data.String
-
-import           Control.DeepSeq          (NFData)
 import           Control.Monad
 
-import qualified Data.Text                as Text
+-- containers
+import           Data.Set                 as Set
 
+-- nfdata
+import           Control.DeepSeq          (NFData)
+
+-- text
+import qualified Data.Text                as Text
 import qualified Data.Text.Encoding       as TE
 import qualified Data.Text.Encoding.Error as TE
 
+-- bytestring
 import qualified Data.ByteString          as BS
 
 -- import           Debug.Trace
@@ -93,11 +101,14 @@ instance Traversable (SizedList w) where
 instance (Binary w, Integral w, Binary a) => Binary (SizedList w a) where
   get = do
     len <- get :: Get w
-    SizedList <$> replicateM (fromIntegral len) get
+    Get.label ("SizedList[" ++ show (fromIntegral len :: Int) ++ "]") $
+      SizedList <$> replicateM (fromIntegral len) get
+  {-# INLINE get #-}
 
   put sl@(SizedList l) = do
     put (listSize sl)
     forM_ l put
+  {-# INLINE put #-}
 
 -- | A byte string with a size w.
 newtype SizedByteString w = SizedByteString
@@ -191,6 +202,9 @@ instance (Show w, Bits w, Binary w, Enumish a) => Binary (BitSet w a) where
     return . BitSet $ Set.fromList [ x | (i, x) <- inOrder, testBit word i ]
 
   put = put . bitSetToWord
+
+-- | A sized list using a 8 bit word as length
+type SizedList8 = SizedList Word8
 
 -- | A sized list using a 16 bit word as length
 type SizedList16 = SizedList Word16

@@ -1,15 +1,15 @@
-{-# LANGUAGE TemplateHaskell    #-}
 {-|
 Module      : Language.JVM.Field
 Copyright   : (c) Christian Gram Kalhauge, 2017
 License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
 -}
-
+{-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 module Language.JVM.Field
   ( Field (..)
   , fAccessFlags
@@ -17,6 +17,7 @@ module Language.JVM.Field
   , fConstantValue
   , fSignature
   , FieldAttributes (..)
+  , emptyFieldAttributes
   ) where
 
 
@@ -29,15 +30,16 @@ import           Language.JVM.Attribute
 import           Language.JVM.Constant
 import           Language.JVM.Staged
 import           Language.JVM.Utils
+import           Language.JVM.Type
 
 
 -- | A Field in the class-file, as described
 -- [here](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.5).
 data Field r = Field
-  { fAccessFlags'    :: !(BitSet16 FAccessFlag)
-  , fName  :: !(Ref Text.Text r)
-  , fDescriptor :: !(Ref FieldDescriptor r)
-  , fAttributes      :: !(Attributes FieldAttributes r)
+  { fAccessFlags'  :: !(BitSet16 FAccessFlag)
+  , fName          :: !(Ref Text.Text r)
+  , fDescriptor    :: !(Ref FieldDescriptor r)
+  , fAttributes    :: !(Attributes FieldAttributes r)
   }
 
 -- | Get the set of access flags
@@ -55,24 +57,30 @@ fSignature =
   firstOne . faSignatures . fAttributes
 
 data FieldAttributes r = FieldAttributes
-  { faConstantValues :: [ ConstantValue r ]
-  , faSignatures     :: [ Signature r ]
-  , faOthers         :: [ Attribute r ]
+  { faConstantValues          :: [ ConstantValue r ]
+  , faSignatures              :: [ Signature r ]
+  , faVisibleAnnotations      :: [ RuntimeVisibleAnnotations r ]
+  , faInvisibleAnnotations    :: [ RuntimeInvisibleAnnotations r ]
+  , faOthers                  :: [ Attribute r ]
   }
+
+emptyFieldAttributes :: FieldAttributes High
+emptyFieldAttributes =
+  FieldAttributes [] [] [] [] []
 
 instance Staged Field where
   evolve field = label "Field" $ do
     fi <- link (fName field)
     fd <- link (fDescriptor field)
-    fattr <- fromCollector <$> fromAttributes FieldAttribute collect' (fAttributes field)
-    return $ Field (fAccessFlags' field) fi fd fattr
-    where
-      fromCollector (cv, sig, others) =
-        FieldAttributes (appEndo cv []) (appEndo sig []) (appEndo others [])
-      collect' attr =
-        collect (mempty, mempty, Endo(attr:)) attr
-          [ toC $ \x -> (Endo (x:), mempty, mempty)
-          , toC $ \x -> (mempty, Endo (x:), mempty) ]
+    label (Text.unpack . typeToText $ NameAndType fi fd) $ do
+      fattr <- fmap (`appEndo` emptyFieldAttributes) . fromAttributes FieldAttribute (fAttributes field)
+        $ collect
+        [ Attr (\e a -> a {faConstantValues = e : faConstantValues a })
+        , Attr (\e a -> a {faSignatures = e : faSignatures a })
+        , Attr (\e a -> a {faVisibleAnnotations = e : faVisibleAnnotations a })
+        , Attr (\e a -> a {faInvisibleAnnotations = e : faInvisibleAnnotations a })
+        ] (\e a -> a { faOthers = e : faOthers a })
+      return $ Field (fAccessFlags' field) fi fd fattr
 
   devolve field = do
     fi <- unlink (fName field)
@@ -81,11 +89,14 @@ instance Staged Field where
     return $ Field (fAccessFlags' field) fi fd (SizedList fattr)
 
     where
-      fromFieldAttributes (FieldAttributes cvs fsg attr) =
-        (\a b c -> a ++ b ++ c)
-        <$> mapM toAttribute cvs
-        <*> mapM toAttribute fsg
-        <*> mapM devolve attr
+      fromFieldAttributes (FieldAttributes {..}) =
+        concat <$> sequence
+        [ mapM toAttribute faConstantValues
+        , mapM toAttribute faSignatures
+        , mapM toAttribute faVisibleAnnotations
+        , mapM toAttribute faInvisibleAnnotations
+        , mapM devolve faOthers
+        ]
 
 $(deriveBase ''FieldAttributes)
 $(deriveBaseWithBinary ''Field)

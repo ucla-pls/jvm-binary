@@ -1,7 +1,8 @@
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveAnyClass              #-}
+{-# LANGUAGE DeriveGeneric               #-}
+{-# LANGUAGE LambdaCase                  #-}
+{-# LANGUAGE FlexibleInstances           #-}
+{-# LANGUAGE OverloadedStrings           #-}
 {-|
 Module      : Language.JVM.Type
 Copyright   : (c) Christian Gram Kalhauge, 2018
@@ -29,6 +30,7 @@ module Language.JVM.Type
 
   -- ** MethodDescriptor
   , MethodDescriptor (..)
+  , ReturnDescriptor
 
   -- ** FieldDescriptor
   , FieldDescriptor (..)
@@ -68,7 +70,6 @@ import qualified Data.Text              as Text
 import qualified Data.Text.Lazy         as Lazy
 import qualified Data.Text.Lazy.Builder as Builder
 
-
 -- | A class name
 newtype ClassName = ClassName
   { classNameAsText :: Text.Text
@@ -106,7 +107,7 @@ data JRefType
 -- | The number of nested arrays
 refTypeDepth :: JRefType -> Int
 refTypeDepth = \case
-  JTArray (JTRef a) -> 1 + (refTypeDepth a)
+  JTArray (JTRef a) -> 1 + refTypeDepth a
   JTArray _ -> 1
   JTClass _ -> 0
 
@@ -115,23 +116,26 @@ data JType
   | JTRef JRefType
   deriving (Show, Eq, Ord, Generic, NFData)
 
-
 -- | Get the corresponding `Char` of a `JBaseType`
 jBaseTypeToChar :: JBaseType -> Char
 jBaseTypeToChar = \case
-    JTByte    -> 'B'
-    JTChar    -> 'C'
-    JTDouble  -> 'D'
-    JTFloat   -> 'F'
-    JTInt     -> 'I'
-    JTLong    -> 'J'
-    JTShort   -> 'S'
-    JTBoolean -> 'Z'
+  JTByte    -> 'B'
+  JTChar    -> 'C'
+  JTDouble  -> 'D'
+  JTFloat   -> 'F'
+  JTInt     -> 'I'
+  JTLong    -> 'J'
+  JTShort   -> 'S'
+  JTBoolean -> 'Z'
+
+-- | A ReturnDescriptor is maybe a type, otherwise it is void.
+-- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.3.3
+type ReturnDescriptor = Maybe JType
 
 -- | Method Descriptor
 data MethodDescriptor = MethodDescriptor
   { methodDescriptorArguments  :: [JType]
-  , methodDescriptorReturnType :: Maybe JType
+  , methodDescriptorReturnType :: ReturnDescriptor
   } deriving (Show, Ord, Eq, Generic, NFData)
 
 -- | Field Descriptor
@@ -168,22 +172,21 @@ instance TypeParse ClassName where
   typeToBuilder = Builder.fromText . classNameAsText
 
 instance TypeParse JBaseType where
-  parseType = try . (<?> "BaseType") $ do
-    anyChar >>= \case
-      'B' -> return $ JTByte
-      'C' -> return $ JTChar
-      'D' -> return $ JTDouble
-      'F' -> return $ JTFloat
-      'I' -> return $ JTInt
-      'J' -> return $ JTLong
-      'S' -> return $ JTShort
-      'Z' -> return $ JTBoolean
-      s -> fail $ "Unknown char " ++ show s
+  parseType = try . (<?> "BaseType") $ anyChar >>= \case
+    'B' -> return JTByte
+    'C' -> return JTChar
+    'D' -> return JTDouble
+    'F' -> return JTFloat
+    'I' -> return JTInt
+    'J' -> return JTLong
+    'S' -> return JTShort
+    'Z' -> return JTBoolean
+    s -> fail $ "Unknown char " ++ show s
 
   typeToBuilder = Builder.singleton . jBaseTypeToChar
 
 instance TypeParse JRefType where
-  parseType = try . (<?> "RefType") $ do
+  parseType = try . (<?> "RefType") $
     anyChar >>= \case
       'L' -> do
         txt <- takeWhile (/= ';')
@@ -195,10 +198,10 @@ instance TypeParse JRefType where
   typeToBuilder = \case
     JTClass cn ->
       Builder.singleton 'L' <> typeToBuilder cn <> Builder.singleton ';'
-    JTArray t -> do
+    JTArray t ->
       Builder.singleton '[' <> typeToBuilder t
 
-parseFlatJRefType :: Parser (JRefType)
+parseFlatJRefType :: Parser JRefType
 parseFlatJRefType =
   JTArray <$> (char '[' *> parseType)
   <|> JTClass <$> parseType
@@ -206,7 +209,8 @@ parseFlatJRefType =
 jRefTypeToFlatText :: JRefType -> Text.Text
 jRefTypeToFlatText = \case
   JTClass t' -> classNameAsText t'
-  JTArray t' -> Lazy.toStrict . Builder.toLazyText $ Builder.singleton '[' <> typeToBuilder t'
+  JTArray t' -> Lazy.toStrict . Builder.toLazyText
+    $ Builder.singleton '[' <> typeToBuilder t'
 
 instance TypeParse JType where
   parseType =
@@ -217,35 +221,36 @@ instance TypeParse JType where
     JTRef r  -> typeToBuilder r
     JTBase r -> typeToBuilder r
 
+instance TypeParse ReturnDescriptor where
+  typeToBuilder = maybe (Builder.singleton 'V') typeToBuilder
+  parseType = choice
+    [ char 'V' >> return Nothing
+    , Just <$> parseType
+    ] <?> "return type"
+
 instance TypeParse MethodDescriptor where
   typeToBuilder md =
     execWriter $ do
       tell $ Builder.singleton '('
       mapM_ (tell . typeToBuilder) (methodDescriptorArguments md)
       tell $ Builder.singleton ')'
-      tell . maybe (Builder.singleton 'V') typeToBuilder $ methodDescriptorReturnType md
+      tell . typeToBuilder $ methodDescriptorReturnType md
 
   parseType = do
     _ <- char '('
     args <- many' parseType <?> "method arguments"
     _ <- char ')'
-    returnType <- choice
-      [ char 'V' >> return Nothing
-      , Just <$> parseType
-      ] <?> "return type"
-    return $ MethodDescriptor args returnType
+    MethodDescriptor args <$> parseType
 
 instance TypeParse FieldDescriptor where
   parseType = FieldDescriptor <$> parseType
   typeToBuilder (FieldDescriptor t) = typeToBuilder t
 
 instance TypeParse t => TypeParse (NameAndType t)  where
-
   parseType = do
     name <- many1 $ notChar ':'
     _ <- char ':'
-    _type <- parseType
-    return $ NameAndType (Text.pack name) _type
+    NameAndType (Text.pack name) <$> parseType
 
   typeToBuilder (NameAndType name _type) =
     Builder.fromText name
