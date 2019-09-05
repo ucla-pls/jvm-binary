@@ -64,12 +64,16 @@ data MethodAttributes r = MethodAttributes
   , maInvisibleAnnotations          :: [RuntimeInvisibleAnnotations r]
   , maVisibleParameterAnnotations   :: [RuntimeVisibleParameterAnnotations r]
   , maInvisibleParamterAnnotations  :: [RuntimeInvisibleParameterAnnotations r]
+  , maVisibleTypeAnnotations            ::
+      [RuntimeVisibleTypeAnnotations MethodTypeAnnotation r]
+  , maInvisibleTypeAnnotations          ::
+      [RuntimeInvisibleTypeAnnotations MethodTypeAnnotation r]
   , maOthers               :: [Attribute r]
   }
 
 emptyMethodAttributes :: MethodAttributes High
 emptyMethodAttributes =
-  MethodAttributes [] [] [] [] [] [] [] []
+  MethodAttributes [] [] [] [] [] [] [] [] [] []
 
 -- | Fetch the 'Code' attribute, if any.
 -- There can only be one code attribute in a method.
@@ -108,6 +112,8 @@ instance Staged Method where
           , Attr (\e a -> a { maInvisibleAnnotations = e : maInvisibleAnnotations a })
           , Attr (\e a -> a { maVisibleParameterAnnotations = e : maVisibleParameterAnnotations a })
           , Attr (\e a -> a { maInvisibleParamterAnnotations = e : maInvisibleParamterAnnotations a })
+          , Attr (\e a -> a { maVisibleTypeAnnotations = e : maVisibleTypeAnnotations a })
+          , Attr (\e a -> a { maInvisibleTypeAnnotations = e : maInvisibleTypeAnnotations a })
           ]
           (\e a -> a { maOthers = e : maOthers a })
       return $ Method mf mn' md' mattr'
@@ -127,6 +133,8 @@ instance Staged Method where
           , mapM toAttribute maInvisibleAnnotations
           , mapM toAttribute maVisibleParameterAnnotations
           , mapM toAttribute maInvisibleParamterAnnotations
+          , mapM toAttribute maVisibleTypeAnnotations
+          , mapM toAttribute maInvisibleTypeAnnotations
           , mapM devolve maOthers
           ]
 

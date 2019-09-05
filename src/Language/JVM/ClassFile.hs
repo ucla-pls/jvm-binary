@@ -114,12 +114,16 @@ data ClassAttributes r = ClassAttributes
   , caInnerClasses         :: [ InnerClasses r ]
   , caVisibleAnnotations   :: [ RuntimeVisibleAnnotations r ]
   , caInvisibleAnnotations :: [ RuntimeInvisibleAnnotations r ]
+  , caVisibleTypeAnnotations   ::
+      [ RuntimeVisibleTypeAnnotations ClassTypeAnnotation r ]
+  , caInvisibleTypeAnnotations ::
+      [ RuntimeInvisibleTypeAnnotations ClassTypeAnnotation r ]
   , caOthers               :: [ Attribute r ]
   }
 
 emptyClassAttributes :: ClassAttributes High
 emptyClassAttributes =
-  ClassAttributes [] [] [] [] [] [] []
+  ClassAttributes [] [] [] [] [] [] [] [] []
 
 instance Staged ClassFile where
   evolve cf = label "ClassFile" $ do
@@ -140,6 +144,8 @@ instance Staged ClassFile where
       , Attr $ \e ca -> ca {caBootstrapMethods = e : caBootstrapMethods ca}
       , Attr $ \e ca -> ca {caVisibleAnnotations = e : caVisibleAnnotations ca}
       , Attr $ \e ca -> ca {caInvisibleAnnotations = e : caInvisibleAnnotations ca}
+      , Attr $ \e ca -> ca {caVisibleTypeAnnotations = e : caVisibleTypeAnnotations ca}
+      , Attr $ \e ca -> ca {caInvisibleTypeAnnotations = e : caInvisibleTypeAnnotations ca}
       , Attr $ \e ca -> ca {caInnerClasses = e : caInnerClasses ca}
       ]
       (\e ca -> ca {caOthers = e : caOthers ca})
@@ -183,6 +189,8 @@ instance Staged ClassFile where
           , mapM toAttribute caInnerClasses
           , mapM toAttribute caVisibleAnnotations
           , mapM toAttribute caInvisibleAnnotations
+          , mapM toAttribute caVisibleTypeAnnotations
+          , mapM toAttribute caInvisibleTypeAnnotations
           , mapM devolve caOthers
           ]
 

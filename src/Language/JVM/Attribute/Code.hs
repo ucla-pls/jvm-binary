@@ -31,6 +31,7 @@ import qualified Data.Vector as V
 import           Language.JVM.Attribute.Base
 import           Language.JVM.Attribute.LineNumberTable
 import           Language.JVM.Attribute.StackMapTable
+import           Language.JVM.Attribute.Annotations
 import           Language.JVM.ByteCode
 import           Language.JVM.Constant
 import           Language.JVM.Staged
@@ -79,11 +80,15 @@ codeStackMapTable =
 data CodeAttributes r = CodeAttributes
   { caStackMapTable   :: [ StackMapTable r ]
   , caLineNumberTable :: [ LineNumberTable r ]
+  , caVisibleTypeAnnotations ::
+      [ RuntimeVisibleTypeAnnotations CodeTypeAnnotation r ]
+  , caInvisibleTypeAnnotations ::
+      [ RuntimeInvisibleTypeAnnotations CodeTypeAnnotation r ]
   , caOthers          :: [ Attribute r ]
   }
 
 emptyCodeAttributes :: CodeAttributes High
-emptyCodeAttributes = CodeAttributes [] [] []
+emptyCodeAttributes = CodeAttributes [] [] [] [] []
 
 instance Staged Code where
   evolve Code{..} = label "Code" $ do
@@ -94,6 +99,8 @@ instance Staged Code where
       $ collectBC evolver
       [ BCAttr (\e a -> a {caStackMapTable = e : caStackMapTable a})
       , BCAttr (\e a -> a {caLineNumberTable = e : caLineNumberTable a})
+      , BCAttr (\e a -> a {caVisibleTypeAnnotations = e : caVisibleTypeAnnotations a})
+      , BCAttr (\e a -> a {caInvisibleTypeAnnotations = e : caInvisibleTypeAnnotations a})
       ]
       (\e a -> a {caOthers = e : caOthers a})
     return $ Code {..}
@@ -110,6 +117,8 @@ instance Staged Code where
         concat <$> sequence
           [ mapM (toBCAttribute bcdevolver) caStackMapTable
           , mapM (toBCAttribute bcdevolver) caLineNumberTable
+          , mapM (toBCAttribute bcdevolver) caVisibleTypeAnnotations
+          , mapM (toBCAttribute bcdevolver) caInvisibleTypeAnnotations
           , mapM devolve caOthers
           ]
 

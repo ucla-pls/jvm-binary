@@ -61,12 +61,16 @@ data FieldAttributes r = FieldAttributes
   , faSignatures              :: [ Signature r ]
   , faVisibleAnnotations      :: [ RuntimeVisibleAnnotations r ]
   , faInvisibleAnnotations    :: [ RuntimeInvisibleAnnotations r ]
+  , faVisibleTypeAnnotations      ::
+      [ RuntimeVisibleTypeAnnotations FieldTypeAnnotation r ]
+  , faInvisibleTypeAnnotations    ::
+      [ RuntimeInvisibleTypeAnnotations FieldTypeAnnotation r ]
   , faOthers                  :: [ Attribute r ]
   }
 
 emptyFieldAttributes :: FieldAttributes High
 emptyFieldAttributes =
-  FieldAttributes [] [] [] [] []
+  FieldAttributes [] [] [] [] [] [] []
 
 instance Staged Field where
   evolve field = label "Field" $ do
@@ -79,6 +83,8 @@ instance Staged Field where
         , Attr (\e a -> a {faSignatures = e : faSignatures a })
         , Attr (\e a -> a {faVisibleAnnotations = e : faVisibleAnnotations a })
         , Attr (\e a -> a {faInvisibleAnnotations = e : faInvisibleAnnotations a })
+        , Attr (\e a -> a {faVisibleTypeAnnotations = e : faVisibleTypeAnnotations a })
+        , Attr (\e a -> a {faInvisibleTypeAnnotations = e : faInvisibleTypeAnnotations a })
         ] (\e a -> a { faOthers = e : faOthers a })
       return $ Field (fAccessFlags' field) fi fd fattr
 
@@ -95,6 +101,8 @@ instance Staged Field where
         , mapM toAttribute faSignatures
         , mapM toAttribute faVisibleAnnotations
         , mapM toAttribute faInvisibleAnnotations
+        , mapM toAttribute faVisibleTypeAnnotations
+        , mapM toAttribute faInvisibleTypeAnnotations
         , mapM devolve faOthers
         ]
 

@@ -20,7 +20,6 @@ import           Language.JVM.UtilsSpec                     ()
 import           Language.JVM
 import           Language.JVM.Attribute.Code
 
-
 spec :: Spec
 spec = do
   prop "can do a roundtrip on Code" prop_roundtrip_Code
@@ -59,22 +58,22 @@ instance Arbitrary (Code High) where
       <*> arbitrary
       <*> pure bc
       <*> (SizedList <$> listOf (genExceptionTable (fromIntegral . V.length . byteCodeInstructions $ bc)))
-      <*> pure (CodeAttributes [] [] [])
+      <*> pure emptyCodeAttributes
 
 genExceptionTable :: Int -> Gen (ExceptionTable High)
 genExceptionTable i =
   ExceptionTable
-    <$> (arbitraryRef i)
-    <*> (arbitraryRef i)
-    <*> (arbitraryRef i)
+    <$> arbitraryRef i
+    <*> arbitraryRef i
+    <*> arbitraryRef i
     <*> arbitrary
 
 arbitraryRef :: Int -> Gen Int
 arbitraryRef i =
   choose (0, i - 1)
 
-instance Arbitrary (CodeAttributes High) where
-  arbitrary = genericArbitraryU
+-- instance Arbitrary (CodeAttributes High) where
+--   arbitrary = genericArbitraryU
 
 instance Arbitrary (ExceptionTable High) where
   arbitrary =

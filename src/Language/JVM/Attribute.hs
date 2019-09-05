@@ -28,6 +28,13 @@ module Language.JVM.Attribute
   , RuntimeInvisibleAnnotations
   , RuntimeVisibleParameterAnnotations
   , RuntimeInvisibleParameterAnnotations
+  , RuntimeVisibleTypeAnnotations
+  , RuntimeInvisibleTypeAnnotations
+
+  , ClassTypeAnnotation
+  , MethodTypeAnnotation
+  , FieldTypeAnnotation
+  , CodeTypeAnnotation
   ) where
 
 import           Language.JVM.Attribute.Base
@@ -42,4 +49,10 @@ import           Language.JVM.Attribute.Annotations      ( RuntimeVisibleAnnotat
                                                          , RuntimeInvisibleAnnotations
                                                          , RuntimeVisibleParameterAnnotations
                                                          , RuntimeInvisibleParameterAnnotations
+                                                         , RuntimeVisibleTypeAnnotations
+                                                         , RuntimeInvisibleTypeAnnotations
+                                                         , ClassTypeAnnotation
+                                                         , MethodTypeAnnotation
+                                                         , FieldTypeAnnotation
+                                                         , CodeTypeAnnotation
                                                          )
