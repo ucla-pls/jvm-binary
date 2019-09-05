@@ -54,6 +54,8 @@ module Language.JVM.Attribute.Annotations
   , OffsetTarget
   , TypeArgumentTarget (..)
 
+  -- * AnnotationDefault
+  , AnnotationDefault (..)
   ) where
 
 -- base
@@ -641,7 +643,25 @@ deriving instance Eq (m Low) => Eq (RuntimeInvisibleTypeAnnotations m Low)
 deriving instance Ord (m Low) => Ord (RuntimeInvisibleTypeAnnotations m Low)
 deriving instance Generic (m Low) => Generic (RuntimeInvisibleTypeAnnotations m Low)
 deriving instance (Generic (m Low), NFData (m Low)) => NFData (RuntimeInvisibleTypeAnnotations m Low)
+
 deriving instance (Generic (m Low), Binary (m Low)) => Binary (RuntimeInvisibleTypeAnnotations m Low)
+
+-- | The AnnotationDefault attribute is a variable-length attribute in the
+-- attributes table of certain method_info structures (§4.6), namely those
+-- representing elements of annotation types (JLS §9.6.1). The AnnotationDefault
+-- attribute records the default value (JLS §9.6.2) for the element represented by
+-- the method_info structure. The Java Virtual Machine must make this default value
+-- available so it can be applied by appropriate reflective APIs.
+newtype AnnotationDefault r = AnnotationDefault
+  { defaultValue :: ElementValue r
+  }
+
+instance IsAttribute (AnnotationDefault Low) where
+  attrName = Const "AnnotationDefault"
+
+instance Staged AnnotationDefault where
+  stage f AnnotationDefault {..} = AnnotationDefault <$> stage f defaultValue
+
 
 $(deriveBaseWithBinary ''RuntimeInvisibleAnnotations)
 $(deriveBaseWithBinary ''RuntimeVisibleAnnotations)
@@ -649,6 +669,7 @@ $(deriveBaseWithBinary ''RuntimeInvisibleParameterAnnotations)
 $(deriveBaseWithBinary ''RuntimeVisibleParameterAnnotations)
 $(deriveBaseWithBinary ''Annotation)
 $(deriveBaseWithBinary ''ValuePair)
+$(deriveBaseWithBinary ''AnnotationDefault)
 $(deriveBase ''ElementValue)
 
 $(deriveBase ''ClassTypeAnnotation)

@@ -35,6 +35,7 @@ module Language.JVM.Attribute
   , MethodTypeAnnotation
   , FieldTypeAnnotation
   , CodeTypeAnnotation
+  , AnnotationDefault
   ) where
 
 import           Language.JVM.Attribute.Base
@@ -55,4 +56,5 @@ import           Language.JVM.Attribute.Annotations      ( RuntimeVisibleAnnotat
                                                          , MethodTypeAnnotation
                                                          , FieldTypeAnnotation
                                                          , CodeTypeAnnotation
+                                                         , AnnotationDefault
                                                          )

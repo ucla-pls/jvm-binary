@@ -60,6 +60,7 @@ data MethodAttributes r = MethodAttributes
   { maCode                          :: [Code r]
   , maExceptions                    :: [Exceptions r]
   , maSignatures                    :: [Signature r]
+  , maAnnotationDefault             :: [AnnotationDefault r]
   , maVisibleAnnotations            :: [RuntimeVisibleAnnotations r]
   , maInvisibleAnnotations          :: [RuntimeInvisibleAnnotations r]
   , maVisibleParameterAnnotations   :: [RuntimeVisibleParameterAnnotations r]
@@ -73,7 +74,7 @@ data MethodAttributes r = MethodAttributes
 
 emptyMethodAttributes :: MethodAttributes High
 emptyMethodAttributes =
-  MethodAttributes [] [] [] [] [] [] [] [] [] []
+  MethodAttributes [] [] [] [] [] [] [] [] [] [] []
 
 -- | Fetch the 'Code' attribute, if any.
 -- There can only be one code attribute in a method.
@@ -108,6 +109,7 @@ instance Staged Method where
           [ Attr (\e a -> a { maCode = e : maCode a })
           , Attr (\e a -> a { maExceptions = e : maExceptions a })
           , Attr (\e a -> a { maSignatures = e : maSignatures a })
+          , Attr (\e a -> a { maAnnotationDefault = e : maAnnotationDefault a })
           , Attr (\e a -> a { maVisibleAnnotations = e : maVisibleAnnotations a })
           , Attr (\e a -> a { maInvisibleAnnotations = e : maInvisibleAnnotations a })
           , Attr (\e a -> a { maVisibleParameterAnnotations = e : maVisibleParameterAnnotations a })
@@ -129,6 +131,7 @@ instance Staged Method where
           [ mapM toAttribute maCode
           , mapM toAttribute maExceptions
           , mapM toAttribute maSignatures
+          , mapM toAttribute maAnnotationDefault
           , mapM toAttribute maVisibleAnnotations
           , mapM toAttribute maInvisibleAnnotations
           , mapM toAttribute maVisibleParameterAnnotations

@@ -3,6 +3,7 @@
 ## Version 0.5.0
 - Reintroduce AbsVariableMethodId
 - Small cleanups
+- Add Annotations
 
 ## Version 0.4.0
 
