@@ -48,6 +48,8 @@ spec = do
         Left msg ->
           fail $ show msg
 
+  spec_reading_classfile
+
   describe "the standard library" $ do
     runIO (lookupEnv "JAVA_HOME") >>= \case
       Just home -> do
@@ -85,9 +87,8 @@ spec = do
               Left msg ->
                 fail $ show msg
       Nothing -> do
-        fail $ "Expecting JAVA_HOME to be set"
+        runIO $ putStrLn "Expecting JAVA_HOME to be set"
 
-  -- spec_reading_classfile
 
 spec_reading_classfile :: Spec
 spec_reading_classfile = testAllFiles $ \bs -> do
@@ -154,7 +155,7 @@ spec_reading_classfile = testAllFiles $ \bs -> do
     --   devolveClassFile' (cConstantPool cls) x `shouldMatchClass'` cls
 
     it "can do full read - write - read process" $ do
-      let w  = writeClassFile' (cConstantPool cls) x
+      let w  = writeClassFile x
       let y' = readClassFile w
       y' `shouldSatisfy` isRight
       let Right y = y'

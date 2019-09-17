@@ -233,13 +233,16 @@ instance ByteCodeStaged ByteCodeInst where
 evolveRefType :: EvolveM m => RefType Low -> m JRefType
 evolveRefType = \case
   ArrayBaseType bt -> return $ JTArray (JTBase bt)
+  Reference m 1 -> JTArray . JTRef . JTClass <$> link m
   Reference m _ -> link m
 
 devolveRefType :: DevolveM m => JRefType -> m (RefType Low)
 devolveRefType  = \case
   JTArray (JTBase bt) -> return $ ArrayBaseType bt
-  c -> flip Reference (fromIntegral $ refTypeDepth c) <$> unlink c
-
+  JTArray (JTRef (JTClass bt)) ->
+    flip Reference 1 <$> unlink bt
+  c ->
+    flip Reference (fromIntegral $ refTypeDepth c) <$> unlink c
 
 evolveByteCodeInst ::
   EvolveM m

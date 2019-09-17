@@ -33,9 +33,13 @@ spec = do
     a' `shouldBe` (CMethodRef (InClass 2 5))
 
     let cp' = bootstrapConstantPool cp
-    cp' `shouldBe` Right (fromConstants
-                          [ CString "class/Name", CClassRef "class/Name", CString "method"
-                          , CString "()V", CNameAndType "method" "()V"])
+    cp' `shouldBe` Right
+      (fromConstants
+       [ CString "class/Name"
+       , CClassRef "class/Name"
+       , CString "method"
+       , CString "()V", CNameAndType "method" "()V"
+       ])
 
     let Right cp'' = cp'
     runEvolve (EvolveConfig [] cp'' (const True)) (evolve a') `shouldBe` Right a
