@@ -1,7 +1,10 @@
 # Change log
 
 ## Version 0.7.0 (PENDING)
-- 
+
+
+## Version 0.6.1
+- Fix a mistake in anewarray
 
 ## Version 0.6.0
 - Add Annotations
