@@ -2,6 +2,7 @@
 
 ## Version 0.7.0 (PENDING)
 - Create instances for InClass
+- Fixed bad encoding of VerificationTypeInfo
 
 ## Version 0.6.1
 - Fix a mistake in anewarray

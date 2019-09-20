@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE LambdaCase          #-}
 {-|
 Module      : Language.JVM.Attribute.StackMapTable
 Copyright   : (c) Christian Gram Kalhauge, 2018
@@ -42,6 +43,7 @@ import           Language.JVM.Attribute.Base
 import           Language.JVM.ByteCode
 import           Language.JVM.Constant
 import           Language.JVM.Staged
+import           Language.JVM.Type
 import           Language.JVM.Utils
 
 -- | 'StackMapTable' is an Attribute.
@@ -112,9 +114,8 @@ instance Binary (StackMapFrame Low) where
         = fail $ "Unknown frame type '0x" ++ showHex ft "'"
     framegetter
 
-  put (StackMapFrame off frame) = do
+  put (StackMapFrame off frame) =
     case frame of
-
       SameFrame
         | off <= 63 ->
             putWord8 (fromIntegral off)
@@ -152,7 +153,6 @@ instance Binary (StackMapFrame Low) where
         put ls1
         put ls2
 
--- TODO: Fix that ClassName can be an array.
 -- | The types info of the stack map frame.
 data VerificationTypeInfo r
   = VTTop
@@ -162,36 +162,33 @@ data VerificationTypeInfo r
   | VTDouble
   | VTNull
   | VTUninitializedThis
-  | VTObject (Ref ClassName r)
+  | VTObject (Ref JRefType r)
   | VTUninitialized !Word16
 
 
 instance Binary (VerificationTypeInfo Low) where
-  get = do
-    tag <- getWord8
-    case tag of
-      0 -> pure VTTop
-      1 -> pure VTInteger
-      2 -> pure VTFloat
-      3 -> pure VTLong
-      4 -> pure VTDouble
-      5 -> pure VTNull
-      6 -> pure VTUninitializedThis
-      7 -> VTObject <$> get
-      8 -> VTUninitialized <$> get
-      _ -> fail $ "Unexpected tag : '0x" ++ showHex tag "'"
+  get = getWord8 >>= \case
+    0 -> pure VTTop
+    1 -> pure VTInteger
+    2 -> pure VTFloat
+    3 -> pure VTLong
+    4 -> pure VTDouble
+    5 -> pure VTNull
+    6 -> pure VTUninitializedThis
+    7 -> VTObject <$> get
+    8 -> VTUninitialized <$> get
+    tag -> fail $ "Unexpected tag : '0x" ++ showHex tag "'"
 
-  put a = do
-    case a of
-      VTTop               -> putWord8 0
-      VTInteger           -> putWord8 1
-      VTFloat             -> putWord8 2
-      VTLong              -> putWord8 3
-      VTDouble            -> putWord8 4
-      VTNull              -> putWord8 5
-      VTUninitializedThis -> putWord8 6
-      VTObject s          -> do putWord8 7; put s
-      VTUninitialized s   -> do putWord8 8; put s
+  put = \case
+    VTTop               -> putWord8 0
+    VTInteger           -> putWord8 1
+    VTFloat             -> putWord8 2
+    VTLong              -> putWord8 3
+    VTDouble            -> putWord8 4
+    VTNull              -> putWord8 5
+    VTUninitializedThis -> putWord8 6
+    VTObject s          -> do putWord8 7; put s
+    VTUninitialized s   -> do putWord8 8; put s
 
 instance ByteCodeStaged StackMapTable where
   evolveBC f (StackMapTable ls) =
@@ -255,7 +252,6 @@ instance Staged VerificationTypeInfo where
     case x of
       VTObject a -> VTObject <$> link a
       a         -> return $ unsafeCoerce a
-
 
 $(deriveBaseWithBinary ''StackMapTable)
 $(deriveBase ''StackMapFrame)
