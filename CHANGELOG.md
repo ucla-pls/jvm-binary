@@ -1,6 +1,8 @@
 # Change log
 
-## Version 0.7.0 (PENDING)
+## Version 0.8.0 (PENDING)
+
+## Version 0.7.0 
 - Create instances for InClass
 - Fixed bad encoding of VerificationTypeInfo
 
