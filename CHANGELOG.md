@@ -1,7 +1,7 @@
 # Change log
 
 ## Version 0.7.0 (PENDING)
-
+- Create instances for InClass
 
 ## Version 0.6.1
 - Fix a mistake in anewarray

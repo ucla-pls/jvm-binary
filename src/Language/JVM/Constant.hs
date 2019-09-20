@@ -107,6 +107,19 @@ data InClass a r = InClass
   , inClassId   :: !(Ref a r)
   }
 
+deriving instance Show a                 => Show (InClass a High)
+deriving instance Eq a                   => Eq (InClass a High)
+deriving instance Ord a                  => Ord (InClass a High)
+deriving instance Generic a              => Generic (InClass a High)
+deriving instance (Generic a, NFData a)  => NFData (InClass a High)
+
+deriving instance Eq (InClass a Low)
+deriving instance Ord (InClass a Low)
+deriving instance Show (InClass a Low)
+deriving instance NFData (InClass a Low)
+deriving instance Generic (InClass a Low)
+deriving instance Binary (InClass a Low)
+
 -- | A method id in a class.
 type AbsMethodId = InClass MethodId
 
@@ -448,8 +461,8 @@ $(deriveBase ''MethodHandleMethod)
 $(deriveBase ''MethodHandleInterface)
 $(deriveBaseWithBinary ''InvokeDynamic)
 
-$(deriveBaseWithBinary ''AbsMethodId)
-$(deriveBaseWithBinary ''AbsFieldId)
+-- $(deriveBaseWithBinary ''AbsMethodId)
+-- $(deriveBaseWithBinary ''AbsFieldId)
 $(deriveBaseWithBinary ''AbsInterfaceMethodId)
 $(deriveBaseWithBinary ''AbsVariableMethodId)
 
