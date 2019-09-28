@@ -38,17 +38,27 @@ module Language.JVM.Attribute.Signature
   -- * Lower Level Definitions
   , ClassType (..)
   , classTypeP
+  , classTypeT
   , ReferenceType (..)
   , referenceTypeP
+  , referenceTypeT
   , ThrowsSignature (..)
+  , throwsSignatureP
+  , throwsSignatureT
   , TypeArgument (..)
+  , typeArgumentsT
+  , typeArgumentsP
+  , typeArgumentP
+  , typeArgumentT
   , TypeParameter (..)
+  , typeParameterP
+  , typeParameterT
+  , typeParametersT
+  , typeParametersP
   , TypeSignature (..)
   , TypeVariable (..)
   , typeVariableP
   , Wildcard (..)
-  , typeParameterP
-  , typeParametersP
   ) where
 
 import           Control.DeepSeq             (NFData)
@@ -61,6 +71,7 @@ import           Data.Functor
 import           GHC.Generics                (Generic)
 
 import           Data.Attoparsec.Text
+import           Control.Applicative
 
 import qualified Data.List                   as L
 
@@ -81,16 +92,74 @@ signatureToText (Signature s) = s
 signatureFromText :: Text.Text -> Signature High
 signatureFromText = Signature
 
-----------------------
--- Parsing
-----------------------
-
 data ClassSignature = ClassSignature
   { csTypeParameters      :: [TypeParameter]
   , csSuperclassSignature :: ClassType
   , csInterfaceSignatures :: [ClassType]
   }
   deriving (Show, Eq, Generic, NFData)
+
+data MethodSignature = MethodSignature
+  { msTypeParameters :: [TypeParameter]
+  , msArguments      :: [TypeSignature]
+  , msResults        :: Maybe TypeSignature
+  , msThrows         :: [ ThrowsSignature ]
+  }
+  deriving (Show, Eq, Generic, NFData)
+
+newtype FieldSignature =
+  FieldSignature {fsRefType :: ReferenceType}
+  deriving (Show, Eq, Generic, NFData)
+
+
+data TypeSignature
+  = ReferenceType ReferenceType
+  | BaseType JBaseType
+  deriving (Show, Eq, Generic, NFData)
+
+data ReferenceType
+  = RefClassType ClassType
+  | RefTypeVariable TypeVariable
+  | RefArrayType TypeSignature
+  deriving (Show, Eq, Generic, NFData)
+
+data ClassType
+  = ClassType
+    { ctsClassName     :: ClassName
+    , ctsTypeArguments :: [Maybe TypeArgument]
+    }
+  | InnerClassType
+    { ctsInnerClassName :: Text.Text
+    , ctsOuterClassType :: ClassType
+    , ctsTypeArguments  :: [Maybe TypeArgument]
+    }
+  deriving (Show, Eq, Generic, NFData)
+
+data TypeArgument = TypeArgument
+  { taWildcard :: Maybe Wildcard
+  , taType     :: ReferenceType
+  } deriving (Show, Eq, Generic, NFData)
+
+data Wildcard =
+  WildPlus | WildMinus
+  deriving (Show, Eq, Generic, NFData)
+
+newtype TypeVariable =
+  TypeVariable { tvAsText :: Text.Text }
+  deriving (Show, Eq, Generic, NFData)
+
+data TypeParameter =
+  TypeParameter
+  { tpIndentifier    :: Text.Text
+  , tpClassBound     :: Maybe ReferenceType
+  , tpInterfaceBound :: [ReferenceType]
+  }
+  deriving (Show, Eq, Generic, NFData)
+
+
+----------------------
+-- Parsing
+----------------------
 
 classSignatureP :: Parser ClassSignature
 classSignatureP = do
@@ -111,10 +180,6 @@ classSignatureT :: ClassSignature -> Builder
 classSignatureT (ClassSignature tp ct its)= do
   typeParametersT tp <> foldMap classTypeT (ct:its)
 
-data TypeSignature
-  = ReferenceType ReferenceType
-  | BaseType JBaseType
-  deriving (Show, Eq, Generic, NFData)
 
 typeSignatureP :: Parser TypeSignature
 typeSignatureP = do
@@ -124,12 +189,6 @@ typeSignatureP = do
 typeSignatureT :: TypeSignature -> Builder
 typeSignatureT (ReferenceType t) = referenceTypeT t
 typeSignatureT (BaseType t)      = singleton (jBaseTypeToChar t)
-
-data ReferenceType
-  = RefClassType ClassType
-  | RefTypeVariable TypeVariable
-  | RefArrayType TypeSignature
-  deriving (Show, Eq, Generic, NFData)
 
 referenceTypeP :: Parser ReferenceType
 referenceTypeP = do
@@ -146,17 +205,6 @@ referenceTypeT t =
     RefTypeVariable tv -> typeVariableT tv
     RefArrayType at    -> singleton '[' <> typeSignatureT at
 
-data ClassType
-  = ClassType
-    { ctsClassName     :: ClassName
-    , ctsTypeArguments :: [Maybe TypeArgument]
-    }
-  | InnerClassType
-    { ctsInnerClassName :: Text.Text
-    , ctsOuterClassType :: ClassType
-    , ctsTypeArguments  :: [Maybe TypeArgument]
-    }
-  deriving (Show, Eq, Generic, NFData)
 
 classTypeP :: Parser ClassType
 classTypeP = nameit "ClassType" $ do
@@ -184,11 +232,6 @@ classTypeT t =
           <> Text.fromText (classNameAsText cn)
           <> typeArgumentsT arg
 
-data TypeArgument = TypeArgument
-  { taWildcard :: Maybe Wildcard
-  , taType     :: ReferenceType
-  }
-  deriving (Show, Eq, Generic, NFData)
 
 typeArgumentsP :: Parser [ Maybe TypeArgument ]
 typeArgumentsP = do
@@ -223,16 +266,10 @@ typeArgumentT a = do
         Just WildPlus  -> singleton '+'
         Nothing        -> mempty) <> referenceTypeT rt
 
-data Wildcard =
-  WildPlus | WildMinus
-  deriving (Show, Eq, Generic, NFData)
 
 wildcardP :: Parser Wildcard
 wildcardP = choice [ char '+' $> WildPlus, char '-' $> WildMinus]
 
-newtype TypeVariable =
-  TypeVariable { tvAsText :: Text.Text }
-  deriving (Show, Eq, Generic, NFData)
 
 typeVariableP :: Parser TypeVariable
 typeVariableP = do
@@ -245,13 +282,6 @@ typeVariableT :: TypeVariable -> Builder
 typeVariableT (TypeVariable t)= do
   singleton 'T' <> Text.fromText t <> singleton ';'
 
-data TypeParameter =
-  TypeParameter
-  { tpIndentifier    :: Text.Text
-  , tpClassBound     :: Maybe ReferenceType
-  , tpInterfaceBound :: [ReferenceType]
-  }
-  deriving (Show, Eq, Generic, NFData)
 
 typeParametersP :: Parser [TypeParameter]
 typeParametersP = nameit "TypeParameters" $ do
@@ -270,7 +300,7 @@ typeParameterP :: Parser TypeParameter
 typeParameterP = nameit "TypeParameter" $ do
   id_ <- identifierP
   _ <- char ':'
-  cb <- option Nothing (Just <$> referenceTypeP)
+  cb <- optional referenceTypeP
   ib <- many' (char ':' >> referenceTypeP)
   return $ TypeParameter id_ cb ib
 
@@ -286,14 +316,6 @@ identifierP :: Parser Text.Text
 identifierP =
   takeWhile1 (notInClass ".;[/<>:") <?> "Identifier"
 
-
-data MethodSignature = MethodSignature
-  { msTypeParameters :: [TypeParameter]
-  , msArguments      :: [TypeSignature]
-  , msResults        :: Maybe TypeSignature
-  , msThrows         :: [ ThrowsSignature ]
-  }
-  deriving (Show, Eq, Generic, NFData)
 
 methodSignatureP :: Parser MethodSignature
 methodSignatureP = do
@@ -343,10 +365,6 @@ throwsSignatureT t =
     <> case t of
          ThrowsClass ct        -> classTypeT ct
          ThrowsTypeVariable tt -> typeVariableT tt
-
-newtype FieldSignature =
-  FieldSignature {fsRefType :: ReferenceType}
-  deriving (Show, Eq, Generic, NFData)
 
 fieldSignatureP :: Parser FieldSignature
 fieldSignatureP =

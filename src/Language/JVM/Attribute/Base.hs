@@ -28,13 +28,16 @@ module Language.JVM.Attribute.Base
   , collectBC
   , AttributeCollector (..)
   , ByteCodeAttributeCollector (..)
-  , Const (..)
   , firstOne
+
+  -- * re-export
+  , Const (..)
   ) where
 
 -- base
 import Data.Monoid
 import           Control.Monad
+import           Control.Applicative
 import           Data.Maybe
 import           Data.Bifunctor
 import qualified Data.List            as List
@@ -82,10 +85,6 @@ $(deriveBaseWithBinary ''Attribute)
 -- | A list of attributes and described by the expected values.
 type Attributes b r = Choice (SizedList16 (Attribute r)) (b r) r
 
--- | Create a type dependent on another type 'b',
--- used for accessing the correct 'attrName' in 'IsAttribute'.
-newtype Const a b = Const { unConst :: a }
-
 -- | A class-type that describes a data-type 'a' as an Attribute. Most notable
 -- it provides the 'fromAttribute'' method that enables converting an Attribute
 -- to a data-type 'a'.
@@ -99,7 +98,7 @@ fromAttribute' = readFromStrict
 
 toAttribute' :: forall a. IsAttribute a => a -> Attribute High
 toAttribute' a =
-  let name = unConst (attrName :: Const Text.Text a)
+  let name = getConst (attrName :: Const Text.Text a)
       bytes = encode a
   in Attribute name (SizedByteString . BL.toStrict $ bytes)
 
@@ -126,7 +125,7 @@ fromAttribute ::
   => Attribute High
   -> Maybe (m (a High))
 fromAttribute as =
-  if aName as == unConst (attrName :: Const Text.Text (a Low))
+  if aName as == getConst (attrName :: Const Text.Text (a Low))
   then Just . label (Text.unpack $ aName as) . either attributeError evolve $ fromAttribute' as
   else Nothing
 
@@ -137,7 +136,7 @@ fromBCAttribute ::
   -> Attribute High
   -> Maybe (m (a High))
 fromBCAttribute fn as =
-  if aName as == unConst (attrName :: Const Text.Text (a Low))
+  if aName as == getConst (attrName :: Const Text.Text (a Low))
   then Just . label (Text.unpack $ aName as) . either attributeError (evolveBC fn) $ fromAttribute' as
   else Nothing
 
@@ -148,7 +147,7 @@ fromBCAttribute fn as =
 --   -> Attribute High
 --   -> Maybe (m (a High))
 -- evolveAttribute g as =
---   if aName as == unConst (attrName :: Const Text.Text (a Low))
+--   if aName as == getConst (attrName :: Const Text.Text (a Low))
 --   then Just $ either attributeError g $ fromAttribute' as
 --   else Nothing
 

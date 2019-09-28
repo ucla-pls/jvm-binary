@@ -53,7 +53,7 @@ spec = do
   describe "the standard library" $ do
     runIO (lookupEnv "JAVA_HOME") >>= \case
       Just home -> do
-        Right archive <- runIO $ readZipFile (home </> "jre/lib/rt.jar")
+        archive <- runIO $ either (error . ("Could not read zip file: "++) . show) return =<< readZipFile (home </> "jre/lib/rt.jar")
 
         let priorities =
               [ "java/lang/Class.class"
