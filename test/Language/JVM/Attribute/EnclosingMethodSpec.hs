@@ -15,17 +15,17 @@ prop_roundtrip_EnclosingMethodSpec = isoRoundtrip
 
 spec :: Spec
 spec =
-  spec_enclosing
+  -- spec_enclosing
 
-spec_enclosing ::  SpecWith ()
-spec_enclosing = do
-  it "can find an enclosing method in 'Streams$5'" $ do
-    tc <- withTestClass "Streams$5"
-    cEnclosingMethod tc `shouldBe`
-       Just (EnclosingMethod
-             "com/google/common/collect/Streams"
-             (Just ("mapWithIndex:(Ljava/util/stream/DoubleStream;Lcom/google/common/collect/Streams$DoubleFunctionWithIndex;)Ljava/util/stream/Stream;"))
-            )
+-- spec_enclosing ::  SpecWith ()
+-- spec_enclosing = do
+--   it "can find an enclosing method in 'Streams$5'" $ do
+--     tc <- withTestClass "Streams$5"
+--     cEnclosingMethod tc `shouldBe`
+--        Just (EnclosingMethod
+--              "com/google/common/collect/Streams"
+--              (Just ("mapWithIndex:(Ljava/util/stream/DoubleStream;Lcom/google/common/collect/Streams$DoubleFunctionWithIndex;)Ljava/util/stream/Stream;"))
+--             )
 
 -- test_real_signatures :: SpecWith ()
 -- test_real_signatures = do
