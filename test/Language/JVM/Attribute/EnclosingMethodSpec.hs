@@ -14,8 +14,8 @@ prop_roundtrip_EnclosingMethodSpec :: EnclosingMethod High -> Property
 prop_roundtrip_EnclosingMethodSpec = isoRoundtrip
 
 spec :: Spec
-spec =
-  -- spec_enclosing
+spec = return ()
+-- spec_enclosing
 
 -- spec_enclosing ::  SpecWith ()
 -- spec_enclosing = do

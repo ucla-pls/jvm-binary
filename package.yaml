@@ -14,9 +14,7 @@ description: A library for reading Java class-files.
 extra-source-files:
 - CHANGELOG.md
 - LICENSE.md
-- package.yaml
 - README.md
-- stack.yaml
 
 dependencies:
 - base >= 4.9 && < 4.13
