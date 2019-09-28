@@ -1,5 +1,8 @@
 # Change log
 
+## Version 0.8.1
+- Made all tests work with nix
+
 ## Version 0.8.0 
 -  Upgrade to GHC 8.6.4
 

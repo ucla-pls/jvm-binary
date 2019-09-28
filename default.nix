@@ -6,7 +6,7 @@
 }:
 mkDerivation {
   pname = "jvm-binary";
-  version = "0.8.0";
+  version = "0.8.1";
   src = ./.;
   libraryHaskellDepends = [
     attoparsec base binary bytestring containers data-binary-ieee754
