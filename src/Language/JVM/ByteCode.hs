@@ -44,6 +44,7 @@ module Language.JVM.ByteCode
   -- * ByteCode Operations
   , ByteCodeOpr (..)
 
+  , BConstant
   , CConstant (..)
   , OneOrTwo (..)
 
@@ -52,6 +53,10 @@ module Language.JVM.ByteCode
 
   , FieldAccess (..)
   , Invocation (..)
+
+  , ShortRelativeRef
+  , LongRelativeRef
+  , RefType (..)
 
   -- * Operations
   , BinOpr (..)
@@ -601,11 +606,11 @@ data ByteCodeOpr r
 
   | Nop
 
-  | Pop WordSize
+  | Pop !WordSize
 
-  | Dup WordSize
-  | DupX1 WordSize
-  | DupX2 WordSize
+  | Dup !WordSize
+  | DupX1 !WordSize
+  | DupX2 !WordSize
 
   | Swap
 

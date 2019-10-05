@@ -3,6 +3,9 @@
 # Stack generates the Cabal file from `package.yaml` through hpack.
 /*.cabal
 
+dist/
+dist-newstyle/
+
 test/data/java
 .DS_Store
 *.el
