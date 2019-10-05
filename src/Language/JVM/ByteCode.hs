@@ -596,8 +596,8 @@ data ByteCodeOpr r
 
   | Throw
 
-  | CheckCast !(Ref ClassName r)
-  | InstanceOf !(Ref ClassName r)
+  | CheckCast !(Ref JRefType r)
+  | InstanceOf !(Ref JRefType r)
 
   | Monitor !Bool
   -- ^ True => Enter, False => Exit
