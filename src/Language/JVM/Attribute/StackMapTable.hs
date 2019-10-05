@@ -162,9 +162,10 @@ data VerificationTypeInfo r
   | VTDouble
   | VTNull
   | VTUninitializedThis
-  | VTObject (Ref JRefType r)
-  | VTUninitialized !Word16
-
+  | VTObject !(Ref JRefType r)
+  | VTUninitialized !(ByteCodeRef r)
+    -- ^ This 'ByteCodeRef' refers to the "new" bytcode instruction
+    -- which created the object.
 
 instance Binary (VerificationTypeInfo Low) where
   get = getWord8 >>= \case
@@ -197,7 +198,7 @@ instance ByteCodeStaged StackMapTable where
     where
       acc a (StackMapFrame delta frm) = do
         (lidx, lst) <- a
-        frm' <- evolve frm
+        frm' <- evolveBC f frm
         let bco = if lst /= [] then offsetDelta lidx delta else delta
         x <- f bco
         return (bco, StackMapFrame x frm' : lst)
@@ -208,7 +209,7 @@ instance ByteCodeStaged StackMapTable where
     where
       acc a (StackMapFrame x frm) = do
         (lidx, lst) <- a
-        frm' <- devolve frm
+        frm' <- devolveBC f frm
         tidx <- f x
         let delta = if lst /= [] then offsetDeltaInv lidx tidx else tidx
         return (tidx, StackMapFrame delta frm' : lst)
@@ -234,23 +235,40 @@ offsetDeltaInv ::
 offsetDeltaInv lidx tidx
   = tidx - lidx - 1
 
-instance Staged StackMapFrameType where
-  stage f x =
+instance ByteCodeStaged StackMapFrameType where
+  evolveBC f x =
     case x of
-      SameLocals1StackItemFrame a -> SameLocals1StackItemFrame <$> f a
-      AppendFrame ls              -> AppendFrame <$> mapM f ls
-      FullFrame bs as             -> FullFrame <$> mapM f bs <*> mapM f as
-      a                           -> return $ unsafeCoerce a
+      SameLocals1StackItemFrame a ->
+        SameLocals1StackItemFrame <$> evolveBC f a
+      AppendFrame ls ->
+        AppendFrame <$> mapM (evolveBC f) ls
+      FullFrame bs as ->
+        FullFrame <$> mapM (evolveBC f) bs <*> mapM (evolveBC f) as
+      a ->
+        return $ unsafeCoerce a
 
-instance Staged VerificationTypeInfo where
-  devolve x =
+  devolveBC f x =
+    case x of
+      SameLocals1StackItemFrame a ->
+        SameLocals1StackItemFrame <$> devolveBC f a
+      AppendFrame ls ->
+        AppendFrame <$> mapM (devolveBC f) ls
+      FullFrame bs as ->
+        FullFrame <$> mapM (devolveBC f) bs <*> mapM (devolveBC f) as
+      a ->
+        return $ unsafeCoerce a
+
+instance ByteCodeStaged VerificationTypeInfo where
+  devolveBC f x =
     case x of
       VTObject a -> VTObject <$> unlink a
+      VTUninitialized r -> VTUninitialized <$> f r
       a         -> return $ unsafeCoerce a
 
-  evolve x =
+  evolveBC f x =
     case x of
       VTObject a -> VTObject <$> link a
+      VTUninitialized r -> VTUninitialized <$> f r
       a         -> return $ unsafeCoerce a
 
 $(deriveBaseWithBinary ''StackMapTable)
