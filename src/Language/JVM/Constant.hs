@@ -404,16 +404,27 @@ instance Referenceable (InClass MethodId High) where
   toConst s =
     return $ CMethodRef s
 
-instance TypeParse t => IsString (InClass t High) where
+instance IsString (InClass MethodId High) where
   fromString = either (error . ("Failed " ++)) id
     . parseOnly (parser <* endOfInput)
     . Text.pack
     where
       parser = do
         cn <- parseType
-        char '.'
+        void $ char '.'
         t <- parseType
-        return $ InClass cn t
+        return $ InClass cn (MethodId t)
+
+instance IsString (InClass FieldId High) where
+  fromString = either (error . ("Failed " ++)) id
+    . parseOnly (parser <* endOfInput)
+    . Text.pack
+    where
+      parser = do
+        cn <- parseType
+        void $ char '.'
+        t <- parseType
+        return $ InClass cn (FieldId t)
 
 instance Referenceable (AbsVariableMethodId High) where
   fromConst _ (CMethodRef s) = do

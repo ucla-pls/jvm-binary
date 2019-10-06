@@ -4,7 +4,7 @@
 module Language.JVM.Attribute.InnerClassesSpec where
 
 import           SpecHelper
-import qualified Data.Set as S
+-- import qualified Data.Set as S
 
 import           Language.JVM.ConstantSpec               ()
 
