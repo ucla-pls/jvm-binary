@@ -75,6 +75,9 @@ import           GHC.Generics             (Generic)
 import           Numeric                  (showHex)
 import           Prelude                  hiding (fail, lookup)
 
+-- attoparsec
+import           Data.Attoparsec.Text (char, endOfInput, parseOnly)
+
 import           Language.JVM.Stage
 import           Language.JVM.TH
 import           Language.JVM.Type
@@ -401,6 +404,16 @@ instance Referenceable (InClass MethodId High) where
   toConst s =
     return $ CMethodRef s
 
+instance TypeParse t => IsString (InClass t High) where
+  fromString = either (error . ("Failed " ++)) id
+    . parseOnly (parser <* endOfInput)
+    . Text.pack
+    where
+      parser = do
+        cn <- parseType
+        char '.'
+        t <- parseType
+        return $ InClass cn t
 
 instance Referenceable (AbsVariableMethodId High) where
   fromConst _ (CMethodRef s) = do
