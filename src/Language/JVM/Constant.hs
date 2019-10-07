@@ -110,7 +110,6 @@ data InClass a r = InClass
   , inClassId   :: !(Ref a r)
   }
 
-deriving instance Show a                 => Show (InClass a High)
 deriving instance Eq a                   => Eq (InClass a High)
 deriving instance Ord a                  => Ord (InClass a High)
 deriving instance Generic a              => Generic (InClass a High)
@@ -141,10 +140,16 @@ data AbsVariableMethodId r = AbsVariableMethodId
   }
 
 newtype MethodId = MethodId (NameAndType MethodDescriptor)
-  deriving (Eq, Show, NFData, Ord, Generic)
+  deriving (Eq, NFData, Ord, Generic)
 
 newtype FieldId  = FieldId (NameAndType FieldDescriptor)
-  deriving (Eq, Show, NFData, Ord, Generic)
+  deriving (Eq, NFData, Ord, Generic)
+
+instance Show FieldId where
+  show (FieldId a) = show (typeToString a)
+
+instance Show MethodId where
+  show (MethodId a) = show (typeToString a)
 
 instance IsString FieldId where
   fromString = FieldId . fromString
@@ -414,6 +419,17 @@ instance IsString (InClass MethodId High) where
         void $ char '.'
         t <- parseType
         return $ InClass cn (MethodId t)
+
+instance Show (InClass MethodId High) where
+  show (InClass cn (MethodId m)) =
+    show (typeToString cn ++ "." ++ typeToString m)
+
+instance Show (InClass FieldId High) where
+  show (InClass cn (FieldId f)) =
+    show (typeToString cn ++ "." ++ typeToString f)
+
+  -- show _ (InClass cls m)
+  --   = show ()
 
 instance IsString (InClass FieldId High) where
   fromString = either (error . ("Failed " ++)) id

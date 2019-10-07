@@ -43,6 +43,7 @@ module Language.JVM.Type
   , TypeParse (..)
   , typeFromText
   , typeToText
+  , typeToString
   , parseOnly
 
   , parseFlatJRefType
@@ -166,6 +167,10 @@ typeFromText = parseOnly (parseType <* endOfInput)
 -- | Convert a type into text
 typeToText :: TypeParse a => a -> Text.Text
 typeToText = Lazy.toStrict . Builder.toLazyText . typeToBuilder
+
+-- | Convert a type into text
+typeToString :: TypeParse a => a -> String
+typeToString = Lazy.unpack . Builder.toLazyText . typeToBuilder
 
 instance TypeParse ClassName where
   parseType = ClassName <$> takeWhile1 (notInClass ".;[<>:") <?> "ClassName"

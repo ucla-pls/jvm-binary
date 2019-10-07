@@ -14,6 +14,20 @@ import Language.JVM.TypeSpec ()
 
 spec :: Spec
 spec = do
+  it "can print things correctly" $ do
+    show ("java/lang/Object.hello:()V" :: InClass MethodId High)
+      `shouldBe` (show "java/lang/Object.hello:()V")
+
+    show ("java/lang/Object.hello:I" :: InClass FieldId High)
+      `shouldBe` (show "java/lang/Object.hello:I")
+
+    show ("hello:()V" :: MethodId)
+      `shouldBe` (show "hello:()V")
+
+    show ("hello:I" :: FieldId)
+      `shouldBe` (show "hello:I")
+
+
   it "can build a class pool" $ do
     let
       (a', cpb) = runConstantPoolBuilder (devolve (CClassRef "class/Name")) cpbEmpty
@@ -29,7 +43,8 @@ spec = do
       a = CMethodRef (InClass "class/Name" "method:()V")
       (a', cpb) = runConstantPoolBuilder (devolve a) cpbEmpty
       cp = constantPoolFromBuilder cpb
-    cp `shouldBe` fromConstants [CString "class/Name", CClassRef 1, CString "method", CString "()V", CNameAndType 3 4]
+    cp `shouldBe` fromConstants [
+      CString "class/Name", CClassRef 1, CString "method", CString "()V", CNameAndType 3 4]
     a' `shouldBe` (CMethodRef (InClass 2 5))
 
     let cp' = bootstrapConstantPool cp
