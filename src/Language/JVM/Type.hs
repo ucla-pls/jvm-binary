@@ -98,12 +98,12 @@ data JBaseType
   | JTLong
   | JTShort
   | JTBoolean
-  deriving (Show, Eq, Ord, Generic, NFData)
+  deriving (Eq, Ord, Generic, NFData)
 
 data JRefType
   = JTClass !ClassName
   | JTArray !JType
-  deriving (Show, Eq, Ord, Generic, NFData)
+  deriving (Eq, Ord, Generic, NFData)
 
 -- | The number of nested arrays
 refTypeDepth :: JRefType -> Int
@@ -115,7 +115,7 @@ refTypeDepth = \case
 data JType
   = JTBase JBaseType
   | JTRef JRefType
-  deriving (Show, Eq, Ord, Generic, NFData)
+  deriving (Eq, Ord, Generic, NFData)
 
 -- | Get the corresponding `Char` of a `JBaseType`
 jBaseTypeToChar :: JBaseType -> Char
@@ -206,6 +206,16 @@ instance TypeParse JRefType where
     JTArray t ->
       Builder.singleton '[' <> typeToBuilder t
 
+instance Show JRefType where
+  show = show . typeToText
+
+instance Show JBaseType where
+  show = show . typeToText
+
+instance Show JType where
+  show = show . typeToText
+
+
 parseFlatJRefType :: Parser JRefType
 parseFlatJRefType =
   JTArray <$> (char '[' *> parseType)
@@ -273,6 +283,12 @@ instance IsString ClassName where
   fromString = strCls
 
 instance IsString JType where
+  fromString = fromString'
+
+instance IsString JRefType where
+  fromString = fromString'
+
+instance IsString JBaseType where
   fromString = fromString'
 
 instance IsString FieldDescriptor where
