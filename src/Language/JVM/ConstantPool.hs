@@ -21,7 +21,7 @@ module Language.JVM.ConstantPool
   (
   -- * Constant Pool
   -- $ConstantPool
-    ConstantPool
+    ConstantPool (..)
   , access
 
   , growPool

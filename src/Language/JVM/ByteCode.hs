@@ -137,7 +137,7 @@ evolveOffset o i =
   case offsetIndex o i of
     Just a -> return $ a
     Nothing ->
-      attributeError $ "Not valid offset " ++ show i
+      evolveError $ "Not valid offset " ++ show i
 
 -- | Given low byte code we can create an `OffsetMap`
 offsetMap :: ByteCode Low -> OffsetMap
@@ -238,14 +238,17 @@ instance ByteCodeStaged ByteCodeInst where
 evolveRefType :: EvolveM m => RefType Low -> m JRefType
 evolveRefType = \case
   ArrayBaseType bt -> return $ JTArray (JTBase bt)
-  Reference m 1 -> JTArray . JTRef . JTClass <$> link m
+  Reference m 1 -> do
+    link m >>= \case
+      JTArray x -> return . JTArray $ x
+      b -> return . JTArray . JTRef $ b
   Reference m _ -> link m
 
 devolveRefType :: DevolveM m => JRefType -> m (RefType Low)
 devolveRefType  = \case
   JTArray (JTBase bt) -> return $ ArrayBaseType bt
-  JTArray (JTRef (JTClass bt)) ->
-    flip Reference 1 <$> unlink bt
+  -- JTArray (bt) ->
+  --   flip Reference 1 <$> unlink bt
   c ->
     flip Reference (fromIntegral $ refTypeDepth c) <$> unlink c
 

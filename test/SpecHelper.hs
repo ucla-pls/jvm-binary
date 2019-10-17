@@ -19,6 +19,8 @@ module SpecHelper
   , it
   , xit
   , describe
+  , xdescribe
+  , fdescribe
   ) where
 
 import Test.Hspec.Expectations.Pretty

@@ -14,3 +14,4 @@ test/data/*.class
 .failures.txt
 /.ghc.environment.x86_64-darwin-8.6.4
 /result
+/failures.txt

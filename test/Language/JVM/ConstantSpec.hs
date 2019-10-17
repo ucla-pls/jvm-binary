@@ -16,16 +16,16 @@ spec :: Spec
 spec = do
   it "can print things correctly" $ do
     show ("java/lang/Object.hello:()V" :: InClass MethodId High)
-      `shouldBe` (show "java/lang/Object.hello:()V")
+      `shouldBe` (show ("java/lang/Object.hello:()V" :: String))
 
     show ("java/lang/Object.hello:I" :: InClass FieldId High)
-      `shouldBe` (show "java/lang/Object.hello:I")
+      `shouldBe` (show ("java/lang/Object.hello:I" :: String))
 
     show ("hello:()V" :: MethodId)
-      `shouldBe` (show "hello:()V")
+      `shouldBe` (show ("hello:()V" :: String))
 
     show ("hello:I" :: FieldId)
-      `shouldBe` (show "hello:I")
+      `shouldBe` (show ("hello:I" :: String))
 
 
   it "can build a class pool" $ do

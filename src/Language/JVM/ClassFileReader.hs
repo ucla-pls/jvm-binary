@@ -175,7 +175,7 @@ instance EvolveM Evolve where
   attributeFilter =
     asks ecAttributeFilter
 
-  attributeError msg = do
+  evolveError msg = do
     lvl <- asks (showLvl . ecLabel)
     throwError (CFEConversionError lvl msg)
 

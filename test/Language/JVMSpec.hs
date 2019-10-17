@@ -68,10 +68,10 @@ spec = do
               Left msg ->
                 fail $ show msg
 
-        let classes =
+        let _classes =
               filter (\entry -> takeExtension (eRelativePath entry) == ".class")
               (zEntries archive)
-        forM_ classes $ \entry -> do
+        forM_ _classes $ \entry -> do
           it ("can read " ++ eRelativePath entry) $ do
             case readClassFile (fromEntry entry) of
               Right _ ->
@@ -79,7 +79,7 @@ spec = do
               Left msg ->
                 fail $ show msg
 
-        forM_ classes $ \entry -> do
+        forM_ _classes $ \entry -> do
           it ("can read " ++ eRelativePath entry) $ do
             case readClassFile (fromEntry entry) of
               Right _ ->

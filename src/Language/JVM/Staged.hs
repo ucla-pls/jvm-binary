@@ -46,7 +46,7 @@ data AttributeLocation
 class LabelM m => EvolveM m where
   link :: Referenceable r => Index -> m r
   attributeFilter :: m ((AttributeLocation, Text.Text) -> Bool)
-  attributeError :: String -> m r
+  evolveError :: String -> m r
 
 class LabelM m => DevolveM m where
   unlink :: Referenceable r => r -> m Index

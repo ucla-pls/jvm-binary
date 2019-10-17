@@ -126,7 +126,7 @@ fromAttribute ::
   -> Maybe (m (a High))
 fromAttribute as =
   if aName as == getConst (attrName :: Const Text.Text (a Low))
-  then Just . label (Text.unpack $ aName as) . either attributeError evolve $ fromAttribute' as
+  then Just . label (Text.unpack $ aName as) . either evolveError evolve $ fromAttribute' as
   else Nothing
 
 -- | Generate an BCAttribute in the 'EvolveM' monad
@@ -137,7 +137,7 @@ fromBCAttribute ::
   -> Maybe (m (a High))
 fromBCAttribute fn as =
   if aName as == getConst (attrName :: Const Text.Text (a Low))
-  then Just . label (Text.unpack $ aName as) . either attributeError (evolveBC fn) $ fromAttribute' as
+  then Just . label (Text.unpack $ aName as) . either evolveError (evolveBC fn) $ fromAttribute' as
   else Nothing
 
 -- -- | Generate an attribute in the 'EvolveM' monad
