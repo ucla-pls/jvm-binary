@@ -56,7 +56,9 @@ module Language.JVM.ByteCode
 
   , ShortRelativeRef
   , LongRelativeRef
-  , RefType (..)
+  , NewArrayType (..)
+  , newArrayTypeType
+  , LowNewArrayType (..)
 
   -- * Operations
   , BinOpr (..)
@@ -235,22 +237,47 @@ instance ByteCodeStaged ByteCodeInst where
   evolveBC = evolveByteCodeInst
   devolveBC = devolveByteCodeInst
 
-evolveRefType :: EvolveM m => RefType Low -> m JRefType
-evolveRefType = \case
-  ArrayBaseType bt -> return $ JTArray (JTBase bt)
-  Reference m 1 -> do
-    link m >>= \case
-      JTArray x -> return . JTArray $ x
-      b -> return . JTArray . JTRef $ b
-  Reference m _ -> link m
 
-devolveRefType :: DevolveM m => JRefType -> m (RefType Low)
-devolveRefType  = \case
-  JTArray (JTBase bt) -> return $ ArrayBaseType bt
-  -- JTArray (bt) ->
-  --   flip Reference 1 <$> unlink bt
-  c ->
-    flip Reference (fromIntegral $ refTypeDepth c) <$> unlink c
+newArrayTypeType :: NewArrayType -> JRefType
+newArrayTypeType (NewArrayType n m) = extendArrays n m
+  where
+    extendArrays :: Word8 -> JType -> JRefType
+    extendArrays 1 = JTArray
+    extendArrays n = extendArrays (n-1) . JTRef . JTArray
+
+evolveNewArrayType :: EvolveM m => LowNewArrayType -> m NewArrayType
+evolveNewArrayType = \case
+  ArrayBaseType b -> pure $ NewArrayType 1 (JTBase b)
+  ArrayReference _ 0 -> evolveError "Invalid bytecode instruction"
+  ArrayReference m 1 -> do
+    m' <- link m
+    pure $ NewArrayType 1 (JTRef m')
+  ArrayReference m n -> do
+    m' <- link m
+    m'' <- dropArrays n (JTRef m')
+    pure $ NewArrayType n m''
+
+  where
+    dropArrays 0 = pure
+    dropArrays n = \case
+      JTRef (JTArray a) ->
+        dropArrays (n - 1) a
+      a ->
+        evolveError ("expected array got" <> show a)
+
+devolveNewArrayType :: DevolveM m => NewArrayType -> m LowNewArrayType
+devolveNewArrayType = \case
+  NewArrayType 0 _ -> error "NewArrayType cannot have 0 dimentions"
+  NewArrayType 1 (JTBase m) ->
+    return $ ArrayBaseType m
+  NewArrayType 1 (JTRef m) -> do
+    m' <- unlink m
+    return $ ArrayReference m' 1
+  a@(NewArrayType n _) -> do
+    m' <- unlink (newArrayTypeType a)
+    return $ ArrayReference m' n
+
+
 
 evolveByteCodeInst ::
   EvolveM m
@@ -263,7 +290,8 @@ evolveByteCodeInst g (ByteCodeInst ofs opr) = do
     Get fa r          -> label "Get" $ Get fa <$> link r
     Put fa r          -> label "Put" $ Put fa <$> link r
     Invoke r          -> label "Invoke" $ Invoke <$> evolve r
-    New r             -> label "New" $ New <$> evolveRefType r
+    New r             -> label "New" $ New <$> link r
+    NewArray r        -> label "NewArray" $ NewArray <$> evolveNewArrayType r
     CheckCast r       -> label "CheckCast" $ CheckCast <$> link r
     InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> link r
     If cp on r        -> label "If" $ If cp on <$> calcOffset r
@@ -292,7 +320,8 @@ devolveByteCodeInst g (ByteCodeInst ofs opr) =
     Get fa r          -> label "Get" $ Get fa <$> unlink r
     Put fa r          -> label "Put" $ Put fa <$> unlink r
     Invoke r          -> label "Invoke" $ Invoke <$> devolve r
-    New r             -> label "New" $ New <$> devolveRefType r
+    New r             -> label "New" $ New <$> unlink r
+    NewArray r        -> label "NewArray" $ NewArray <$> devolveNewArrayType r
     CheckCast r       -> label "CheckCast" $ CheckCast <$> unlink r
     InstanceOf r      -> label "InstanceOf" $ InstanceOf <$> unlink r
     If cp on r        -> label "If" $ If cp on <$> calcOffset r
@@ -369,9 +398,14 @@ data ArithmeticType = MInt | MLong | MFloat | MDouble
 data SmallArithmeticType = MByte | MChar | MShort
   deriving (Show, Ord, Eq, Enum, Bounded, Generic, NFData)
 
-data RefType r
+data LowNewArrayType
   = ArrayBaseType JBaseType
-  | Reference (Ref JRefType r) Word8
+  | ArrayReference (Ref JRefType Low) Word8
+  deriving (Show, Ord, Eq, Generic, NFData)
+
+data NewArrayType
+  = NewArrayType Word8 JType
+  deriving (Show, Ord, Eq, Generic, NFData)
 
 data LocalType = LInt | LLong | LFloat | LDouble | LRef
   deriving (Show, Ord, Eq, Enum, Bounded, Generic, NFData)
@@ -593,7 +627,12 @@ data ByteCodeOpr r
 
   | Invoke !(Invocation r)
 
-  | New !(Choice (RefType Low) JRefType r)
+  | New !(Ref ClassName r)
+  
+  | NewArray !(Choice LowNewArrayType NewArrayType r)
+  -- ^ the first argument is the number of dimentions
+  -- of the array that have to be instantiatied.
+  -- The JType indicates the type of the instantiated array
 
   | ArrayLength
 
@@ -889,11 +928,11 @@ instance Binary (ByteCodeOpr Low) where
         zero <- getWord8
         when (zero /= 0) $ fail "Should be zero"
         return $ Invoke (InvkDynamic ref)
-      0xbb -> New . (flip Reference 0) <$> get
+      0xbb -> New <$> get
 
       0xbc -> do
         x <- getWord8
-        New . ArrayBaseType <$> case x of
+        NewArray . ArrayBaseType <$> case x of
           4  -> return JTBoolean
           5  -> return JTChar
           6  -> return JTFloat
@@ -904,7 +943,7 @@ instance Binary (ByteCodeOpr Low) where
           11 -> return JTLong
           _  -> fail $ "Unknown type '0x" ++ showHex x "'."
 
-      0xbd -> New . (flip Reference 1) <$> get
+      0xbd -> NewArray . (flip ArrayReference 1) <$> get
 
       0xbe -> return ArrayLength
 
@@ -938,7 +977,7 @@ instance Binary (ByteCodeOpr Low) where
           _ -> fail $ "Wide does not work for opcode '0x"
                 ++ showHex subopcode "'"
 
-      0xc5 -> New <$> (Reference <$> get <*> get)
+      0xc5 -> NewArray <$> (ArrayReference <$> get <*> get)
 
       0xc6 -> IfRef False One <$> get
       0xc7 -> IfRef True One <$> get
@@ -1311,7 +1350,8 @@ putByteCode n bc =
         InvkDynamic a ->
           putWord8 0xba >> put a >> putWord8 0 >> putWord8 0
 
-    New a ->
+    New a -> putWord8 0xbb >> put a
+    NewArray a ->
       case a of
         ArrayBaseType bt -> case bt of
           JTBoolean -> putWord8 0xbc >> putWord8 4
@@ -1322,9 +1362,8 @@ putByteCode n bc =
           JTShort   -> putWord8 0xbc >> putWord8 9
           JTInt     -> putWord8 0xbc >> putWord8 10
           JTLong    -> putWord8 0xbc >> putWord8 11
-        Reference p 0 -> putWord8 0xbb >> put p
-        Reference p 1 -> putWord8 0xbd >> put p
-        Reference p n -> putWord8 0xc5 >> put p >> put n
+        ArrayReference p 1 -> putWord8 0xbd >> put p
+        ArrayReference p n -> putWord8 0xc5 >> put p >> put n
 
     ArrayLength -> putWord8 0xbe
     Throw -> putWord8 0xbf
@@ -1364,5 +1403,4 @@ $(deriveThese ''ByteCodeInst [''Show, ''Generic, ''NFData])
 $(deriveBase ''ByteCodeOpr)
 $(deriveBase ''SwitchTable)
 $(deriveBase ''Invocation)
-$(deriveBase ''RefType)
 $(deriveBase ''CConstant)

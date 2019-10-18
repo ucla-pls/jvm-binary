@@ -1,5 +1,9 @@
 # Change log
 
+## Version 0.X.X
+- Changed attributeError to evolveError
+- Added new instruction NewArray to correctly model array behaviour
+
 ## Version 0.8.1
 - Made all tests work with nix
 

@@ -151,6 +151,9 @@ instance Arbitrary BitOpr where
 instance Arbitrary OneOrTwo where
   arbitrary = genericArbitraryU
 
+instance Arbitrary NewArrayType where
+  arbitrary = genericArbitraryU
+
 instance Arbitrary SmallArithmeticType where
   arbitrary = genericArbitraryU
 
