@@ -15,15 +15,18 @@ import Language.JVM.TypeSpec ()
 spec :: Spec
 spec = do
   it "can print things correctly" $ do
-    show ("java/lang/Object.hello:()V" :: InClass MethodId High)
+    show ("java/lang/Object.hello:()V" :: AbsMethodId)
       `shouldBe` (show ("java/lang/Object.hello:()V" :: String))
 
-    show ("java/lang/Object.hello:I" :: InClass FieldId High)
+  it "can print things correctly" $ do
+    show ("java/lang/Object.hello:I" :: AbsFieldId)
       `shouldBe` (show ("java/lang/Object.hello:I" :: String))
 
+  it "can print things correctly" $ do
     show ("hello:()V" :: MethodId)
       `shouldBe` (show ("hello:()V" :: String))
 
+  it "can print things correctly" $ do
     show ("hello:I" :: FieldId)
       `shouldBe` (show ("hello:I" :: String))
 
@@ -40,12 +43,12 @@ spec = do
 
   it "can build a complex class pool" $ do
     let
-      a = CMethodRef (InClass "class/Name" "method:()V")
+      a = CMethodRef (InRefType "Lclass/Name;" "method:()V")
       (a', cpb) = runConstantPoolBuilder (devolve a) cpbEmpty
       cp = constantPoolFromBuilder cpb
     cp `shouldBe` fromConstants [
       CString "class/Name", CClassRef 1, CString "method", CString "()V", CNameAndType 3 4]
-    a' `shouldBe` (CMethodRef (InClass 2 5))
+    a' `shouldBe` (CMethodRef (2, 5))
 
     let cp' = bootstrapConstantPool cp
     cp' `shouldBe` Right
@@ -94,10 +97,10 @@ instance Arbitrary (ConstantPool High) where
   arbitrary =
     fromConstants <$> (arbitrary :: Gen [Constant High])
 
-instance Arbitrary (AbsInterfaceMethodId High) where
+instance Arbitrary AbsInterfaceMethodId where
   arbitrary = genericArbitraryU
 
-instance Arbitrary (AbsVariableMethodId High) where
+instance Arbitrary AbsVariableMethodId where
   arbitrary = genericArbitraryU
 
 instance Arbitrary (Constant High) where
@@ -126,15 +129,6 @@ instance Arbitrary (Constant High) where
         , CMethodType <$> arbitrary
         , CInvokeDynamic <$> arbitrary
         ]
-
-instance (Arbitrary a) => Arbitrary (InClass a High) where
-  arbitrary = InClass <$> arbitrary <*> arbitrary
-
-instance Arbitrary (FieldId) where
-  arbitrary = FieldId <$> arbitrary
-
-instance Arbitrary (MethodId) where
-  arbitrary = MethodId <$> arbitrary
 
 instance Arbitrary (MethodHandle High) where
   arbitrary =

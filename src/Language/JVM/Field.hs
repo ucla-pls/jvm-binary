@@ -76,7 +76,7 @@ instance Staged Field where
   evolve field = label "Field" $ do
     fi <- link (fName field)
     fd <- link (fDescriptor field)
-    label (Text.unpack . typeToText $ NameAndType fi fd) $ do
+    label (Text.unpack . toText $ fi <:> fd) $ do
       fattr <- fmap (`appEndo` emptyFieldAttributes) . fromAttributes FieldAttribute (fAttributes field)
         $ collect
         [ Attr (\e a -> a {faConstantValues = e : faConstantValues a })

@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE StrictData            #-}
 {-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE ViewPatterns          #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -35,8 +36,9 @@ module Language.JVM.Constant
   , ClassName (..)
 
   , InClass (..)
+  , InRefType (..)
 
-  , AbsMethodId
+  , parseAbsMethodId
   , AbsFieldId
   , AbsInterfaceMethodId (..)
   , AbsVariableMethodId (..)
@@ -60,6 +62,7 @@ module Language.JVM.Constant
   -- * re-exports
   , High
   , Low
+
   ) where
 
 import           Control.DeepSeq          (NFData)
@@ -74,9 +77,6 @@ import qualified Data.Text.Encoding.Error as TE
 import           GHC.Generics             (Generic)
 import           Numeric                  (showHex)
 import           Prelude                  hiding (fail, lookup)
-
--- attoparsec
-import           Data.Attoparsec.Text (char, endOfInput, parseOnly)
 
 import           Language.JVM.Stage
 import           Language.JVM.TH
@@ -94,9 +94,9 @@ data Constant r
   | CDouble !Double
   | CClassRef !(Ref Text.Text r)
   | CStringRef !(Ref BS.ByteString r)
-  | CFieldRef !(InClass FieldId r)
-  | CMethodRef !(InClass MethodId r)
-  | CInterfaceMethodRef !(InClass MethodId r)
+  | CFieldRef !(Choice (Index, Index) AbsFieldId r)
+  | CMethodRef !(Choice (Index, Index) (InRefType MethodId) r)
+  | CInterfaceMethodRef !(Choice (Index, Index) (InRefType MethodId) r)
   | CNameAndType !(Ref Text.Text r) !(Ref Text.Text r)
   | CMethodHandle !(MethodHandle r)
   | CMethodType !(Ref MethodDescriptor r)
@@ -104,58 +104,16 @@ data Constant r
 
 --deriving (Show, Eq, Generic, NFData)
 
--- | Anything pointing inside a class
-data InClass a r = InClass
-  { inClassName :: !(Ref ClassName r)
-  , inClassId   :: !(Ref a r)
-  }
-
-deriving instance Eq a                   => Eq (InClass a High)
-deriving instance Ord a                  => Ord (InClass a High)
-deriving instance Generic a              => Generic (InClass a High)
-deriving instance (Generic a, NFData a)  => NFData (InClass a High)
-
-deriving instance Eq (InClass a Low)
-deriving instance Ord (InClass a Low)
-deriving instance Show (InClass a Low)
-deriving instance NFData (InClass a Low)
-deriving instance Generic (InClass a Low)
-deriving instance Binary (InClass a Low)
-
--- | A method id in a class.
-type AbsMethodId = InClass MethodId
-
--- | A field id in a class
-type AbsFieldId = InClass FieldId
-
 -- | An method which is from an interface
-newtype AbsInterfaceMethodId r = AbsInterfaceMethodId
-  { interfaceMethodId :: InClass MethodId r
-  }
+newtype AbsInterfaceMethodId = AbsInterfaceMethodId
+  { interfaceMethodId :: InRefType MethodId
+  } deriving (Show, Eq, Generic, NFData)
 
 -- | An method which can be from an interface
-data AbsVariableMethodId r = AbsVariableMethodId
+data AbsVariableMethodId = AbsVariableMethodId
   { variableIsInterface :: !Bool
-  , variableMethodId    :: !(InClass MethodId r)
-  }
-
-newtype MethodId = MethodId (NameAndType MethodDescriptor)
-  deriving (Eq, NFData, Ord, Generic)
-
-newtype FieldId  = FieldId (NameAndType FieldDescriptor)
-  deriving (Eq, NFData, Ord, Generic)
-
-instance Show FieldId where
-  show (FieldId a) = show (typeToString a)
-
-instance Show MethodId where
-  show (MethodId a) = show (typeToString a)
-
-instance IsString FieldId where
-  fromString = FieldId . fromString
-
-instance IsString MethodId where
-  fromString = MethodId . fromString
+  , variableMethodId    :: !(InRefType MethodId)
+  } deriving (Show, Eq, Generic, NFData)
 
 -- | The union type over the different method handles.
 data MethodHandle r
@@ -163,10 +121,9 @@ data MethodHandle r
   | MHMethod !(MethodHandleMethod r)
   | MHInterface !(MethodHandleInterface r)
 
-
 data MethodHandleField r = MethodHandleField
   { methodHandleFieldKind :: !MethodHandleFieldKind
-  , methodHandleFieldRef  :: !(DeepRef AbsFieldId r)
+  , methodHandleFieldRef  :: !(Ref (InRefType MethodId) r)
   }
 
 data MethodHandleFieldKind
@@ -177,15 +134,15 @@ data MethodHandleFieldKind
   deriving (Eq, Show, NFData, Generic, Ord)
 
 data MethodHandleMethod r
-  = MHInvokeVirtual !(DeepRef AbsMethodId r)
-  | MHInvokeStatic !(DeepRef AbsVariableMethodId r)
+  = MHInvokeVirtual !(Ref (InRefType MethodId) r)
+  | MHInvokeStatic !(Ref AbsVariableMethodId r)
   -- ^ Since version 52.0
-  | MHInvokeSpecial !(DeepRef AbsVariableMethodId r)
+  | MHInvokeSpecial !(Ref AbsVariableMethodId r)
   -- ^ Since version 52.0
-  | MHNewInvokeSpecial !(DeepRef AbsMethodId r)
+  | MHNewInvokeSpecial !(Ref (InRefType MethodId) r)
 
 data MethodHandleInterface r = MethodHandleInterface
-  {  methodHandleInterfaceRef :: !(DeepRef AbsInterfaceMethodId r)
+  {  methodHandleInterfaceRef :: !(Ref AbsInterfaceMethodId r)
   }
 
 data InvokeDynamic r = InvokeDynamic
@@ -315,14 +272,14 @@ instance Referenceable (Constant High) where
   fromConst _ = return
   toConst = return
 
-instance TypeParse a => Referenceable (NameAndType a) where
+instance TextSerializable a => Referenceable (NameAndType a) where
   fromConst err (CNameAndType rn txt) = do
-    md <- either err return $ typeFromText txt
+    md <- either err return $ deserialize txt
     return $ NameAndType rn md
   fromConst e c = expected "CNameAndType" e c
 
   toConst (NameAndType rn md) =
-    return $ CNameAndType rn (typeToText md)
+    return $ CNameAndType rn (toText md)
 
 -- TODO: Find good encoding of string.
 instance Referenceable Text.Text where
@@ -349,41 +306,44 @@ instance Referenceable BS.ByteString where
 
 
 instance Referenceable ClassName where
-  fromConst _ (CClassRef r) =
-    return . ClassName $ r
-  fromConst err a =
-    err $ wrongType "ClassRef" a
+  fromConst err = \case
+    CClassRef r  ->
+      case (textCls r) of
+        Right cn -> return cn
+        Left msg ->
+          err $ "Could not read class name: " <> Text.unpack r <> ": " <> msg
+    a ->
+      err $ wrongType "ClassRef" a
 
-  toConst (ClassName txt) = do
+  toConst (classNameAsText -> txt) = do
     return . CClassRef $ txt
 
 instance Referenceable JRefType where
-  fromConst err (CClassRef r) =
-    either err return $ parseOnly parseFlatJRefType r
-  fromConst err a =
-    err $ wrongType "ClassRef" a
+  fromConst err = \case
+    CClassRef r ->
+      case deserializeWith parseFlatJRefType r of
+        Right t -> return t
+        Left msg ->
+          err $ "Could not read the flat reference type: " <> Text.unpack r <> ": " <> msg
+    a ->
+      err $ wrongType "ClassRef" a
   toConst =
-    return . CClassRef . jRefTypeToFlatText
+    return . CClassRef . toTextWith serializeFlatJRefType
 
 instance Referenceable ReturnDescriptor where
   fromConst err =
-    fromConst err >=> either err return . typeFromText
-  toConst = toConst . typeToText
+    fromConst err >=> either err return . deserialize
+  toConst = toConst . toText
 
 instance Referenceable MethodDescriptor where
   fromConst err =
-    fromConst err >=> either err pure . typeFromText
-  toConst = toConst . typeToText
+    fromConst err >=> either err pure . deserialize
+  toConst = toConst . toText
 
 instance Referenceable FieldDescriptor where
   fromConst err =
-    fromConst err >=> either err pure . typeFromText
-  toConst = toConst . typeToText
-
--- instance TypeParse f => Referenceable (NameAndType f) where
---   fromConst err =
---     fromConst err >=> either err pure . fromText
---   toConst = toConst . typeToText
+    fromConst err >=> either err pure . deserialize
+  toConst = toConst . toText
 
 instance Referenceable MethodId where
   fromConst err x = MethodId <$> fromConst err x
@@ -393,67 +353,43 @@ instance Referenceable FieldId where
   fromConst err x = FieldId <$> fromConst err x
   toConst (FieldId s) = toConst s
 
-instance Referenceable (InClass FieldId High) where
-  fromConst _ (CFieldRef s) = do
-    return $ s
-  fromConst err c = expected "CFieldRef" err c
+instance Referenceable AbsFieldId where
+  fromConst err = \case
+    CFieldRef s ->
+      return $ s
+    c -> expected "CFieldRef" err c
 
   toConst s =
     return $ CFieldRef s
 
-instance Referenceable (InClass MethodId High) where
-  fromConst _ (CMethodRef s) = do
-    return $ s
-  fromConst err c = expected "CMethodRef" err c
+instance Referenceable (InRefType MethodId) where
+  fromConst err = \case
+    CMethodRef s ->
+      return $ s
+    c -> expected "CMethodRef" err c
 
   toConst s =
     return $ CMethodRef s
 
-instance IsString (InClass MethodId High) where
-  fromString = either (error . ("Failed " ++)) id
-    . parseOnly (parser <* endOfInput)
-    . Text.pack
-    where
-      parser = do
-        cn <- parseType
-        void $ char '.'
-        t <- parseType
-        return $ InClass cn (MethodId t)
+instance Referenceable AbsVariableMethodId where
+  fromConst err = \case
+    CMethodRef s ->
+      return $ AbsVariableMethodId False s
+    CInterfaceMethodRef s ->
+      return $ AbsVariableMethodId True s
+    c ->
+      expected "CMethodRef or CInterfaceMethodRef" err c
 
-instance Show (InClass MethodId High) where
-  show (InClass cn (MethodId m)) =
-    show (typeToString cn ++ "." ++ typeToString m)
+  toConst (AbsVariableMethodId t s) =
+    return $ if t then CInterfaceMethodRef s else CMethodRef s
 
-instance Show (InClass FieldId High) where
-  show (InClass cn (FieldId f)) =
-    show (typeToString cn ++ "." ++ typeToString f)
+instance Referenceable AbsInterfaceMethodId where
+  fromConst _ (CInterfaceMethodRef s) =
+    return . AbsInterfaceMethodId $ s
+  fromConst err c = expected "CInterfaceMethodRef" err c
 
-  -- show _ (InClass cls m)
-  --   = show ()
-
-instance IsString (InClass FieldId High) where
-  fromString = either (error . ("Failed " ++)) id
-    . parseOnly (parser <* endOfInput)
-    . Text.pack
-    where
-      parser = do
-        cn <- parseType
-        void $ char '.'
-        t <- parseType
-        return $ InClass cn (FieldId t)
-
-instance Referenceable (AbsVariableMethodId High) where
-  fromConst _ (CMethodRef s) = do
-    return $ AbsVariableMethodId False s
-  fromConst _ (CInterfaceMethodRef s) = do
-    return $ AbsVariableMethodId True s
-  fromConst err c = expected "CMethodRef or CInterfaceMethodRef" err c
-
-  toConst (AbsVariableMethodId t s)
-    | t =
-      return $ CInterfaceMethodRef s
-    | otherwise =
-      return $ CMethodRef s
+  toConst (AbsInterfaceMethodId s) =
+    return $ CInterfaceMethodRef s
 
 
 instance Referenceable (InvokeDynamic High) where
@@ -470,13 +406,6 @@ instance Referenceable (MethodHandle High) where
   toConst s =
     return $ CMethodHandle s
 
-instance Referenceable (AbsInterfaceMethodId High) where
-  fromConst _ (CInterfaceMethodRef s) =
-    return . AbsInterfaceMethodId $ s
-  fromConst err c = expected "CInterfaceMethodRef" err c
-
-  toConst (AbsInterfaceMethodId s) =
-    return $ CInterfaceMethodRef s
 
 expected :: String -> (String -> a) -> (Constant r) -> a
 expected name err c =
@@ -503,8 +432,8 @@ $(deriveBaseWithBinary ''InvokeDynamic)
 
 -- $(deriveBaseWithBinary ''AbsMethodId)
 -- $(deriveBaseWithBinary ''AbsFieldId)
-$(deriveBaseWithBinary ''AbsInterfaceMethodId)
-$(deriveBaseWithBinary ''AbsVariableMethodId)
+-- $(deriveBaseWithBinary ''AbsInterfaceMethodId)
+-- $(deriveBaseWithBinary ''AbsVariableMethodId)
 
 type VInteger = Int32
 type VLong = Int64
@@ -561,7 +490,10 @@ instance Referenceable JValue where
     CFloat f        -> return $ VFloat f
     CLong l         -> return $ VLong l
     CDouble d       -> return $ VDouble d
-    CClassRef r     -> return $ VClass (ClassName r)
+    CClassRef r     ->
+      case textCls r of
+        Right cn -> return $ VClass cn
+        Left msg -> err $ "Could not parse class name " <> Text.unpack r <> ": " <> msg
     CMethodHandle m -> return $ VMethodHandle m
     CMethodType t   -> return $ VMethodType t
     x               -> expected "Value" err x
@@ -573,7 +505,7 @@ instance Referenceable JValue where
     VFloat f             -> CFloat f
     VLong l              -> CLong l
     VDouble d            -> CDouble d
-    VClass (ClassName r) -> CClassRef r
+    VClass (classNameAsText -> r) -> CClassRef r
     VMethodHandle m      -> CMethodHandle m
     VMethodType t        -> CMethodType t
   {-# INLINE toConst #-}

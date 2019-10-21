@@ -3,6 +3,8 @@
 ## Version 0.X.X
 - Changed attributeError to evolveError
 - Added new instruction NewArray to correctly model array behaviour
+- Massive rewrite of AbsMethodId and friends to make them easier to 
+  work with
 
 ## Version 0.8.1
 - Made all tests work with nix

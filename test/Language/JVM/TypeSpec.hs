@@ -4,34 +4,30 @@ module Language.JVM.TypeSpec where
 
 import SpecHelper
 
-import Data.Attoparsec.Text
 import Data.Either
 import Language.JVM.Type
-
--- import Text.Megaparsec
--- import Spec.Hspec.Megaparsec
 
 spec :: Spec
 spec = do
   describe "JType parsing" $ do
     it "can parse \"[B\" as an array" $
-      parseOnly parseType "[B" `shouldBe` Right (JTRef (JTArray (JTBase JTByte)))
+      deserialize "[B" `shouldBe` Right (JTRef (JTArray (JTBase JTByte)))
     it "can parse an array of strings" $
-      parseOnly parseType "[Ljava/lang/String;" `shouldBe`
-        Right (JTRef (JTArray (JTRef (JTClass (ClassName "java/lang/String")))))
+      deserialize "[Ljava/lang/String;" `shouldBe`
+        Right (JTRef (JTArray (JTRef (JTClass "java/lang/String"))))
 
   describe "MethodDescriptor parsing" $ do
     it "can parse the empty method" $
-      parseOnly parseType "()V" `shouldBe`
-        Right (MethodDescriptor [] Nothing)
+      deserialize "()V" `shouldBe`
+        Right (MethodDescriptor [] "V")
     it "can parse method arguments" $
-      parseOnly parseType "(BZ)B" `shouldBe`
-        Right (MethodDescriptor [JTBase JTByte, JTBase JTBoolean] (Just (JTBase JTByte)))
+      deserialize "(BZ)B" `shouldBe`
+        Right (MethodDescriptor [JTBase JTByte, JTBase JTBoolean] "B")
     it "does not parse if there is too much" $
-      (typeFromText "(BZ)Bx" :: Either String MethodDescriptor) `shouldSatisfy` isLeft
+      (deserialize "(BZ)Bx" :: Either String MethodDescriptor) `shouldSatisfy` isLeft
 
 instance Arbitrary ClassName where
-  arbitrary = pure $ ClassName "package/Main"
+  arbitrary = pure $ "package/Main"
 
 instance Arbitrary JType where
   arbitrary = genericArbitrary uniform
@@ -42,11 +38,33 @@ instance Arbitrary JBaseType where
 instance Arbitrary JRefType where
   arbitrary = genericArbitrary uniform
 
+instance Arbitrary ReturnDescriptor where
+  arbitrary = genericArbitrary uniform
+
 instance Arbitrary MethodDescriptor where
   arbitrary = genericArbitrary uniform
 
 instance Arbitrary FieldDescriptor where
   arbitrary = genericArbitrary uniform
+
+instance Arbitrary FieldId where
+  arbitrary = FieldId <$> arbitrary
+
+instance Arbitrary MethodId where
+  arbitrary = MethodId <$> arbitrary
+
+instance Arbitrary a => Arbitrary (InClass a) where
+  arbitrary = InClass <$> arbitrary <*> arbitrary
+
+instance Arbitrary a => Arbitrary (InRefType a) where
+  arbitrary = InRefType <$> arbitrary <*> arbitrary
+
+instance Arbitrary AbsFieldId where
+  arbitrary = AbsFieldId <$> arbitrary
+
+instance Arbitrary AbsMethodId where
+  arbitrary = AbsMethodId <$> arbitrary
+
 
 instance Arbitrary t => Arbitrary (NameAndType t) where
   arbitrary =

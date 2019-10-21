@@ -184,7 +184,7 @@ classSignatureT (ClassSignature tp ct its)= do
 typeSignatureP :: Parser TypeSignature
 typeSignatureP = do
   choice [ (ReferenceType <$> referenceTypeP) <?> "JRefereceType"
-         , (BaseType <$> parseType) <?> "JBaseType" ]
+         , (BaseType <$> parseJBaseType) <?> "JBaseType" ]
 
 typeSignatureT :: TypeSignature -> Builder
 typeSignatureT (ReferenceType t) = referenceTypeT t
@@ -209,7 +209,7 @@ referenceTypeT t =
 classTypeP :: Parser ClassType
 classTypeP = nameit "ClassType" $ do
   _ <- char 'L'
-  cn <- parseType
+  cn <- parseClassName
   ta <- option [] typeArgumentsP
   ict <- many' $ do
       _ <- char '.'

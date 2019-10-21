@@ -1,8 +1,8 @@
 { mkDerivation, attoparsec, base, binary, bytestring, containers
 , criterion, data-binary-ieee754, deepseq, deriving-compat
-, directory, filepath, generic-random, hpack, hspec, hspec-discover
-, hspec-expectations-pretty-diff, mtl, QuickCheck, stdenv
-, template-haskell, text, vector, zip-archive
+, directory, doctest, filepath, generic-random, hpack, hspec
+, hspec-discover, hspec-expectations-pretty-diff, mtl, QuickCheck
+, stdenv, template-haskell, text, vector, zip-archive
 }:
 mkDerivation {
   pname = "jvm-binary";
@@ -15,8 +15,8 @@ mkDerivation {
   libraryToolDepends = [ hpack ];
   testHaskellDepends = [
     attoparsec base binary bytestring containers data-binary-ieee754
-    deepseq deriving-compat directory filepath generic-random hspec
-    hspec-discover hspec-expectations-pretty-diff mtl QuickCheck
+    deepseq deriving-compat directory doctest filepath generic-random
+    hspec hspec-discover hspec-expectations-pretty-diff mtl QuickCheck
     template-haskell text vector zip-archive
   ];
   testToolDepends = [ hspec-discover ];

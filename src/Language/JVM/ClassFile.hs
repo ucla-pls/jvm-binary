@@ -129,11 +129,11 @@ instance Staged ClassFile where
   evolve cf = label "ClassFile" $ do
     tci' <- link (cThisClass cf)
     sci' <-
-      if tci' /= ClassName "java/lang/Object"
+      if tci' /= "java/lang/Object"
       then do
         link (cSuperClass cf)
       else do
-        return $ ClassName "java/lang/Object"
+        return $ "java/lang/Object"
     cii' <- mapM link $ cInterfaces cf
     cf' <- mapM evolve $ cFields' cf
     cm' <- mapM evolve $ cMethods' cf
@@ -162,7 +162,7 @@ instance Staged ClassFile where
   devolve cf = do
     tci' <- unlink (cThisClass cf)
     sci' <-
-      if cThisClass cf /= ClassName "java/lang/Object" then
+      if cThisClass cf /= "java/lang/Object" then
         unlink (cSuperClass cf)
       else
         return $ 0

@@ -46,6 +46,7 @@ tests:
     - hspec-discover
     - hspec-expectations-pretty-diff
     - zip-archive
+    - doctest
     ghc-options:
     - -rtsopts
     - -threaded

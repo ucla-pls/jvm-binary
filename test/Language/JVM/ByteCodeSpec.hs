@@ -14,7 +14,7 @@ import Language.JVM.ByteCode
 
 spec :: Spec
 spec = do
-  fdescribe "new RefType" $ do
+  describe "new RefType" $ do
     it "should evolve 1, [J -> [[J" $ do
         let cp = ConstantPool (IntMap.singleton 0 (CClassRef "[J"))
         let x = runEvolve (EvolveConfig [] cp (const True))

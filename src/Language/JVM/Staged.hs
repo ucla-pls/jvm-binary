@@ -27,6 +27,7 @@ module Language.JVM.Staged
 import qualified Data.Text as Text
 
 import Language.JVM.Constant
+import Language.JVM.Type
 import Language.JVM.Stage
 import Language.JVM.TH
 
@@ -75,9 +76,12 @@ instance Staged Constant where
       CDouble d -> pure $ CDouble d
       CClassRef r -> label "CClassRef" $ CClassRef <$> link r
       CStringRef r -> label "CStringRef" $ CStringRef <$> link r
-      CFieldRef r -> label "CFieldRef" $ CFieldRef <$> evolve r
-      CMethodRef r -> label "CMethodRef" $ CMethodRef <$> evolve r
-      CInterfaceMethodRef r -> label "CInterfaceMethodRef" $ CInterfaceMethodRef <$> evolve r
+      CFieldRef (x, y) -> label "CFieldRef"
+        $ CFieldRef . AbsFieldId <$> (InClass <$> link x <*> link y)
+      CMethodRef (x, y) -> label "CMethodRef"
+        $ CMethodRef <$> (InRefType <$> link x <*> link y)
+      CInterfaceMethodRef (x, y) -> label "CInterfaceMethodRef"
+        $ CInterfaceMethodRef <$> (InRefType <$> link x <*> link y)
       CNameAndType r1 r2 -> label "CNameAndType" $ CNameAndType <$> link r1 <*> link r2
       CMethodHandle mh -> label "CMethodHandle" $ CMethodHandle <$> evolve mh
       CMethodType r -> label "CMethodType" $ CMethodType <$> link r
@@ -92,9 +96,12 @@ instance Staged Constant where
       CDouble d -> pure $ CDouble d
       CClassRef r -> label "CClassRef" $ CClassRef <$> unlink r
       CStringRef r -> label "CStringRef" $ CStringRef <$> unlink r
-      CFieldRef r -> label "CFieldRef" $ CFieldRef <$> devolve r
-      CMethodRef r -> label "CMethodRef" $ CMethodRef <$> devolve r
-      CInterfaceMethodRef r -> label "CInterfaceMethodRef" $ CInterfaceMethodRef <$> devolve r
+      CFieldRef (AbsFieldId (InClass rt rid)) -> label "CFieldRef"
+        $ CFieldRef <$> ((,) <$> unlink rt <*> unlink rid)
+      CMethodRef (InRefType rt rid) -> label "CMethodRef"
+        $ CMethodRef <$> ((,) <$> unlink rt <*> unlink rid)
+      CInterfaceMethodRef (InRefType rt rid) -> label "CInterfaceMethodRef"
+        $ CInterfaceMethodRef <$> ((,) <$> unlink rt <*> unlink rid)
       CNameAndType r1 r2 -> label "CNameAndType" $ CNameAndType <$> unlink r1 <*> unlink r2
       CMethodHandle mh -> label "CMetho" $ CMethodHandle <$> devolve mh
       CMethodType r -> label "CMethodType" $ CMethodType <$> unlink r
@@ -115,11 +122,17 @@ instance Staged InvokeDynamic where
 --   devolve (MethodId n d) =
 --     MethodId <$> unlink n <*> unlink d
 
-instance Referenceable r => Staged (InClass r) where
-  evolve (InClass cn cid) =
-    InClass <$> link cn <*> link cid
-  devolve (InClass cn cid) =
-    InClass <$> unlink cn <*> unlink cid
+-- instance Referenceable r => Staged (InClass r) where
+--   evolve (InClass cn cid) =
+--     InClass <$> link cn <*> link cid
+--   devolve (InClass cn cid) =
+--     InClass <$> unlink cn <*> unlink cid
+
+-- instance Referenceable r => Staged (InRefType r) where
+--   evolve (InRefType cn cid) =
+--     InRefType <$> link cn <*> link cid
+--   devolve (InRefType cn cid) =
+--     InRefType <$> unlink cn <*> unlink cid
 
 instance Staged MethodHandle where
   evolve m =

@@ -416,12 +416,12 @@ data ArrayType
   deriving (Show, Eq, Ord, Generic, NFData)
 
 data Invocation r
-  = InvkSpecial !(DeepRef AbsVariableMethodId r)
+  = InvkSpecial !(Ref AbsVariableMethodId r)
   -- ^ Variable since 52.0
-  | InvkVirtual !(DeepRef AbsMethodId r)
-  | InvkStatic !(DeepRef AbsVariableMethodId r)
+  | InvkVirtual !(Ref (InRefType MethodId) r)
+  | InvkStatic !(Ref AbsVariableMethodId r)
   -- ^ Variable since 52.0
-  | InvkInterface !Word8 !(DeepRef AbsInterfaceMethodId r)
+  | InvkInterface !Word8 !(Ref AbsInterfaceMethodId r)
   -- ^ Should be a positive number
   | InvkDynamic !(DeepRef InvokeDynamic r)
 
@@ -622,8 +622,8 @@ data ByteCodeOpr r
   | LookupSwitch !(LongRelativeRef r) (V.Vector (Int32, (LongRelativeRef r)))
   -- ^ a lookup switch has a `default` value and a list of pairs.
 
-  | Get !FieldAccess !(DeepRef (InClass FieldId) r)
-  | Put !FieldAccess !(DeepRef (InClass FieldId) r)
+  | Get !FieldAccess !(Ref AbsFieldId r)
+  | Put !FieldAccess !(Ref AbsFieldId r)
 
   | Invoke !(Invocation r)
 
