@@ -152,7 +152,7 @@ instance Arbitrary OneOrTwo where
   arbitrary = genericArbitraryU
 
 instance Arbitrary NewArrayType where
-  arbitrary = genericArbitraryU
+  arbitrary = genericArbitraryU `suchThat` (\(NewArrayType i _) -> i > 0)
 
 instance Arbitrary SmallArithmeticType where
   arbitrary = genericArbitraryU
