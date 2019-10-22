@@ -164,7 +164,7 @@ serializeClassName =
 
 instance TextSerializable ClassName where
   parseText = parseClassName
-  serialize = serializeClassName
+  toBuilder = serializeClassName
 
 -- | A 'JRefType' is a Class or an Array.
 data JRefType
@@ -193,7 +193,7 @@ serializeJRefType = \case
 
 instance TextSerializable JRefType where
   parseText = parseJRefType
-  serialize = serializeJRefType
+  toBuilder = serializeJRefType
 
 -- | Parses a 'JRefType' but does not require an 'L' infront of
 -- the class name, and ';'
@@ -263,7 +263,7 @@ serializeJBaseType =
 
 instance TextSerializable JBaseType where
   parseText = parseJBaseType
-  serialize = serializeJBaseType
+  toBuilder = serializeJBaseType
 
 
 -- | A 'JType' is either a simple type or a Reftype
@@ -287,7 +287,7 @@ serializeJType = \case
 
 instance TextSerializable JType where
   parseText = parseJType
-  serialize = serializeJType
+  toBuilder = serializeJType
 
 -- | jTypes also have different sizes.
 jTypeSize :: JType -> Int
@@ -320,7 +320,7 @@ serializeReturnDescriptor =
   . asMaybeJType
 
 instance TextSerializable ReturnDescriptor where
-  serialize = serializeReturnDescriptor
+  toBuilder = serializeReturnDescriptor
   parseText = parseReturnDescriptor
 
 -- | Method Descriptor
@@ -344,7 +344,7 @@ serializeMethodDescriptor (MethodDescriptor args rt) =
   <> serializeReturnDescriptor rt
 
 instance TextSerializable MethodDescriptor where
-  serialize = serializeMethodDescriptor
+  toBuilder = serializeMethodDescriptor
   parseText = parseMethodDescriptor
 
 -- | Field Descriptor
@@ -366,7 +366,7 @@ serializeFieldDescriptor =
 
 instance TextSerializable FieldDescriptor where
   parseText = parseFieldDescriptor
-  serialize = serializeFieldDescriptor
+  toBuilder = serializeFieldDescriptor
 
 -- | A name and a type
 data NameAndType a = NameAndType !Text.Text !a
@@ -418,7 +418,7 @@ serializeFieldId = serializeNameAndType serializeFieldDescriptor . fieldIdAsName
 
 instance TextSerializable FieldId where
   parseText = parseFieldId
-  serialize = serializeFieldId
+  toBuilder = serializeFieldId
 
 instance WithName FieldDescriptor where
   type WithNameId FieldDescriptor = FieldId
@@ -442,7 +442,7 @@ serializeMethodId = serializeNameAndType serializeMethodDescriptor . methodIdAsN
 
 instance TextSerializable MethodId where
   parseText = parseMethodId
-  serialize = serializeMethodId
+  toBuilder = serializeMethodId
 
 instance WithName MethodDescriptor where
   type WithNameId MethodDescriptor = MethodId
@@ -499,7 +499,7 @@ serializeAbsFieldId = serializeInClass serializeFieldId . absFieldAsInClass
 
 instance TextSerializable AbsFieldId where
   parseText = parseAbsFieldId
-  serialize = serializeAbsFieldId
+  toBuilder = serializeAbsFieldId
 
 -- | A MethodId
 newtype AbsMethodId =
@@ -514,7 +514,7 @@ serializeAbsMethodId = serializeInClass serializeMethodId . absMethodAsInClass
 
 instance TextSerializable AbsMethodId where
   parseText = parseAbsMethodId
-  serialize = serializeAbsMethodId
+  toBuilder = serializeAbsMethodId
 
 deriveFromTextSerializable ''ClassName
 deriveFromTextSerializable ''JType

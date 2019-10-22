@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Language.JVM.TypeSpec where
 
 import SpecHelper
@@ -25,6 +26,20 @@ spec = do
         Right (MethodDescriptor [JTBase JTByte, JTBase JTBoolean] "B")
     it "does not parse if there is too much" $
       (deserialize "(BZ)Bx" :: Either String MethodDescriptor) `shouldSatisfy` isLeft
+
+  describe "serializes" $ do
+    it "JType" . property $ \(t :: JType) ->
+      deserialize (serialize t) === Right t
+    it "MethodDescriptor" . property $ \(t :: MethodDescriptor) ->
+      deserialize (serialize t) === Right t
+    it "FieldDescriptor" . property $ \(t :: FieldDescriptor) ->
+      deserialize (serialize t) === Right t
+    it "Flat JRefType" . property $ \(t :: JRefType) ->
+      deserializeWith parseFlatJRefType (serializeWith serializeFlatJRefType t) === Right t
+    it "AbsMethodId" . property $ \(t :: AbsMethodId) ->
+      deserialize (serialize t) === Right t
+    it "AbsFieldId" . property $ \(t :: AbsFieldId) ->
+      deserialize (serialize t) === Right t
 
 instance Arbitrary ClassName where
   arbitrary = pure $ "package/Main"

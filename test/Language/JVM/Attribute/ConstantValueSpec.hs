@@ -14,7 +14,7 @@ import Language.JVM.Attribute.ConstantValue
 spec :: Spec
 spec = do
   it "can do a roundtrip on a VClass" $
-    prop_roundtrip_ConstantValue (ConstantValue (VClass "this/class"))
+    prop_roundtrip_ConstantValue (ConstantValue (VClass "Lthis/class;"))
   it "can do a roundtrip" $ property $ prop_roundtrip_ConstantValue
 
 prop_roundtrip_ConstantValue :: ConstantValue High -> Property

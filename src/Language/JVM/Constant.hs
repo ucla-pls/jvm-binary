@@ -279,7 +279,7 @@ instance TextSerializable a => Referenceable (NameAndType a) where
   fromConst e c = expected "CNameAndType" e c
 
   toConst (NameAndType rn md) =
-    return $ CNameAndType rn (toText md)
+    return $ CNameAndType rn (serialize md)
 
 -- TODO: Find good encoding of string.
 instance Referenceable Text.Text where
@@ -328,22 +328,22 @@ instance Referenceable JRefType where
     a ->
       err $ wrongType "ClassRef" a
   toConst =
-    return . CClassRef . toTextWith serializeFlatJRefType
+    return . CClassRef . serializeWith serializeFlatJRefType
 
 instance Referenceable ReturnDescriptor where
   fromConst err =
     fromConst err >=> either err return . deserialize
-  toConst = toConst . toText
+  toConst = toConst . serialize
 
 instance Referenceable MethodDescriptor where
   fromConst err =
     fromConst err >=> either err pure . deserialize
-  toConst = toConst . toText
+  toConst = toConst . serialize
 
 instance Referenceable FieldDescriptor where
   fromConst err =
     fromConst err >=> either err pure . deserialize
-  toConst = toConst . toText
+  toConst = toConst . serialize
 
 instance Referenceable MethodId where
   fromConst err x = MethodId <$> fromConst err x
@@ -478,7 +478,7 @@ data JValue
   | VFloat VFloat
   | VDouble VDouble
   | VString VString
-  | VClass ClassName
+  | VClass JRefType
   | VMethodType MethodDescriptor
   | VMethodHandle (MethodHandle High)
   deriving (Show, Eq, Generic, NFData)
@@ -491,9 +491,9 @@ instance Referenceable JValue where
     CLong l         -> return $ VLong l
     CDouble d       -> return $ VDouble d
     CClassRef r     ->
-      case textCls r of
-        Right cn -> return $ VClass cn
-        Left msg -> err $ "Could not parse class name " <> Text.unpack r <> ": " <> msg
+      case deserializeWith parseFlatJRefType r of
+        Right rt -> return $ VClass rt
+        Left msg -> err $ "Could not parse reftype " <> Text.unpack r <> ": " <> msg
     CMethodHandle m -> return $ VMethodHandle m
     CMethodType t   -> return $ VMethodType t
     x               -> expected "Value" err x
@@ -505,7 +505,7 @@ instance Referenceable JValue where
     VFloat f             -> CFloat f
     VLong l              -> CLong l
     VDouble d            -> CDouble d
-    VClass (classNameAsText -> r) -> CClassRef r
+    VClass (serializeWith serializeFlatJRefType -> r) -> CClassRef r
     VMethodHandle m      -> CMethodHandle m
     VMethodType t        -> CMethodType t
   {-# INLINE toConst #-}

@@ -34,33 +34,35 @@ class TextSerializable a where
   parseText :: Parser a
 
   -- | A `TypeParse` should be printable
-  serialize :: a -> Builder
+  toBuilder :: a -> Builder
 
--- | Parse a type from text
-deserialize :: TextSerializable a => Text.Text -> Either String a
-deserialize = deserializeWith parseText
+  -- | Parse a type from text
+  deserialize :: Text.Text -> Either String a
+  deserialize = deserializeWith parseText
+
+  -- | Print a type from text
+  serialize :: a -> Text.Text
+  serialize = serializeWith toBuilder
 
 -- | Parse a type from text
 deserializeWith :: Parser a -> Text.Text -> Either String a
 deserializeWith p = parseOnly (p <* endOfInput)
 
 -- | Print a type from text
-toText :: TextSerializable a => a -> Text.Text
-toText = toTextWith serialize
-
--- | Print a type from text
-toTextWith :: (a -> Builder) -> a -> Text.Text
-toTextWith serializer = Lazy.toStrict . Builder.toLazyText . serializer
+serializeWith :: (a -> Builder) -> a -> Text.Text
+serializeWith serializer = Lazy.toStrict . Builder.toLazyText . serializer
 
 showViaTextSerializable :: TextSerializable a => a -> String
-showViaTextSerializable = show . toText
+showViaTextSerializable = show . serialize
 {-# INLINE showViaTextSerializable #-}
 
 fromStringViaTextSerializable :: TextSerializable a => String -> a
 fromStringViaTextSerializable a =
   case deserialize (Text.pack a) of
     Right a' -> a'
-    Left msg -> error $ "Could not parse: " <> msg
+    Left msg -> error $
+      "While parsing a fromString instance we got this error message: " <> msg
+      <> "Maybe the string " <> show a <> " is wrongly formatted."
 
 {-# INLINE fromStringViaTextSerializable #-}
 

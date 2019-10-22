@@ -103,7 +103,7 @@ instance Staged Method where
   evolve (Method mf mn md mattr) = label "Method" $ do
     mn' <- link mn
     md' <- link md
-    label (Text.unpack.toText $ MethodId (NameAndType mn' md')) $ do
+    label (Text.unpack.serialize $ mn' <:> md') $ do
       mattr' <- fmap (`appEndo` emptyMethodAttributes) . fromAttributes MethodAttribute mattr
         $ collect
           [ Attr (\e a -> a { maCode = e : maCode a })
