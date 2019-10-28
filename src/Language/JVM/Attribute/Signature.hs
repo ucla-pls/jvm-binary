@@ -21,7 +21,6 @@ module Language.JVM.Attribute.Signature
   , signatureFromText
 
   -- * Top Level Definitions
-
   , ClassSignature (..)
   , classSignatureToText
   , classSignatureFromText
@@ -42,6 +41,7 @@ module Language.JVM.Attribute.Signature
   , ReferenceType (..)
   , referenceTypeP
   , referenceTypeT
+
   , ThrowsSignature (..)
   , throwsSignatureP
   , throwsSignatureT
@@ -56,6 +56,8 @@ module Language.JVM.Attribute.Signature
   , typeParametersT
   , typeParametersP
   , TypeSignature (..)
+  , typeSignatureP
+  , typeSignatureT
   , TypeVariable (..)
   , typeVariableP
   , Wildcard (..)

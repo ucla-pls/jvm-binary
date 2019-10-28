@@ -177,4 +177,3 @@ instance Arbitrary (CConstant High) where
 
 instance Arbitrary (SwitchTable High) where
   arbitrary = genericArbitraryU
-
