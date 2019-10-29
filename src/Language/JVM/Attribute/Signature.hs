@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE LambdaCase     #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
@@ -23,24 +24,43 @@ module Language.JVM.Attribute.Signature
 
   -- * Top Level Definitions
   , ClassSignature (..)
-  , MethodSignature (..)
-  , FieldSignature (..)
-
-  -- ** Handlers
+  , isSimpleClassSignature
   , classSignatureToText
   , classSignatureFromText
+
+  , MethodSignature (..)
+  , isSimpleMethodSignature
   , methodSignatureToText
   , methodSignatureFromText
+
+  , FieldSignature (..)
+  , isSimpleFieldSignature
   , fieldSignatureToText
   , fieldSignatureFromText
 
+  -- ** Handlers
+
+
   -- * Lower Level Definitions
   , ClassType (..)
+  , isSimpleClassType
+  , classTypeToName
+  , classTypeFromName
+
   , ReferenceType (..)
+  , isSimpleReferenceType
+  , referenceTypeFromRefType
+
   , ThrowsSignature (..)
+  , isSimpleThrowsSignature
+  , throwsSignatureFromName
+
+  , TypeSignature (..)
+  , isSimpleTypeSignature
+  , typeSignatureFromType
+
   , TypeArgument (..)
   , TypeParameter (..)
-  , TypeSignature (..)
   , TypeVariable (..)
   , Wildcard (..)
 
@@ -162,6 +182,84 @@ data TypeParameter =
   }
   deriving (Show, Eq, Ord, Generic, NFData)
 
+data ThrowsSignature
+  = ThrowsClass ClassType
+  | ThrowsTypeVariable TypeVariable
+  deriving (Show, Eq, Ord, Generic, NFData)
+
+-- Conversion
+
+classTypeToName :: ClassType -> ClassName
+classTypeToName =
+  (either error id . textCls . Text.intercalate "$" . reverse . getClassName)
+  where
+    getClassName = \case
+      InnerClassType {..} ->
+        ctsInnerClassName : getClassName ctsOuterClassType
+      ClassType {..} ->
+        [ classNameAsText ctsClassName ]
+
+classTypeFromName :: ClassName -> ClassType
+classTypeFromName cn =
+  -- Note the language is wierd here! Main.A is not Main$A, but Main<T>.A is!
+  ClassType cn []
+
+throwsSignatureFromName :: ClassName -> ThrowsSignature
+throwsSignatureFromName cn =
+  ThrowsClass (classTypeFromName cn)
+
+referenceTypeFromRefType :: JRefType -> ReferenceType
+referenceTypeFromRefType = \case
+  JTArray a -> RefArrayType (typeSignatureFromType a)
+  JTClass a -> RefClassType (classTypeFromName a)
+
+typeSignatureFromType :: JType -> TypeSignature
+typeSignatureFromType = \case
+  JTBase a -> BaseType a
+  JTRef a  -> ReferenceType (referenceTypeFromRefType a)
+
+isSimpleMethodSignature :: MethodSignature -> Bool
+isSimpleMethodSignature MethodSignature {..} = and
+  [ null msTypeParameters
+  , all isSimpleTypeSignature msArguments
+  , all isSimpleTypeSignature msResults
+  , all isSimpleThrowsSignature msThrows
+  ]
+
+isSimpleClassSignature :: ClassSignature -> Bool
+isSimpleClassSignature ClassSignature {..} = and
+  [ null csTypeParameters
+  , isSimpleClassType csSuperclassSignature
+  , all isSimpleClassType csInterfaceSignatures
+  ]
+
+isSimpleFieldSignature :: FieldSignature -> Bool
+isSimpleFieldSignature FieldSignature {..} =
+  isSimpleReferenceType fsRefType
+
+isSimpleTypeSignature :: TypeSignature -> Bool
+isSimpleTypeSignature = \case
+  BaseType _ -> True
+  ReferenceType a -> isSimpleReferenceType a
+
+isSimpleReferenceType :: ReferenceType -> Bool
+isSimpleReferenceType = \case
+  RefArrayType a -> isSimpleTypeSignature a
+  RefClassType a -> isSimpleClassType a
+  RefTypeVariable _ -> False
+
+isSimpleClassType :: ClassType -> Bool
+isSimpleClassType = \case
+  ClassType _ [] -> True
+  _ -> False
+
+isSimpleThrowsSignature :: ThrowsSignature -> Bool
+isSimpleThrowsSignature = \case
+  ThrowsClass a -> isSimpleClassType a
+  ThrowsTypeVariable _ -> False
+
+
+
 instance TextSerializable ClassSignature where
   parseText = classSignatureP
   toBuilder = classSignatureT
@@ -197,6 +295,10 @@ instance TextSerializable TypeVariable where
 instance TextSerializable TypeParameter where
   parseText = typeParameterP
   toBuilder = typeParameterT
+
+instance TextSerializable ThrowsSignature where
+  parseText = throwsSignatureP
+  toBuilder = throwsSignatureT
 
 ----------------------
 -- Parsing
@@ -394,10 +496,6 @@ methodSignatureT (MethodSignature tp args res thrws)= do
     <> (case res of Nothing -> singleton 'V'; Just r -> typeSignatureT r)
     <> foldMap throwsSignatureT thrws
 
-data ThrowsSignature
-  = ThrowsClass ClassType
-  | ThrowsTypeVariable TypeVariable
-  deriving (Show, Eq, Ord, Generic, NFData)
 
 throwsSignatureP :: Parser ThrowsSignature
 throwsSignatureP = do
