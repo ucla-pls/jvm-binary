@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE LambdaCase     #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE OverloadedStrings  #-}
@@ -22,45 +23,50 @@ module Language.JVM.Attribute.Signature
 
   -- * Top Level Definitions
   , ClassSignature (..)
+  , MethodSignature (..)
+  , FieldSignature (..)
+
+  -- ** Handlers
   , classSignatureToText
   , classSignatureFromText
-  , classSignatureP
-  , MethodSignature (..)
   , methodSignatureToText
   , methodSignatureFromText
-  , methodSignatureP
-  , FieldSignature (..)
   , fieldSignatureToText
   , fieldSignatureFromText
-  , fieldSignatureP
 
   -- * Lower Level Definitions
   , ClassType (..)
+  , ReferenceType (..)
+  , ThrowsSignature (..)
+  , TypeArgument (..)
+  , TypeParameter (..)
+  , TypeSignature (..)
+  , TypeVariable (..)
+  , Wildcard (..)
+
+  -- * Parsers
+  , classSignatureP
+  , methodSignatureP
+  , fieldSignatureP
+
   , classTypeP
   , classTypeT
-  , ReferenceType (..)
   , referenceTypeP
   , referenceTypeT
 
-  , ThrowsSignature (..)
   , throwsSignatureP
   , throwsSignatureT
-  , TypeArgument (..)
   , typeArgumentsT
   , typeArgumentsP
   , typeArgumentP
   , typeArgumentT
-  , TypeParameter (..)
   , typeParameterP
   , typeParameterT
   , typeParametersT
   , typeParametersP
-  , TypeSignature (..)
   , typeSignatureP
   , typeSignatureT
-  , TypeVariable (..)
   , typeVariableP
-  , Wildcard (..)
   ) where
 
 import           Control.DeepSeq             (NFData)
@@ -81,7 +87,6 @@ import           Language.JVM.Attribute.Base
 import           Language.JVM.Staged
 import           Language.JVM.Type
 
-
 instance IsAttribute (Signature Low) where
   attrName = Const "Signature"
 
@@ -99,7 +104,7 @@ data ClassSignature = ClassSignature
   , csSuperclassSignature :: ClassType
   , csInterfaceSignatures :: [ClassType]
   }
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data MethodSignature = MethodSignature
   { msTypeParameters :: [TypeParameter]
@@ -107,23 +112,22 @@ data MethodSignature = MethodSignature
   , msResults        :: Maybe TypeSignature
   , msThrows         :: [ ThrowsSignature ]
   }
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 newtype FieldSignature =
   FieldSignature {fsRefType :: ReferenceType}
-  deriving (Show, Eq, Generic, NFData)
-
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data TypeSignature
   = ReferenceType ReferenceType
   | BaseType JBaseType
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data ReferenceType
   = RefClassType ClassType
   | RefTypeVariable TypeVariable
   | RefArrayType TypeSignature
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data ClassType
   = ClassType
@@ -135,20 +139,20 @@ data ClassType
     , ctsOuterClassType :: ClassType
     , ctsTypeArguments  :: [Maybe TypeArgument]
     }
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data TypeArgument = TypeArgument
   { taWildcard :: Maybe Wildcard
   , taType     :: ReferenceType
-  } deriving (Show, Eq, Generic, NFData)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data Wildcard =
   WildPlus | WildMinus
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 newtype TypeVariable =
   TypeVariable { tvAsText :: Text.Text }
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data TypeParameter =
   TypeParameter
@@ -156,8 +160,43 @@ data TypeParameter =
   , tpClassBound     :: Maybe ReferenceType
   , tpInterfaceBound :: [ReferenceType]
   }
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
+instance TextSerializable ClassSignature where
+  parseText = classSignatureP
+  toBuilder = classSignatureT
+
+instance TextSerializable MethodSignature where
+  parseText = methodSignatureP
+  toBuilder = methodSignatureT
+
+instance TextSerializable FieldSignature where
+  parseText = fieldSignatureP
+  toBuilder = fieldSignatureT
+
+instance TextSerializable TypeSignature where
+  parseText = typeSignatureP
+  toBuilder = typeSignatureT
+
+instance TextSerializable ReferenceType where
+  parseText = referenceTypeP
+  toBuilder = referenceTypeT
+
+instance TextSerializable ClassType where
+  parseText = classTypeP
+  toBuilder = classTypeT
+
+instance TextSerializable Wildcard where
+  parseText = wildcardP
+  toBuilder = wildcardT
+
+instance TextSerializable TypeVariable where
+  parseText = typeVariableP
+  toBuilder = typeVariableT
+
+instance TextSerializable TypeParameter where
+  parseText = typeParameterP
+  toBuilder = typeParameterT
 
 ----------------------
 -- Parsing
@@ -264,13 +303,18 @@ typeArgumentT a = do
     Nothing -> singleton '*'
     Just (TypeArgument w rt) ->
       (case w of
-        Just WildMinus -> singleton '-'
-        Just WildPlus  -> singleton '+'
-        Nothing        -> mempty) <> referenceTypeT rt
+        Just m -> wildcardT m
+        Nothing        -> mempty
+      ) <> referenceTypeT rt
 
 
 wildcardP :: Parser Wildcard
 wildcardP = choice [ char '+' $> WildPlus, char '-' $> WildMinus]
+
+wildcardT :: Wildcard -> Builder
+wildcardT = \case
+  WildPlus  -> singleton '+'
+  WildMinus -> singleton '-'
 
 
 typeVariableP :: Parser TypeVariable
@@ -353,7 +397,7 @@ methodSignatureT (MethodSignature tp args res thrws)= do
 data ThrowsSignature
   = ThrowsClass ClassType
   | ThrowsTypeVariable TypeVariable
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 throwsSignatureP :: Parser ThrowsSignature
 throwsSignatureP = do
@@ -375,6 +419,10 @@ fieldSignatureP =
 fieldSignatureToText :: FieldSignature -> Text.Text
 fieldSignatureToText =
   LText.toStrict . toLazyText . referenceTypeT . fsRefType
+
+fieldSignatureT :: FieldSignature -> Builder
+fieldSignatureT =
+  referenceTypeT . fsRefType
 
 instance Staged Signature where
   evolve (Signature a) =
