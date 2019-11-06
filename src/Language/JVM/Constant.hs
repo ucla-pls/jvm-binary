@@ -371,15 +371,6 @@ instance Referenceable (InRefType MethodId) where
   toConst s =
     return $ CMethodRef s
 
--- instance Referenceable (InRefType FieldId) where
---   fromConst err = \case
---     CFieldRef s ->
---       return $ s
---     c -> expected "CFieldRef" err c
-
---   toConst s =
---     return $ CFieldRef s
-
 instance Referenceable AbsVariableMethodId where
   fromConst err = \case
     CMethodRef s ->
