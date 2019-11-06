@@ -123,7 +123,7 @@ data MethodHandle r
 
 data MethodHandleField r = MethodHandleField
   { methodHandleFieldKind :: !MethodHandleFieldKind
-  , methodHandleFieldRef  :: !(Ref (InRefType MethodId) r)
+  , methodHandleFieldRef  :: !(Ref (InRefType FieldId) r)
   }
 
 data MethodHandleFieldKind
