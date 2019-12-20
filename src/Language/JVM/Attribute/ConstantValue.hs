@@ -14,8 +14,9 @@ Based on the ConstantValue, as documented [here](http://docs.oracle.com/javase/s
 -}
 
 module Language.JVM.Attribute.ConstantValue
-  ( ConstantValue (..)
-  ) where
+  ( ConstantValue(..)
+  )
+where
 
 import           Language.JVM.Attribute.Base
 import           Language.JVM.Constant
@@ -25,16 +26,13 @@ import           Language.JVM.Staged
 instance IsAttribute (ConstantValue Low) where
   attrName = Const "ConstantValue"
 
-
 -- | A constant value is just a index into the constant pool.
-data ConstantValue r = ConstantValue
-  { constantValue :: !(Ref JValue r)
+newtype ConstantValue r = ConstantValue
+  { constantValue :: Ref JValue r
   }
 
 instance Staged ConstantValue where
-  evolve (ConstantValue r) =
-    ConstantValue <$> link r
-  devolve (ConstantValue r) =
-    ConstantValue <$> unlink r
+  evolve (ConstantValue r) = ConstantValue <$> link r
+  devolve (ConstantValue r) = ConstantValue <$> unlink r
 
 $(deriveBaseWithBinary ''ConstantValue)
