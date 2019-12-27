@@ -5,6 +5,8 @@
 - Added new instruction NewArray to correctly model array behaviour
 - Massive rewrite of AbsMethodId and friends to make them easier to 
   work with
+- Changed ClassType in Signature to contain the inner classes in 
+  the correct order.
 
 ## Version 0.8.1
 - Made all tests work with nix
