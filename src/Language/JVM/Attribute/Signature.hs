@@ -44,6 +44,7 @@ module Language.JVM.Attribute.Signature
   , isSimpleClassType
   , classTypeToName
   , classTypeFromName
+  , InnerClassType(..)
   , ReferenceType(..)
   , isSimpleReferenceType
   , referenceTypeFromRefType
@@ -144,9 +145,17 @@ data ReferenceType
 
 data ClassType
   = ClassType
-    { ctsName          :: !Text.Text
-    , ctsInnerClass    :: !(Maybe ClassType)
+    { ctsName          :: !ClassName
+    , ctsInnerClass    :: !(Maybe InnerClassType)
     , ctsTypeArguments :: [Maybe TypeArgument]
+    }
+  deriving (Show, Eq, Ord, Generic, NFData)
+
+data InnerClassType
+  = InnerClassType
+    { ictsName          :: !Text.Text
+    , ictsInnerClass    :: !(Maybe InnerClassType)
+    , ictsTypeArguments :: [Maybe TypeArgument]
     }
   deriving (Show, Eq, Ord, Generic, NFData)
 
@@ -182,14 +191,17 @@ classTypeToName :: ClassType -> ClassName
 classTypeToName =
   (either error id . textCls . Text.intercalate "$" . getClassName)
  where
-  getClassName (ClassType {..}) = ctsName : case ctsInnerClass of
-    Just ic -> getClassName ic
-    Nothing -> []
+  getClassName (ClassType {..}) =
+    classNameAsText ctsName : getInnerClassName ctsInnerClass
+
+  getInnerClassName = \case
+    Just (InnerClassType {..}) -> ictsName : getInnerClassName ictsInnerClass
+    Nothing                    -> []
 
 -- | Create a classType from a Name
 -- Note the language is wierd here! Main.A is not Main$A, but Main<T>.A is!
 classTypeFromName :: ClassName -> ClassType
-classTypeFromName cn = ClassType (classNameAsText cn) Nothing []
+classTypeFromName cn = ClassType cn Nothing []
 
 throwsSignatureFromName :: ClassName -> ThrowsSignature
 throwsSignatureFromName cn = ThrowsClass (classTypeFromName cn)
@@ -345,18 +357,21 @@ classTypeP = nameit "ClassType" $ do
     return (i, ta')
   _ <- char ';'
   return $ ClassType
-    (classNameAsText cn)
-    (L.foldr (\(i, ta') a -> Just $ ClassType i a ta') Nothing ict)
+    cn
+    (L.foldr (\(i, ta') a -> Just $ InnerClassType i a ta') Nothing ict)
     ta
 
 classTypeT :: ClassType -> Builder
 classTypeT (ClassType n ic arg) =
-  singleton 'L' <> Text.fromText n <> typeArgumentsT arg <> go ic <> singleton
-    ';'
+  singleton 'L'
+    <> Text.fromText (classNameAsText n)
+    <> typeArgumentsT arg
+    <> go ic
+    <> singleton ';'
  where
   go = \case
     Nothing -> mempty
-    Just (ClassType n' ic' arg') ->
+    Just (InnerClassType n' ic' arg') ->
       singleton '.' <> Text.fromText n' <> typeArgumentsT arg' <> go ic'
 
 

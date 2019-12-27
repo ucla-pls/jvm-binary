@@ -198,14 +198,23 @@ instance Arbitrary (ClassType) where
     s <- getSize
     n <- choose (0, s)
     x <- vectorOf n (resize (s `div` n) arbitrary)
-    ClassType
-      <$> elements ["a", "subclass"]
-      <*> sized
-            (\case
-              0 -> pure $ Nothing
-              _ -> Just <$> scale (`div` 2) arbitrary
-            )
-      <*> pure x
+    ClassType <$> arbitrary <*> genInnerClassType <*> pure x
+
+   where
+    genInnerClassType = sized
+      (\case
+        0 -> pure $ Nothing
+        _ -> do
+          s <- getSize
+          n <- choose (0, s)
+          x <- vectorOf n (resize (s `div` n) arbitrary)
+          fmap Just
+            .   scale (`div` 2)
+            $   InnerClassType
+            <$> elements ["a", "subclass"]
+            <*> genInnerClassType
+            <*> pure x
+      )
 
 
 instance Arbitrary (TypeVariable) where
