@@ -1,6 +1,6 @@
 # Change log
 
-## Version 0.X.X
+## Version 0.9.0
 - Changed attributeError to evolveError
 - Added new instruction NewArray to correctly model array behaviour
 - Massive rewrite of AbsMethodId and friends to make them easier to 

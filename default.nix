@@ -6,7 +6,7 @@
 }:
 mkDerivation {
   pname = "jvm-binary";
-  version = "0.8.1";
+  version = "0.9.0";
   src = ./.;
   libraryHaskellDepends = [
     attoparsec base binary bytestring containers data-binary-ieee754
@@ -25,7 +25,7 @@ mkDerivation {
     data-binary-ieee754 deepseq deriving-compat mtl template-haskell
     text vector
   ];
-  preConfigure = "hpack";
+  prePatch = "hpack";
   homepage = "https://github.com/ucla-pls/jvm-binary#readme";
   description = "A library for reading Java class-files";
   license = stdenv.lib.licenses.mit;
