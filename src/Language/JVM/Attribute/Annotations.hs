@@ -16,32 +16,26 @@ Based on the Annotations Attribute, as documented
 [here](https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.16).
 -}
 module Language.JVM.Attribute.Annotations
-  ( RuntimeVisibleAnnotations (..)
-  , RuntimeInvisibleAnnotations (..)
-  , RuntimeVisibleParameterAnnotations (..)
-  , RuntimeInvisibleParameterAnnotations (..)
-
-  , Annotation (..)
-  , ElementValue (..)
-  , EnumValue (..)
-  , ValuePair (..)
+  ( RuntimeVisibleAnnotations(..)
+  , RuntimeInvisibleAnnotations(..)
+  , RuntimeVisibleParameterAnnotations(..)
+  , RuntimeInvisibleParameterAnnotations(..)
+  , Annotation(..)
+  , ElementValue(..)
+  , EnumValue(..)
+  , ValuePair(..)
 
   -- * TypeAnnotations
-
-  , TypeAnnotation (..)
-
+  , TypeAnnotation(..)
   , TypePath
-  , TypePathItem (..)
-  , TypePathKind (..)
-
-  , RuntimeVisibleTypeAnnotations (..)
-  , RuntimeInvisibleTypeAnnotations (..)
-
-  , ClassTypeAnnotation (..)
-  , MethodTypeAnnotation (..)
-  , FieldTypeAnnotation (..)
-  , CodeTypeAnnotation (..)
-
+  , TypePathItem(..)
+  , TypePathKind(..)
+  , RuntimeVisibleTypeAnnotations(..)
+  , RuntimeInvisibleTypeAnnotations(..)
+  , ClassTypeAnnotation(..)
+  , MethodTypeAnnotation(..)
+  , FieldTypeAnnotation(..)
+  , CodeTypeAnnotation(..)
   , TypeParameterTarget
   , SupertypeTarget
   , isInExtendsClause
@@ -49,30 +43,31 @@ module Language.JVM.Attribute.Annotations
   , FormalParameterTarget
   , ThrowsTarget
   , LocalvarTarget
-  , LocalvarEntry (..)
+  , LocalvarEntry(..)
   , CatchTarget
   , OffsetTarget
-  , TypeArgumentTarget (..)
+  , TypeArgumentTarget(..)
 
   -- * AnnotationDefault
-  , AnnotationDefault (..)
-  ) where
+  , AnnotationDefault(..)
+  )
+where
 
 -- base
-import Data.Char
-import Numeric
-import GHC.Generics
-import Unsafe.Coerce
+import           Data.Char
+import           Numeric
+import           GHC.Generics
+import           Unsafe.Coerce
 
 -- text
-import qualified Data.Text as Text
+import qualified Data.Text                     as Text
 
 -- nfdata
-import Control.DeepSeq
+import           Control.DeepSeq
 
 -- binary
-import Data.Binary
-import qualified Data.Binary.Get as Get
+import           Data.Binary
+import qualified Data.Binary.Get               as Get
 
 -- jvm-binary
 import           Language.JVM.Attribute.Base
@@ -93,8 +88,7 @@ instance IsAttribute (RuntimeVisibleAnnotations Low) where
 
 instance Staged RuntimeVisibleAnnotations where
   stage f (RuntimeVisibleAnnotations m) =
-    label "RuntimeVisibleAnnotations"
-    $ RuntimeVisibleAnnotations <$> mapM f m
+    label "RuntimeVisibleAnnotations" $ RuntimeVisibleAnnotations <$> mapM f m
 
 newtype RuntimeInvisibleAnnotations r = RuntimeInvisibleAnnotations
   { asListOfRuntimeInvisibleAnnotations :: SizedList16 (Annotation r)
@@ -106,7 +100,8 @@ instance IsAttribute (RuntimeInvisibleAnnotations Low) where
 instance Staged RuntimeInvisibleAnnotations where
   stage f (RuntimeInvisibleAnnotations m) =
     label "RuntimeInvisibleAnnotations"
-    $ RuntimeInvisibleAnnotations <$> mapM f m
+      $   RuntimeInvisibleAnnotations
+      <$> mapM f m
 
 newtype RuntimeVisibleParameterAnnotations r =
   RuntimeVisibleParameterAnnotations
@@ -121,7 +116,8 @@ instance IsAttribute (RuntimeVisibleParameterAnnotations Low) where
 instance Staged RuntimeVisibleParameterAnnotations where
   stage f (RuntimeVisibleParameterAnnotations m) =
     label "RuntimeVisibleParameterAnnotations"
-    $ RuntimeVisibleParameterAnnotations <$> mapM (mapM f) m
+      $   RuntimeVisibleParameterAnnotations
+      <$> mapM (mapM f) m
 
 newtype RuntimeInvisibleParameterAnnotations r =
   RuntimeInvisibleParameterAnnotations
@@ -136,16 +132,17 @@ instance IsAttribute (RuntimeInvisibleParameterAnnotations Low) where
 instance Staged RuntimeInvisibleParameterAnnotations where
   stage f (RuntimeInvisibleParameterAnnotations m) =
     label "RuntimeInvisibleParameterAnnotations"
-    $ RuntimeInvisibleParameterAnnotations <$> mapM (mapM f) m
+      $   RuntimeInvisibleParameterAnnotations
+      <$> mapM (mapM f) m
 
 data Annotation r = Annotation
-  { annotationType :: !(Ref Text.Text r)
+  { annotationType :: !(Ref FieldDescriptor r)
   , annotationValuePairs :: !(SizedList16 (ValuePair r))
   }
 
 instance Staged Annotation where
-   evolve (Annotation t b) = Annotation <$> link t <*> mapM evolve b
-   devolve (Annotation t b) = Annotation <$> unlink t <*> mapM devolve b
+  evolve (Annotation t b) = Annotation <$> link t <*> mapM evolve b
+  devolve (Annotation t b) = Annotation <$> unlink t <*> mapM devolve b
 
 data ValuePair r = ValuePair
   { name :: !(Ref Text.Text r)
@@ -153,7 +150,7 @@ data ValuePair r = ValuePair
   }
 
 instance Staged ValuePair where
-  evolve  (ValuePair t b) = ValuePair <$> link t <*> evolve b
+  evolve (ValuePair t b) = ValuePair <$> link t <*> evolve b
   devolve (ValuePair t b) = ValuePair <$> unlink t <*> devolve b
 
 data ElementValue r
@@ -175,34 +172,34 @@ data ElementValue r
 
 instance Staged ElementValue where
   evolve = \case
-    EByte s -> EByte <$> link s
-    EChar s -> EChar <$> link s
-    EDouble s -> EDouble <$> link s
-    EFloat s -> EFloat <$> link s
-    EInt s -> EInt <$> link s
-    ELong s -> ELong <$> link s
-    EShort s -> EShort <$> link s
-    EBoolean s -> EBoolean <$> link s
-    EString s -> EString <$> link s
-    EEnum s -> EEnum <$> evolve s
-    EClass s -> EClass <$> link s
+    EByte           s -> EByte <$> link s
+    EChar           s -> EChar <$> link s
+    EDouble         s -> EDouble <$> link s
+    EFloat          s -> EFloat <$> link s
+    EInt            s -> EInt <$> link s
+    ELong           s -> ELong <$> link s
+    EShort          s -> EShort <$> link s
+    EBoolean        s -> EBoolean <$> link s
+    EString         s -> EString <$> link s
+    EEnum           s -> EEnum <$> evolve s
+    EClass          s -> EClass <$> link s
     EAnnotationType s -> EAnnotationType <$> evolve s
-    EArrayType s -> EArrayType <$> mapM evolve s
+    EArrayType      s -> EArrayType <$> mapM evolve s
 
   devolve = \case
-    EByte s -> EByte <$> unlink s
-    EChar s -> EChar <$> unlink s
-    EDouble s -> EDouble <$> unlink s
-    EFloat s -> EFloat <$> unlink s
-    EInt s -> EInt <$> unlink s
-    ELong s -> ELong <$> unlink s
-    EShort s -> EShort <$> unlink s
-    EEnum s -> EEnum <$> devolve s
-    EBoolean s -> EBoolean <$> unlink s
-    EString s -> EString <$> unlink s
-    EClass s -> EClass <$> unlink s
+    EByte           s -> EByte <$> unlink s
+    EChar           s -> EChar <$> unlink s
+    EDouble         s -> EDouble <$> unlink s
+    EFloat          s -> EFloat <$> unlink s
+    EInt            s -> EInt <$> unlink s
+    ELong           s -> ELong <$> unlink s
+    EShort          s -> EShort <$> unlink s
+    EEnum           s -> EEnum <$> devolve s
+    EBoolean        s -> EBoolean <$> unlink s
+    EString         s -> EString <$> unlink s
+    EClass          s -> EClass <$> unlink s
     EAnnotationType s -> EAnnotationType <$> devolve s
-    EArrayType s -> EArrayType <$> mapM devolve s
+    EArrayType      s -> EArrayType <$> mapM devolve s
 
 instance Binary (ElementValue Low) where
   get = Get.label "ElementValue" $ getChar8 >>= \case
@@ -219,25 +216,23 @@ instance Binary (ElementValue Low) where
     'c' -> EClass <$> get
     '@' -> EAnnotationType <$> get
     '[' -> EArrayType <$> get
-    c -> fail $ "Does not know " ++ show c
-
+    c   -> fail $ "Does not know " ++ show c
     where getChar8 = chr . fromIntegral <$> Get.getWord8
 
   put = \case
-    EByte a -> putChar8 'B' >> put a
-    EChar a -> putChar8 'C' >> put a
-    EDouble a -> putChar8 'D' >> put a
-    EFloat a -> putChar8 'F' >> put a
-    EInt a -> putChar8 'I' >> put a
-    ELong a -> putChar8 'J' >> put a
-    EShort a -> putChar8 'S' >> put a
-    EBoolean a -> putChar8 'Z' >> put a
-    EString a -> putChar8 's' >> put a
-    EEnum a -> putChar8 'e' >> put a
-    EClass a -> putChar8 'c' >> put a
+    EByte           a -> putChar8 'B' >> put a
+    EChar           a -> putChar8 'C' >> put a
+    EDouble         a -> putChar8 'D' >> put a
+    EFloat          a -> putChar8 'F' >> put a
+    EInt            a -> putChar8 'I' >> put a
+    ELong           a -> putChar8 'J' >> put a
+    EShort          a -> putChar8 'S' >> put a
+    EBoolean        a -> putChar8 'Z' >> put a
+    EString         a -> putChar8 's' >> put a
+    EEnum           a -> putChar8 'e' >> put a
+    EClass          a -> putChar8 'c' >> put a
     EAnnotationType a -> putChar8 '@' >> put a
-    EArrayType a -> putChar8 '[' >> put a
-
+    EArrayType      a -> putChar8 '[' >> put a
     where putChar8 = putWord8 . fromIntegral . ord
 
 data EnumValue r = EnumValue
@@ -249,42 +244,52 @@ instance Staged EnumValue where
   evolve (EnumValue n c) = EnumValue <$> link n <*> link c
   devolve (EnumValue n c) = EnumValue <$> unlink n <*> unlink c
 
-
 -- Type Annoations
 
--- | A TypeAnnoation is targeting different types.
+-- | A 'TypeAnnotation' is targeting different types.
 data TypeAnnotation m r = TypeAnnotation
-  { typeAnnotationTarget     :: m r
+  { typeAnnotationTarget     :: !(m r)
   , typeAnnotationPath       :: !TypePath
+  , typeAnnotationType       :: !(Ref FieldDescriptor r)
   , typeAnnotationValuePairs :: SizedList16 (ValuePair r)
   }
 
 instance Binary (m Low) => Binary (TypeAnnotation m Low) where
-  get = TypeAnnotation <$> get <*> get <*> get
+  get = TypeAnnotation <$> get <*> get <*> get <*> get
   put TypeAnnotation {..} =
     put typeAnnotationTarget
-    >> put typeAnnotationPath
-    >> put typeAnnotationValuePairs
+      >> put typeAnnotationPath
+      >> put typeAnnotationType
+      >> put typeAnnotationValuePairs
 
 instance Staged m => Staged (TypeAnnotation m) where
-  stage f TypeAnnotation {..} =
+  evolve TypeAnnotation {..} =
     TypeAnnotation
-    <$> stage f typeAnnotationTarget
-    <*> pure typeAnnotationPath
-    <*> mapM f typeAnnotationValuePairs
+      <$> evolve typeAnnotationTarget
+      <*> pure typeAnnotationPath
+      <*> link typeAnnotationType
+      <*> mapM evolve typeAnnotationValuePairs
+  devolve TypeAnnotation {..} =
+    TypeAnnotation
+      <$> devolve typeAnnotationTarget
+      <*> pure typeAnnotationPath
+      <*> unlink typeAnnotationType
+      <*> mapM devolve typeAnnotationValuePairs
 
 instance ByteCodeStaged m => ByteCodeStaged (TypeAnnotation m) where
   evolveBC f TypeAnnotation {..} =
     TypeAnnotation
-    <$> evolveBC f typeAnnotationTarget
-    <*> pure typeAnnotationPath
-    <*> mapM evolve typeAnnotationValuePairs
+      <$> evolveBC f typeAnnotationTarget
+      <*> pure typeAnnotationPath
+      <*> link typeAnnotationType
+      <*> mapM evolve typeAnnotationValuePairs
 
   devolveBC f TypeAnnotation {..} =
     TypeAnnotation
-    <$> devolveBC f typeAnnotationTarget
-    <*> pure typeAnnotationPath
-    <*> mapM devolve typeAnnotationValuePairs
+      <$> devolveBC f typeAnnotationTarget
+      <*> pure typeAnnotationPath
+      <*> unlink typeAnnotationType
+      <*> mapM devolve typeAnnotationValuePairs
 
 deriving instance Show (m High) => Show (TypeAnnotation m High)
 deriving instance Eq (m High) => Eq (TypeAnnotation m High)
@@ -320,13 +325,13 @@ instance Binary TypePathItem where
       3 -> pure TPathTypeArgument
       a -> fail $ "Expected unsigned byte in range [0:3] got: " ++ show a
     typePathIndex <- getWord8
-    pure $ TypePathItem {..}
+    pure $ TypePathItem { .. }
 
   put TypePathItem {..} = do
     putWord8 $ case typePathKind of
-      TPathInArray -> 0
-      TPathInNested -> 1
-      TPathWildcard -> 2
+      TPathInArray      -> 0
+      TPathInNested     -> 1
+      TPathWildcard     -> 2
       TPathTypeArgument -> 3
     putWord8 typePathIndex
 
@@ -347,11 +352,15 @@ instance Binary (ClassTypeAnnotation Low) where
     0x00 -> ClassTypeParameterDeclaration <$> get
     0x10 -> ClassSuperType <$> get
     0x11 -> ClassBoundTypeParameterDeclaration <$> get
-    a -> fail $ "Unexpected target type " ++ showHex a "" ++ " in class type annotation"
+    a ->
+      fail
+        $  "Unexpected target type "
+        ++ showHex a ""
+        ++ " in class type annotation"
 
   put = \case
-    ClassTypeParameterDeclaration a -> putWord8 0x00 >> put a
-    ClassSuperType a -> putWord8 0x10 >> put a
+    ClassTypeParameterDeclaration      a -> putWord8 0x00 >> put a
+    ClassSuperType                     a -> putWord8 0x10 >> put a
     ClassBoundTypeParameterDeclaration a -> putWord8 0x11 >> put a
 
 instance Staged ClassTypeAnnotation where
@@ -381,15 +390,19 @@ instance Binary (MethodTypeAnnotation Low) where
     0x15 -> pure MethodReceiverType
     0x16 -> MethodFormalParameter <$> get
     0x17 -> MethodThrowsClause <$> get
-    a -> fail $ "Unexpected target type " ++ showHex a "" ++ " in method type annotation"
+    a ->
+      fail
+        $  "Unexpected target type "
+        ++ showHex a ""
+        ++ " in method type annotation"
 
   put = \case
-    MethodTypeParameterDeclaration a -> putWord8 0x01 >> put a
+    MethodTypeParameterDeclaration      a -> putWord8 0x01 >> put a
     MethodBoundTypeParameterDeclaration a -> putWord8 0x12 >> put a
-    MethodReturnType -> putWord8 0x14
-    MethodReceiverType -> putWord8 0x15
-    MethodFormalParameter a -> putWord8 0x16 >> put a
-    MethodThrowsClause a -> putWord8 0x17 >> put a
+    MethodReturnType                      -> putWord8 0x14
+    MethodReceiverType                    -> putWord8 0x15
+    MethodFormalParameter a               -> putWord8 0x16 >> put a
+    MethodThrowsClause    a               -> putWord8 0x17 >> put a
 
 instance Staged MethodTypeAnnotation where
   stage _ = unsafeCoerce
@@ -404,7 +417,11 @@ instance Staged FieldTypeAnnotation where
 instance Binary (FieldTypeAnnotation Low) where
   get = getWord8 >>= \case
     0x13 -> pure FieldTypeAnnotation
-    a -> fail $ "Unexpected target type " ++ showHex a "" ++ " in field type annotation"
+    a ->
+      fail
+        $  "Unexpected target type "
+        ++ showHex a ""
+        ++ " in field type annotation"
 
   put _ = putWord8 0x13
 
@@ -449,51 +466,66 @@ instance Binary (CodeTypeAnnotation Low) where
     0x49 -> MethodIncovationExpression <$> get
     0x4A -> GenericNewMethodReferenceExpression <$> get
     0x4B -> GenericIdentifierwMethodReferenceExpression <$> get
-    a -> fail $ "Unexpected target type " ++ showHex a "" ++ " in code type annotation"
+    a ->
+      fail
+        $  "Unexpected target type "
+        ++ showHex a ""
+        ++ " in code type annotation"
 
   put = \case
-    LocalVariableDeclaration a -> putWord8 0x40 >> put a
-    ResourceVariableDeclaration a -> putWord8 0x41 >> put a
-    ExceptionParameterDeclaration a -> putWord8 0x42 >> put a
-    InstanceOfExpression a -> putWord8 0x43 >> put a
-    NewExpression a -> putWord8 0x44 >> put a
-    NewMethodReferenceExpression a -> putWord8 0x45 >> put a
-    IdentifierMethodReferenceExpression a -> putWord8 0x46 >> put a
-    CastExpression a -> putWord8 0x47 >> put a
-    ConstructorExpression a -> putWord8 0x48 >> put a
-    MethodIncovationExpression a -> putWord8 0x49 >> put a
-    GenericNewMethodReferenceExpression a -> putWord8 0x4A >> put a
+    LocalVariableDeclaration                    a -> putWord8 0x40 >> put a
+    ResourceVariableDeclaration                 a -> putWord8 0x41 >> put a
+    ExceptionParameterDeclaration               a -> putWord8 0x42 >> put a
+    InstanceOfExpression                        a -> putWord8 0x43 >> put a
+    NewExpression                               a -> putWord8 0x44 >> put a
+    NewMethodReferenceExpression                a -> putWord8 0x45 >> put a
+    IdentifierMethodReferenceExpression         a -> putWord8 0x46 >> put a
+    CastExpression                              a -> putWord8 0x47 >> put a
+    ConstructorExpression                       a -> putWord8 0x48 >> put a
+    MethodIncovationExpression                  a -> putWord8 0x49 >> put a
+    GenericNewMethodReferenceExpression         a -> putWord8 0x4A >> put a
     GenericIdentifierwMethodReferenceExpression a -> putWord8 0x4B >> put a
-
 
 instance ByteCodeStaged CodeTypeAnnotation where
   evolveBC ev = \case
-    LocalVariableDeclaration a -> LocalVariableDeclaration <$> mapM (evolveBC ev) a
-    ResourceVariableDeclaration a -> ResourceVariableDeclaration <$> mapM (evolveBC ev) a
+    LocalVariableDeclaration a ->
+      LocalVariableDeclaration <$> mapM (evolveBC ev) a
+    ResourceVariableDeclaration a ->
+      ResourceVariableDeclaration <$> mapM (evolveBC ev) a
     ExceptionParameterDeclaration a -> pure $ ExceptionParameterDeclaration a
-    InstanceOfExpression a -> InstanceOfExpression <$> ev a
-    NewExpression a -> NewExpression <$> ev a
-    NewMethodReferenceExpression a -> NewMethodReferenceExpression <$> ev a
-    IdentifierMethodReferenceExpression a -> IdentifierMethodReferenceExpression <$> ev a
-    CastExpression a -> CastExpression <$> evolveBC ev a
+    InstanceOfExpression          a -> InstanceOfExpression <$> ev a
+    NewExpression                 a -> NewExpression <$> ev a
+    NewMethodReferenceExpression  a -> NewMethodReferenceExpression <$> ev a
+    IdentifierMethodReferenceExpression a ->
+      IdentifierMethodReferenceExpression <$> ev a
+    CastExpression        a -> CastExpression <$> evolveBC ev a
     ConstructorExpression a -> ConstructorExpression <$> evolveBC ev a
-    MethodIncovationExpression a -> MethodIncovationExpression <$> evolveBC ev a
-    GenericNewMethodReferenceExpression a -> GenericNewMethodReferenceExpression <$> evolveBC ev a
-    GenericIdentifierwMethodReferenceExpression a -> GenericIdentifierwMethodReferenceExpression <$> evolveBC ev a
+    MethodIncovationExpression a ->
+      MethodIncovationExpression <$> evolveBC ev a
+    GenericNewMethodReferenceExpression a ->
+      GenericNewMethodReferenceExpression <$> evolveBC ev a
+    GenericIdentifierwMethodReferenceExpression a ->
+      GenericIdentifierwMethodReferenceExpression <$> evolveBC ev a
 
   devolveBC dev = \case
-    LocalVariableDeclaration a -> LocalVariableDeclaration <$> mapM (devolveBC dev) a
-    ResourceVariableDeclaration a -> ResourceVariableDeclaration <$> mapM (devolveBC dev) a
+    LocalVariableDeclaration a ->
+      LocalVariableDeclaration <$> mapM (devolveBC dev) a
+    ResourceVariableDeclaration a ->
+      ResourceVariableDeclaration <$> mapM (devolveBC dev) a
     ExceptionParameterDeclaration a -> pure $ ExceptionParameterDeclaration a
-    InstanceOfExpression a -> InstanceOfExpression <$> dev a
-    NewExpression a -> NewExpression <$> dev a
-    NewMethodReferenceExpression a -> NewMethodReferenceExpression <$> dev a
-    IdentifierMethodReferenceExpression a -> IdentifierMethodReferenceExpression <$> dev a
-    CastExpression a -> CastExpression <$> devolveBC dev a
+    InstanceOfExpression          a -> InstanceOfExpression <$> dev a
+    NewExpression                 a -> NewExpression <$> dev a
+    NewMethodReferenceExpression  a -> NewMethodReferenceExpression <$> dev a
+    IdentifierMethodReferenceExpression a ->
+      IdentifierMethodReferenceExpression <$> dev a
+    CastExpression        a -> CastExpression <$> devolveBC dev a
     ConstructorExpression a -> ConstructorExpression <$> devolveBC dev a
-    MethodIncovationExpression a -> MethodIncovationExpression <$> devolveBC dev a
-    GenericNewMethodReferenceExpression a -> GenericNewMethodReferenceExpression <$> devolveBC dev a
-    GenericIdentifierwMethodReferenceExpression a -> GenericIdentifierwMethodReferenceExpression <$> devolveBC dev a
+    MethodIncovationExpression a ->
+      MethodIncovationExpression <$> devolveBC dev a
+    GenericNewMethodReferenceExpression a ->
+      GenericNewMethodReferenceExpression <$> devolveBC dev a
+    GenericIdentifierwMethodReferenceExpression a ->
+      GenericIdentifierwMethodReferenceExpression <$> devolveBC dev a
 
 -- | The 'TypeParameterTarget' item indicates that an annotation appears on the
 -- declaration of the i'th type parameter of a generic class, generic interface,
