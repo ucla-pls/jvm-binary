@@ -13,31 +13,32 @@ Maintainer  : kalhuage@cs.ucla.edu
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE RecordWildCards   #-}
 module Language.JVM.Method
-  ( Method (..)
+  ( Method(..)
   , mAccessFlags
 
   -- * Attributes
-  , MethodAttributes (..)
+  , MethodAttributes(..)
   , emptyMethodAttributes
   , mCode
   , mExceptions'
   , mExceptions
   , mSignature
-
-  ) where
+  )
+where
 
 -- base
 import           Data.Monoid
 
 -- containers
-import           Data.Set                          (Set)
+import           Data.Set                       ( Set )
 
 -- text
-import qualified Data.Text                         as Text
+import qualified Data.Text                     as Text
 
 import           Language.JVM.AccessFlag
 import           Language.JVM.Attribute
-import           Language.JVM.Attribute.Exceptions (exceptions)
+import           Language.JVM.Attribute.Exceptions
+                                                ( exceptions )
 import           Language.JVM.Constant
 import           Language.JVM.Staged
 import           Language.JVM.Type
@@ -64,7 +65,7 @@ data MethodAttributes r = MethodAttributes
   , maVisibleAnnotations            :: [RuntimeVisibleAnnotations r]
   , maInvisibleAnnotations          :: [RuntimeInvisibleAnnotations r]
   , maVisibleParameterAnnotations   :: [RuntimeVisibleParameterAnnotations r]
-  , maInvisibleParamterAnnotations  :: [RuntimeInvisibleParameterAnnotations r]
+  , maInvisibleParameterAnnotations  :: [RuntimeInvisibleParameterAnnotations r]
   , maVisibleTypeAnnotations            ::
       [RuntimeVisibleTypeAnnotations MethodTypeAnnotation r]
   , maInvisibleTypeAnnotations          ::
@@ -73,73 +74,92 @@ data MethodAttributes r = MethodAttributes
   }
 
 emptyMethodAttributes :: MethodAttributes High
-emptyMethodAttributes =
-  MethodAttributes [] [] [] [] [] [] [] [] [] [] []
+emptyMethodAttributes = MethodAttributes [] [] [] [] [] [] [] [] [] [] []
 
 -- | Fetch the 'Code' attribute, if any.
 -- There can only be one code attribute in a method.
 mCode :: Method High -> Maybe (Code High)
-mCode =
-  firstOne . maCode . mAttributes
+mCode = firstOne . maCode . mAttributes
 
 -- | Fetch the 'Exceptions' attribute.
 -- There can only be one exceptions attribute in a method.
 mExceptions' :: Method High -> Maybe (Exceptions High)
-mExceptions' =
-  firstOne . maExceptions . mAttributes
+mExceptions' = firstOne . maExceptions . mAttributes
 
 -- | Fetches the 'Exceptions' attribute, but turns it into an list of exceptions.
 -- If no exceptions field where found the empty list is returned
 mExceptions :: Method High -> [ClassName]
-mExceptions =
-  maybe [] (unSizedList . exceptions) . mExceptions'
+mExceptions = maybe [] (unSizedList . exceptions) . mExceptions'
 
 -- | Fetches the 'Signature' attribute, if any.
 mSignature :: Method High -> Maybe (Signature High)
-mSignature =
-  firstOne . maSignatures . mAttributes
+mSignature = firstOne . maSignatures . mAttributes
 
 instance Staged Method where
   evolve (Method mf mn md mattr) = label "Method" $ do
     mn' <- link mn
     md' <- link md
-    label (Text.unpack.serialize $ mn' <:> md') $ do
-      mattr' <- fmap (`appEndo` emptyMethodAttributes) . fromAttributes MethodAttribute mattr
+    label (Text.unpack . serialize $ mn' <:> md') $ do
+      mattr' <-
+        fmap (`appEndo` emptyMethodAttributes)
+        . fromAttributes MethodAttribute mattr
         $ collect
-          [ Attr (\e a -> a { maCode = e : maCode a })
-          , Attr (\e a -> a { maExceptions = e : maExceptions a })
-          , Attr (\e a -> a { maSignatures = e : maSignatures a })
-          , Attr (\e a -> a { maAnnotationDefault = e : maAnnotationDefault a })
-          , Attr (\e a -> a { maVisibleAnnotations = e : maVisibleAnnotations a })
-          , Attr (\e a -> a { maInvisibleAnnotations = e : maInvisibleAnnotations a })
-          , Attr (\e a -> a { maVisibleParameterAnnotations = e : maVisibleParameterAnnotations a })
-          , Attr (\e a -> a { maInvisibleParamterAnnotations = e : maInvisibleParamterAnnotations a })
-          , Attr (\e a -> a { maVisibleTypeAnnotations = e : maVisibleTypeAnnotations a })
-          , Attr (\e a -> a { maInvisibleTypeAnnotations = e : maInvisibleTypeAnnotations a })
-          ]
-          (\e a -> a { maOthers = e : maOthers a })
+            [ Attr (\e a -> a { maCode = e : maCode a })
+            , Attr (\e a -> a { maExceptions = e : maExceptions a })
+            , Attr (\e a -> a { maSignatures = e : maSignatures a })
+            , Attr
+              (\e a -> a { maAnnotationDefault = e : maAnnotationDefault a })
+            , Attr
+              (\e a -> a { maVisibleAnnotations = e : maVisibleAnnotations a })
+            , Attr
+              (\e a ->
+                a { maInvisibleAnnotations = e : maInvisibleAnnotations a }
+              )
+            , Attr
+              (\e a -> a
+                { maVisibleParameterAnnotations =
+                  e : maVisibleParameterAnnotations a
+                }
+              )
+            , Attr
+              (\e a -> a
+                { maInvisibleParameterAnnotations =
+                  e : maInvisibleParameterAnnotations a
+                }
+              )
+            , Attr
+              (\e a -> a
+                { maVisibleTypeAnnotations = e : maVisibleTypeAnnotations a
+                }
+              )
+            , Attr
+              (\e a -> a
+                { maInvisibleTypeAnnotations = e : maInvisibleTypeAnnotations a
+                }
+              )
+            ]
+            (\e a -> a { maOthers = e : maOthers a })
       return $ Method mf mn' md' mattr'
 
   devolve (Method mf mn md mattr) = do
-    mn' <- unlink mn
-    md' <- unlink md
+    mn'    <- unlink mn
+    md'    <- unlink md
     mattr' <- fromMethodAttributes mattr
     return $ Method mf mn' md' (SizedList mattr')
-    where
-      fromMethodAttributes MethodAttributes {..} =
-        concat <$> sequence
-          [ mapM toAttribute maCode
-          , mapM toAttribute maExceptions
-          , mapM toAttribute maSignatures
-          , mapM toAttribute maAnnotationDefault
-          , mapM toAttribute maVisibleAnnotations
-          , mapM toAttribute maInvisibleAnnotations
-          , mapM toAttribute maVisibleParameterAnnotations
-          , mapM toAttribute maInvisibleParamterAnnotations
-          , mapM toAttribute maVisibleTypeAnnotations
-          , mapM toAttribute maInvisibleTypeAnnotations
-          , mapM devolve maOthers
-          ]
+   where
+    fromMethodAttributes MethodAttributes {..} = concat <$> sequence
+      [ mapM toAttribute maCode
+      , mapM toAttribute maExceptions
+      , mapM toAttribute maSignatures
+      , mapM toAttribute maAnnotationDefault
+      , mapM toAttribute maVisibleAnnotations
+      , mapM toAttribute maInvisibleAnnotations
+      , mapM toAttribute maVisibleParameterAnnotations
+      , mapM toAttribute maInvisibleParameterAnnotations
+      , mapM toAttribute maVisibleTypeAnnotations
+      , mapM toAttribute maInvisibleTypeAnnotations
+      , mapM devolve     maOthers
+      ]
 
 $(deriveBase ''MethodAttributes)
 $(deriveBaseWithBinary ''Method)
