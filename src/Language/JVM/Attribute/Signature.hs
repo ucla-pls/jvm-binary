@@ -174,7 +174,7 @@ newtype TypeVariable =
 
 data TypeParameter =
   TypeParameter
-  { tpIndentifier    :: Text.Text
+  { tpIdentifier    :: Text.Text
   , tpClassBound     :: Maybe ReferenceType
   , tpInterfaceBound :: [ReferenceType]
   }

@@ -8,6 +8,7 @@
 - Changed ClassType in Signature to contain the inner classes in 
   the correct order.
 - Fixed problem with defintion of TypedAnnotations
+- Fixed spelling mistake in TypeParameter
 
 ## Version 0.8.1
 - Made all tests work with nix

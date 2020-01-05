@@ -56,7 +56,7 @@ spec_real_signatures = do
     let sig = "E:Ljava/lang/Object;"
     parseOnly typeParameterP sig `shouldBe` Right
       (TypeParameter
-        { tpIndentifier    = "E"
+        { tpIdentifier     = "E"
         , tpClassBound     =
           Just (RefClassType (ClassType "java/lang/Object" Nothing []))
         , tpInterfaceBound = []
@@ -66,7 +66,7 @@ spec_real_signatures = do
     let sig = "<E:Ljava/lang/Object;>"
     parseOnly typeParametersP sig `shouldBe` Right
       [ TypeParameter
-          { tpIndentifier    = "E"
+          { tpIdentifier     = "E"
           , tpClassBound     = Just
                                  (RefClassType
                                    (ClassType { ctsName = "java/lang/Object"
@@ -83,7 +83,7 @@ spec_real_signatures = do
     parseOnly classSignatureP sig `shouldBe` Right
       (ClassSignature
         { csTypeParameters      = [ TypeParameter
-                                      { tpIndentifier    = "E"
+                                      { tpIdentifier     = "E"
                                       , tpClassBound     = Just
                                                              (RefClassType
                                                                (ClassType
