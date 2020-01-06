@@ -364,7 +364,7 @@ instance Binary (ClassTypeAnnotation Low) where
     ClassBoundTypeParameterDeclaration a -> putWord8 0x11 >> put a
 
 instance Staged ClassTypeAnnotation where
-  stage _ = unsafeCoerce
+  stage _ = pure . unsafeCoerce
 
 data MethodTypeAnnotation r
   = MethodTypeParameterDeclaration !TypeParameterTarget
@@ -405,14 +405,14 @@ instance Binary (MethodTypeAnnotation Low) where
     MethodThrowsClause    a               -> putWord8 0x17 >> put a
 
 instance Staged MethodTypeAnnotation where
-  stage _ = unsafeCoerce
+  stage _ = pure . unsafeCoerce
 
 data FieldTypeAnnotation r =
   FieldTypeAnnotation
   -- ^ type in field declaration (0x13)
 
 instance Staged FieldTypeAnnotation where
-  stage _ = unsafeCoerce
+  stage _ = pure . unsafeCoerce
 
 instance Binary (FieldTypeAnnotation Low) where
   get = getWord8 >>= \case
