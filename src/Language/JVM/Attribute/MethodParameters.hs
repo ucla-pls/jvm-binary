@@ -34,7 +34,7 @@ instance IsAttribute (MethodParameters Low) where
 
 -- | Is a list of method parameters, one for each parameter
 newtype MethodParameters r = MethodParameters
-  { methodParameters :: SizedList8 (MethodParameters r)
+  { methodParameters :: SizedList8 (MethodParameter r)
   }
 
 -- | A method parameter
@@ -42,7 +42,6 @@ data MethodParameter r = MethodParameter
   { parameterName        :: !(Ref Text.Text r)
   , parameterAccessFlags :: !(BitSet16 PAccessFlag)
   }
-
 
 instance Staged MethodParameters where
   stage f (MethodParameters m) =
