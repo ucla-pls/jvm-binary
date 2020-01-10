@@ -39,7 +39,7 @@ module Language.JVM.Attribute.Annotations
   , TypeParameterTarget
   , SupertypeTarget
   , isInExtendsClause
-  , TypeParameterBoundTarget
+  , TypeParameterBoundTarget(..)
   , FormalParameterTarget
   , ThrowsTarget
   , LocalvarTarget
@@ -709,7 +709,15 @@ $(deriveBase ''MethodTypeAnnotation)
 $(deriveBase ''FieldTypeAnnotation)
 $(deriveBase ''CodeTypeAnnotation)
 
+deriving instance Ord (MethodTypeAnnotation High)
+deriving instance Ord (ClassTypeAnnotation High)
+deriving instance Ord (FieldTypeAnnotation High)
+deriving instance Ord (CodeTypeAnnotation High)
+
 $(deriveBaseWithBinary ''LocalvarEntry)
 $(deriveBaseWithBinary ''TypeArgumentTarget)
+
+deriving instance Ord (LocalvarEntry High)
+deriving instance Ord (TypeArgumentTarget High)
 
 $(deriveBaseWithBinary ''EnumValue)

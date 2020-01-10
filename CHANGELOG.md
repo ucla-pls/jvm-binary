@@ -10,6 +10,7 @@
 - Fixed problem with defintion of TypedAnnotations
 - Fixed spelling mistake in TypeParameter
 - Added MethodParameters
+- Made more Annotations Ord'able and exported them fully
 
 ## Version 0.8.1
 - Made all tests work with nix
