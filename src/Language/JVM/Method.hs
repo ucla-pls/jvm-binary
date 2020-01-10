@@ -62,6 +62,7 @@ data MethodAttributes r = MethodAttributes
   , maExceptions                    :: [Exceptions r]
   , maSignatures                    :: [Signature r]
   , maAnnotationDefault             :: [AnnotationDefault r]
+  , maMethodParameters              :: [MethodParameters r]
   , maVisibleAnnotations            :: [RuntimeVisibleAnnotations r]
   , maInvisibleAnnotations          :: [RuntimeInvisibleAnnotations r]
   , maVisibleParameterAnnotations   :: [RuntimeVisibleParameterAnnotations r]
@@ -74,7 +75,7 @@ data MethodAttributes r = MethodAttributes
   }
 
 emptyMethodAttributes :: MethodAttributes High
-emptyMethodAttributes = MethodAttributes [] [] [] [] [] [] [] [] [] [] []
+emptyMethodAttributes = MethodAttributes [] [] [] [] [] [] [] [] [] [] [] []
 
 -- | Fetch the 'Code' attribute, if any.
 -- There can only be one code attribute in a method.
@@ -137,6 +138,7 @@ instance Staged Method where
                 { maInvisibleTypeAnnotations = e : maInvisibleTypeAnnotations a
                 }
               )
+            , Attr (\e a -> a { maMethodParameters = e : maMethodParameters a })
             ]
             (\e a -> a { maOthers = e : maOthers a })
       return $ Method mf mn' md' mattr'

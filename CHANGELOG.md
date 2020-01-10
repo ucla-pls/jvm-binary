@@ -9,6 +9,7 @@
   the correct order.
 - Fixed problem with defintion of TypedAnnotations
 - Fixed spelling mistake in TypeParameter
+- Added MethodParameters
 
 ## Version 0.8.1
 - Made all tests work with nix
