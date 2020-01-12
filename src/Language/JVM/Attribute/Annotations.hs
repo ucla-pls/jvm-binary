@@ -704,6 +704,11 @@ $(deriveBaseWithBinary ''ValuePair)
 $(deriveBaseWithBinary ''AnnotationDefault)
 $(deriveBase ''ElementValue)
 
+deriving instance Ord (ValuePair High)
+deriving instance Ord (ElementValue High)
+deriving instance Ord (EnumValue High)
+deriving instance Ord (Annotation High)
+
 $(deriveBase ''ClassTypeAnnotation)
 $(deriveBase ''MethodTypeAnnotation)
 $(deriveBase ''FieldTypeAnnotation)
@@ -713,6 +718,8 @@ deriving instance Ord (MethodTypeAnnotation High)
 deriving instance Ord (ClassTypeAnnotation High)
 deriving instance Ord (FieldTypeAnnotation High)
 deriving instance Ord (CodeTypeAnnotation High)
+
+deriving instance Ord (a High) => Ord (TypeAnnotation a High)
 
 $(deriveBaseWithBinary ''LocalvarEntry)
 $(deriveBaseWithBinary ''TypeArgumentTarget)
