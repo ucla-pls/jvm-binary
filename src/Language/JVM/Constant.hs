@@ -19,13 +19,13 @@ are essential for accessing data in the class-file.
 -}
 
 module Language.JVM.Constant
-  ( Constant (..)
+  ( Constant(..)
   , constantSize
   , typeToStr
+  , Referenceable(..)
 
-  , Referenceable (..)
-
-  , JValue (..)
+  -- * JValue
+  , JValue(..)
   , VInteger
   , VLong
   , VDouble
@@ -33,50 +33,45 @@ module Language.JVM.Constant
   , VString
 
     -- * Special constants
-  , ClassName (..)
-
-  , InClass (..)
-  , InRefType (..)
-
+  , ClassName(..)
+  , InClass(..)
+  , InRefType(..)
   , parseAbsMethodId
-  , AbsFieldId
-  , AbsInterfaceMethodId (..)
-  , AbsVariableMethodId (..)
-
-  , MethodId (..)
-  , FieldId (..)
-  , NameAndType (..)
-
-
+  , AbsFieldId(..)
+  , AbsInterfaceMethodId(..)
+  , AbsVariableMethodId(..)
+  , MethodId(..)
+  , FieldId(..)
+  , NameAndType(..)
   , MethodDescriptor
   , FieldDescriptor
-
-
-  , MethodHandle (..)
-  , MethodHandleField (..)
-  , MethodHandleMethod (..)
-  , MethodHandleInterface (..)
-  , MethodHandleFieldKind (..)
-  , InvokeDynamic (..)
+  , MethodHandle(..)
+  , MethodHandleField(..)
+  , MethodHandleMethod(..)
+  , MethodHandleInterface(..)
+  , MethodHandleFieldKind(..)
+  , InvokeDynamic(..)
 
   -- * re-exports
   , High
   , Low
+  )
+where
 
-  ) where
-
-import           Control.DeepSeq          (NFData)
+import           Control.DeepSeq                ( NFData )
 import           Control.Monad.Reader
 import           Data.Binary
 import           Data.String
 import           Data.Binary.IEEE754
-import qualified Data.ByteString          as BS
+import qualified Data.ByteString               as BS
 import           Data.Int
-import qualified Data.Text                as Text
-import qualified Data.Text.Encoding.Error as TE
-import           GHC.Generics             (Generic)
-import           Numeric                  (showHex)
-import           Prelude                  hiding (fail, lookup)
+import qualified Data.Text                     as Text
+import qualified Data.Text.Encoding.Error      as TE
+import           GHC.Generics                   ( Generic )
+import           Numeric                        ( showHex )
+import           Prelude                 hiding ( fail
+                                                , lookup
+                                                )
 
 import           Language.JVM.Stage
 import           Language.JVM.TH
@@ -123,7 +118,7 @@ data MethodHandle r
 
 data MethodHandleField r = MethodHandleField
   { methodHandleFieldKind :: !MethodHandleFieldKind
-  , methodHandleFieldRef  :: !(Ref (AbsFieldId) r)
+  , methodHandleFieldRef  :: !(Ref AbsFieldId r)
   }
 
 data MethodHandleFieldKind
@@ -141,8 +136,8 @@ data MethodHandleMethod r
   -- ^ Since version 52.0
   | MHNewInvokeSpecial !(Ref (InRefType MethodId) r)
 
-data MethodHandleInterface r = MethodHandleInterface
-  {  methodHandleInterfaceRef :: !(Ref AbsInterfaceMethodId r)
+newtype MethodHandleInterface r = MethodHandleInterface
+  {  methodHandleInterfaceRef :: Ref AbsInterfaceMethodId r
   }
 
 data InvokeDynamic r = InvokeDynamic
@@ -152,22 +147,21 @@ data InvokeDynamic r = InvokeDynamic
 
 -- | Hack that returns the name of a constant.
 typeToStr :: Constant r -> String
-typeToStr c =
-  case c of
-    CString _             -> "CString"
-    CInteger _            -> "CInteger"
-    CFloat _              -> "CFloat"
-    CLong _               -> "CLong"
-    CDouble _             -> "CDouble"
-    CClassRef _           -> "CClassRef"
-    CStringRef _          -> "CStringRef"
-    CFieldRef _           -> "CFieldRef"
-    CMethodRef _          -> "CMethodRef"
-    CInterfaceMethodRef _ -> "CInterfaceMethodRef"
-    CNameAndType _ _      -> "CNameAndType"
-    CMethodHandle _       -> "CMethodHandle"
-    CMethodType _         -> "CMethodType"
-    CInvokeDynamic _      -> "CInvokeDynamic"
+typeToStr c = case c of
+  CString             _ -> "CString"
+  CInteger            _ -> "CInteger"
+  CFloat              _ -> "CFloat"
+  CLong               _ -> "CLong"
+  CDouble             _ -> "CDouble"
+  CClassRef           _ -> "CClassRef"
+  CStringRef          _ -> "CStringRef"
+  CFieldRef           _ -> "CFieldRef"
+  CMethodRef          _ -> "CMethodRef"
+  CInterfaceMethodRef _ -> "CInterfaceMethodRef"
+  CNameAndType _ _      -> "CNameAndType"
+  CMethodHandle  _      -> "CMethodHandle"
+  CMethodType    _      -> "CMethodType"
+  CInvokeDynamic _      -> "CInvokeDynamic"
 
 instance Binary (Constant Low) where
   get = do
@@ -189,22 +183,50 @@ instance Binary (Constant Low) where
       18 -> CInvokeDynamic <$> get
       _  -> fail $ "Unknown identifier " ++ show ident
 
-  put x =
-    case x of
-      CString bs            -> do putWord8 1; put bs
-      CInteger i            -> do putWord8 3; put i
-      CFloat i              -> do putWord8 4; putFloat32be i
-      CLong i               -> do putWord8 5; put i
-      CDouble i             -> do putWord8 6; putFloat64be i
-      CClassRef i           -> do putWord8 7; put i
-      CStringRef i          -> do putWord8 8; put i
-      CFieldRef i           -> do putWord8 9; put i
-      CMethodRef i          -> do putWord8 10; put i
-      CInterfaceMethodRef i -> do putWord8 11; put i
-      CNameAndType i j      -> do putWord8 12; put i; put j
-      CMethodHandle h       -> do putWord8 15; put h
-      CMethodType i         -> do putWord8 16; put i;
-      CInvokeDynamic i      -> do putWord8 18; put i
+  put x = case x of
+    CString bs -> do
+      putWord8 1
+      put bs
+    CInteger i -> do
+      putWord8 3
+      put i
+    CFloat i -> do
+      putWord8 4
+      putFloat32be i
+    CLong i -> do
+      putWord8 5
+      put i
+    CDouble i -> do
+      putWord8 6
+      putFloat64be i
+    CClassRef i -> do
+      putWord8 7
+      put i
+    CStringRef i -> do
+      putWord8 8
+      put i
+    CFieldRef i -> do
+      putWord8 9
+      put i
+    CMethodRef i -> do
+      putWord8 10
+      put i
+    CInterfaceMethodRef i -> do
+      putWord8 11
+      put i
+    CNameAndType i j -> do
+      putWord8 12
+      put i
+      put j
+    CMethodHandle h -> do
+      putWord8 15
+      put h
+    CMethodType i -> do
+      putWord8 16
+      put i
+    CInvokeDynamic i -> do
+      putWord8 18
+      put i
 
 instance Binary (MethodHandle Low) where
   get = do
@@ -217,7 +239,7 @@ instance Binary (MethodHandle Low) where
 
       5 -> MHMethod . MHInvokeVirtual <$> get
       6 -> MHMethod . MHInvokeStatic <$> get
-      7 -> MHMethod . MHInvokeSpecial<$> get
+      7 -> MHMethod . MHInvokeSpecial <$> get
       8 -> MHMethod . MHNewInvokeSpecial <$> get
 
       9 -> MHInterface . MethodHandleInterface <$> get
@@ -233,15 +255,14 @@ instance Binary (MethodHandle Low) where
         MHPutStatic -> 4
       put $ methodHandleFieldRef h
 
-    MHMethod h -> do
-      case h of
-        MHInvokeVirtual m    -> putWord8 5 >> put m
-        MHInvokeStatic m     -> putWord8 6 >> put m
-        MHInvokeSpecial m    -> putWord8 7 >> put m
-        MHNewInvokeSpecial m -> putWord8 8 >> put m
+    MHMethod h -> case h of
+      MHInvokeVirtual    m -> putWord8 5 >> put m
+      MHInvokeStatic     m -> putWord8 6 >> put m
+      MHInvokeSpecial    m -> putWord8 7 >> put m
+      MHNewInvokeSpecial m -> putWord8 8 >> put m
 
     MHInterface h -> do
-      putWord8  9
+      putWord8 9
       put $ methodHandleInterfaceRef h
 
 -- | Some of the 'Constant's take up more space in the constant pool than other.
@@ -250,11 +271,10 @@ instance Binary (MethodHandle Low) where
 -- [inconsistency](http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4.5)
 -- in JVM.
 constantSize :: Constant r -> Index
-constantSize x =
-  case x of
-    CDouble _ -> 2
-    CLong _   -> 2
-    _         -> 1
+constantSize x = case x of
+  CDouble _ -> 2
+  CLong   _ -> 2
+  _         -> 1
 
 -- | 'Referenceable' is something that can exist in the constant pool.
 class Referenceable a where
@@ -278,71 +298,60 @@ instance TextSerializable a => Referenceable (NameAndType a) where
     return $ NameAndType rn md
   fromConst e c = expected "CNameAndType" e c
 
-  toConst (NameAndType rn md) =
-    return $ CNameAndType rn (serialize md)
+  toConst (NameAndType rn md) = return $ CNameAndType rn (serialize md)
 
 -- TODO: Find good encoding of string.
 instance Referenceable Text.Text where
-  fromConst err c =
-    case c of
-      CString str ->
-        case sizedByteStringToText str of
-          Left (TE.DecodeError msg _) ->
-            err $ badEncoding msg (unSizedByteString str)
-          Left _ -> error "This is deprecated in the api"
-          Right txt -> return txt
-      a -> err $ wrongType "String" a
+  fromConst err c = case c of
+    CString str -> case sizedByteStringToText str of
+      Left (TE.DecodeError msg _) ->
+        err $ badEncoding msg (unSizedByteString str)
+      Left  _   -> error "This is deprecated in the api"
+      Right txt -> return txt
+    a -> err $ wrongType "String" a
 
-  toConst =
-    return . CString . sizedByteStringFromText
+  toConst = return . CString . sizedByteStringFromText
 
 instance Referenceable BS.ByteString where
-  fromConst err c =
-    case c of
-      CString str -> return $ unSizedByteString str
-      a           -> err $ wrongType "String" a
-  toConst =
-    return . CString . SizedByteString
+  fromConst err c = case c of
+    CString str -> return $ unSizedByteString str
+    a           -> err $ wrongType "String" a
+  toConst = return . CString . SizedByteString
 
 
 instance Referenceable ClassName where
   fromConst err = \case
-    CClassRef r  ->
-      case (textCls r) of
-        Right cn -> return cn
-        Left msg ->
-          err $ "Could not read class name: " <> Text.unpack r <> ": " <> msg
-    a ->
-      err $ wrongType "ClassRef" a
+    CClassRef r -> case textCls r of
+      Right cn -> return cn
+      Left msg ->
+        err $ "Could not read class name: " <> Text.unpack r <> ": " <> msg
+    a -> err $ wrongType "ClassRef" a
 
-  toConst (classNameAsText -> txt) = do
-    return . CClassRef $ txt
+  toConst (classNameAsText -> txt) = return . CClassRef $ txt
 
 instance Referenceable JRefType where
   fromConst err = \case
-    CClassRef r ->
-      case deserializeWith parseFlatJRefType r of
-        Right t -> return t
-        Left msg ->
-          err $ "Could not read the flat reference type: " <> Text.unpack r <> ": " <> msg
-    a ->
-      err $ wrongType "ClassRef" a
-  toConst =
-    return . CClassRef . serializeWith serializeFlatJRefType
+    CClassRef r -> case deserializeWith parseFlatJRefType r of
+      Right t -> return t
+      Left msg ->
+        err
+          $  "Could not read the flat reference type: "
+          <> Text.unpack r
+          <> ": "
+          <> msg
+    a -> err $ wrongType "ClassRef" a
+  toConst = return . CClassRef . serializeWith serializeFlatJRefType
 
 instance Referenceable ReturnDescriptor where
-  fromConst err =
-    fromConst err >=> either err return . deserialize
+  fromConst err = fromConst err >=> either err return . deserialize
   toConst = toConst . serialize
 
 instance Referenceable MethodDescriptor where
-  fromConst err =
-    fromConst err >=> either err pure . deserialize
+  fromConst err = fromConst err >=> either err pure . deserialize
   toConst = toConst . serialize
 
 instance Referenceable FieldDescriptor where
-  fromConst err =
-    fromConst err >=> either err pure . deserialize
+  fromConst err = fromConst err >=> either err pure . deserialize
   toConst = toConst . serialize
 
 instance Referenceable MethodId where
@@ -355,70 +364,56 @@ instance Referenceable FieldId where
 
 instance Referenceable AbsFieldId where
   fromConst err = \case
-    CFieldRef s ->
-      return $ s
-    c -> expected "CFieldRef" err c
+    CFieldRef s -> return s
+    c           -> expected "CFieldRef" err c
 
-  toConst s =
-    return $ CFieldRef s
+  toConst s = return $ CFieldRef s
 
 instance Referenceable (InRefType MethodId) where
   fromConst err = \case
-    CMethodRef s ->
-      return $ s
-    c -> expected "CMethodRef" err c
+    CMethodRef s -> return $ s
+    c            -> expected "CMethodRef" err c
 
-  toConst s =
-    return $ CMethodRef s
+  toConst s = return $ CMethodRef s
 
 instance Referenceable AbsVariableMethodId where
   fromConst err = \case
-    CMethodRef s ->
-      return $ AbsVariableMethodId False s
-    CInterfaceMethodRef s ->
-      return $ AbsVariableMethodId True s
-    c ->
-      expected "CMethodRef or CInterfaceMethodRef" err c
+    CMethodRef          s -> return $ AbsVariableMethodId False s
+    CInterfaceMethodRef s -> return $ AbsVariableMethodId True s
+    c                     -> expected "CMethodRef or CInterfaceMethodRef" err c
 
   toConst (AbsVariableMethodId t s) =
     return $ if t then CInterfaceMethodRef s else CMethodRef s
 
 instance Referenceable AbsInterfaceMethodId where
-  fromConst _ (CInterfaceMethodRef s) =
-    return . AbsInterfaceMethodId $ s
-  fromConst err c = expected "CInterfaceMethodRef" err c
+  fromConst _   (CInterfaceMethodRef s) = return . AbsInterfaceMethodId $ s
+  fromConst err c                       = expected "CInterfaceMethodRef" err c
 
-  toConst (AbsInterfaceMethodId s) =
-    return $ CInterfaceMethodRef s
+  toConst (AbsInterfaceMethodId s) = return $ CInterfaceMethodRef s
 
 
 instance Referenceable (InvokeDynamic High) where
-  fromConst _ (CInvokeDynamic c) = return c
-  fromConst err c = expected "CInvokeDynamic" err c
+  fromConst _   (CInvokeDynamic c) = return c
+  fromConst err c                  = expected "CInvokeDynamic" err c
 
-  toConst s =
-    return $ CInvokeDynamic s
+  toConst s = return $ CInvokeDynamic s
 
 instance Referenceable (MethodHandle High) where
-  fromConst _ (CMethodHandle c) = return c
-  fromConst err c = expected "CMethodHandle" err c
+  fromConst _   (CMethodHandle c) = return c
+  fromConst err c                 = expected "CMethodHandle" err c
 
-  toConst s =
-    return $ CMethodHandle s
+  toConst s = return $ CMethodHandle s
 
 
 expected :: String -> (String -> a) -> (Constant r) -> a
-expected name err c =
-  err $ wrongType name c
+expected name err c = err $ wrongType name c
 
 
 wrongType :: String -> Constant r -> String
-wrongType n c =
-  "Expected '" ++ n ++ "', but found '" ++ typeToStr c ++ "'."
+wrongType n c = "Expected '" ++ n ++ "', but found '" ++ typeToStr c ++ "'."
 
 badEncoding :: String -> BS.ByteString -> String
-badEncoding str bs =
-  "Could not encode '" ++ str ++ "': " ++ show bs
+badEncoding str bs = "Could not encode '" ++ str ++ "': " ++ show bs
 
 -- $(deriveBaseWithBinary ''MethodId)
 -- $(deriveBaseWithBinary ''FieldId)
@@ -444,25 +439,25 @@ type VString = BS.ByteString
 instance Referenceable VInteger where
   fromConst err = \case
     CInteger i -> return i
-    x -> expected "Integer" err x
+    x          -> expected "Integer" err x
   toConst = return . CInteger
 
 instance Referenceable VLong where
   fromConst err = \case
     CLong i -> return i
-    x -> expected "Long" err x
+    x       -> expected "Long" err x
   toConst = return . CLong
 
 instance Referenceable VFloat where
   fromConst err = \case
     CFloat i -> return i
-    x -> expected "Float" err x
+    x        -> expected "Float" err x
   toConst = return . CFloat
 
 instance Referenceable VDouble where
   fromConst err = \case
     CDouble i -> return i
-    x -> expected "Double" err x
+    x         -> expected "Double" err x
   toConst = return . CDouble
 
 -- instance Referenceable VString where
@@ -485,27 +480,27 @@ data JValue
 
 instance Referenceable JValue where
   fromConst err = \case
-    CStringRef s    -> return $ VString s
-    CInteger i      -> return $ VInteger i
-    CFloat f        -> return $ VFloat f
-    CLong l         -> return $ VLong l
-    CDouble d       -> return $ VDouble d
-    CClassRef r     ->
-      case deserializeWith parseFlatJRefType r of
-        Right rt -> return $ VClass rt
-        Left msg -> err $ "Could not parse reftype " <> Text.unpack r <> ": " <> msg
+    CStringRef s -> return $ VString s
+    CInteger   i -> return $ VInteger i
+    CFloat     f -> return $ VFloat f
+    CLong      l -> return $ VLong l
+    CDouble    d -> return $ VDouble d
+    CClassRef  r -> case deserializeWith parseFlatJRefType r of
+      Right rt -> return $ VClass rt
+      Left msg ->
+        err $ "Could not parse reftype " <> Text.unpack r <> ": " <> msg
     CMethodHandle m -> return $ VMethodHandle m
-    CMethodType t   -> return $ VMethodType t
+    CMethodType   t -> return $ VMethodType t
     x               -> expected "Value" err x
   {-# INLINE fromConst #-}
 
   toConst = return . \case
-    VString s            -> CStringRef s
-    VInteger i           -> CInteger i
-    VFloat f             -> CFloat f
-    VLong l              -> CLong l
-    VDouble d            -> CDouble d
+    VString       s -> CStringRef s
+    VInteger      i -> CInteger i
+    VFloat        f -> CFloat f
+    VLong         l -> CLong l
+    VDouble       d -> CDouble d
     VClass (serializeWith serializeFlatJRefType -> r) -> CClassRef r
-    VMethodHandle m      -> CMethodHandle m
-    VMethodType t        -> CMethodType t
+    VMethodHandle m -> CMethodHandle m
+    VMethodType   t -> CMethodType t
   {-# INLINE toConst #-}

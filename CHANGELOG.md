@@ -11,6 +11,7 @@
 - Fixed spelling mistake in TypeParameter
 - Added MethodParameters
 - Made more Annotations Ord'able and exported them fully
+- Make some data types into newtypes
 
 ## Version 0.8.1
 - Made all tests work with nix
