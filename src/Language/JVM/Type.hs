@@ -20,109 +20,107 @@ module Language.JVM.Type
   (
   -- * Base types
   -- ** ClassName
-    ClassName (classNameAsText)
+    ClassName(classNameAsText)
   , textCls
-  , strCls
+  , textClsOrFail
+  , strClsOrFail
   , dotCls
+  , unsafeTextCls
   , parseClassName
   , serializeClassName
 
   -- ** JType
-  , JType (..)
+  , JType(..)
   , jTypeSize
   , parseJType
   , serializeJType
-
-  , JBaseType (..)
+  , JBaseType(..)
   , jBaseTypeToChar
   , jBaseTypeSize
   , parseJBaseType
   , serializeJBaseType
-
-  , JRefType (..)
+  , JRefType(..)
   , refTypeDepth
   , parseJRefType
   , serializeJRefType
-
   , parseFlatJRefType
   , serializeFlatJRefType
 
   -- ** MethodDescriptor
-  , MethodDescriptor (..)
+  , MethodDescriptor(..)
   , parseMethodDescriptor
   , serializeMethodDescriptor
-
-  , ReturnDescriptor (..)
+  , ReturnDescriptor(..)
   , parseReturnDescriptor
   , serializeReturnDescriptor
 
   -- ** FieldDescriptor
-  , FieldDescriptor (..)
+  , FieldDescriptor(..)
   , parseFieldDescriptor
   , serializeFieldDescriptor
 
   -- ** NameAndType
-  , NameAndType (..)
+  , NameAndType(..)
   , parseNameAndType
   , serializeNameAndType
-
-  , WithName (..)
-  , AsNameAndType (..)
+  , WithName(..)
+  , AsNameAndType(..)
 
   -- ** MethodId
-  , MethodId (..)
+  , MethodId(..)
   , parseMethodId
   , serializeMethodId
 
   -- ** FieldId
-  , FieldId (..)
+  , FieldId(..)
   , parseFieldId
   , serializeFieldId
 
   -- ** InClass
-  , InClass (..)
+  , InClass(..)
   , parseInClass
   , serializeInClass
 
   -- ** InRefType
-  , InRefType (..)
+  , InRefType(..)
   , parseInRefType
   , serializeInRefType
   , inRefTypeAsInClass
 
   -- ** AbsMethodId
-  , AbsMethodId (..)
+  , AbsMethodId(..)
   , parseAbsMethodId
   , serializeAbsMethodId
 
   -- ** AbsFieldId
-  , AbsFieldId (..)
+  , AbsFieldId(..)
   , parseAbsFieldId
   , serializeAbsFieldId
 
   -- * Re-export
   , module Language.JVM.TextSerializable
-  ) where
+  )
+where
 
 -- base
 import           Data.String
 import           Control.Applicative
 import           Data.Semigroup
-import           GHC.Generics           (Generic)
-import           Prelude                hiding (takeWhile)
+import           GHC.Generics                   ( Generic )
+import           Prelude                 hiding ( takeWhile )
 
 -- deepseq
-import           Control.DeepSeq        (NFData)
+import           Control.DeepSeq                ( NFData )
 
 -- attoparsec
 import           Data.Attoparsec.Text
 
 -- text
-import qualified Data.Text              as Text
-import Data.Text.Lazy.Builder as Builder
+import qualified Data.Text                     as Text
+import           Data.Text.Lazy.Builder        as Builder
 
 -- jvm-binary
-import Language.JVM.TextSerializable
+import           Language.JVM.TextSerializable
 
 -- $setup
 -- >>> :set -XOverloadedStrings
@@ -137,10 +135,20 @@ newtype ClassName = ClassName
 textCls :: Text.Text -> Either String ClassName
 textCls = deserialize
 
+-- | Converts a text directly into a ClassName, will fail silently and
+-- might corrupt data.
+unsafeTextCls :: Text.Text -> ClassName
+unsafeTextCls = ClassName
+
 -- | Parses a ClassName from String, might fail with an exception.
 -- *warning* Unpure.
-strCls :: String -> ClassName
-strCls = either error id . deserialize . Text.pack
+strClsOrFail :: String -> ClassName
+strClsOrFail = textClsOrFail . Text.pack
+
+-- | Parses a ClassName from String, might fail with an exception.
+-- *warning* Unpure.
+textClsOrFail :: Text.Text -> ClassName
+textClsOrFail = either error id . deserialize
 
 -- | Takes the dot representation and converts it into a class.
 dotCls :: Text.Text -> Either String ClassName
@@ -154,13 +162,11 @@ dotCls = textCls . Text.map (\c -> if c == '.' then '/' else c)
 -- >>> deserialize parseClassName "java;"
 -- Left "endOfInput"
 parseClassName :: Parser ClassName
-parseClassName =
-  ClassName <$> takeWhile1 (notInClass ".;[<>:") <?> "ClassName"
+parseClassName = ClassName <$> takeWhile1 (notInClass ".;[<>:") <?> "ClassName"
 
 -- | Display a ClassName
 serializeClassName :: ClassName -> Builder
-serializeClassName =
-  Builder.fromText . classNameAsText
+serializeClassName = Builder.fromText . classNameAsText
 
 instance TextSerializable ClassName where
   parseText = parseClassName
@@ -176,15 +182,17 @@ data JRefType
 refTypeDepth :: JRefType -> Int
 refTypeDepth = \case
   JTArray (JTRef a) -> 1 + refTypeDepth a
-  JTArray _ -> 1
-  JTClass _ -> 0
+  JTArray _         -> 1
+  JTClass _         -> 0
 
 -- | Parses a 'JRefType'
 parseJRefType :: Parser JRefType
-parseJRefType = choice
-  [ JTArray <$> (char '[' *> parseJType)
-  , JTClass <$> (char 'L' *> parseClassName <* char ';')
-  ] <?> "JRefType"
+parseJRefType =
+  choice
+      [ JTArray <$> (char '[' *> parseJType)
+      , JTClass <$> (char 'L' *> parseClassName <* char ';')
+      ]
+    <?> "JRefType"
 
 serializeJRefType :: JRefType -> Builder
 serializeJRefType = \case
@@ -202,10 +210,9 @@ instance TextSerializable JRefType where
 -- >>> deserialize parseFlatJRefType "[I"
 -- Right "[I"
 parseFlatJRefType :: Parser JRefType
-parseFlatJRefType = choice
-  [ JTArray <$> (char '[' *> parseJType)
-  , JTClass <$> parseClassName
-  ] <?> "flat JRefType"
+parseFlatJRefType =
+  choice [JTArray <$> (char '[' *> parseJType), JTClass <$> parseClassName]
+    <?> "flat JRefType"
 
 serializeFlatJRefType :: JRefType -> Builder
 serializeFlatJRefType = \case
@@ -240,8 +247,8 @@ jBaseTypeToChar = \case
 jBaseTypeSize :: JBaseType -> Int
 jBaseTypeSize = \case
   JTDouble -> 2
-  JTLong -> 2
-  _ -> 1
+  JTLong   -> 2
+  _        -> 1
 
 -- | Parse a JBaseType
 parseJBaseType :: Parser JBaseType
@@ -254,12 +261,11 @@ parseJBaseType = try . (<?> "JBaseType") $ anyChar >>= \case
   'J' -> return JTLong
   'S' -> return JTShort
   'Z' -> return JTBoolean
-  s -> fail $ "Unknown char " ++ show s
+  s   -> fail $ "Unknown char " ++ show s
 
 -- | Serializes JBaseType
 serializeJBaseType :: JBaseType -> Builder
-serializeJBaseType =
-  Builder.singleton . jBaseTypeToChar
+serializeJBaseType = Builder.singleton . jBaseTypeToChar
 
 instance TextSerializable JBaseType where
   parseText = parseJBaseType
@@ -274,15 +280,13 @@ data JType
 
 -- | Parse a JType
 parseJType :: Parser JType
-parseJType = choice
-  [ JTRef  <$> parseJRefType
-  , JTBase <$> parseJBaseType
-  ] <?> "JType"
+parseJType =
+  choice [JTRef <$> parseJRefType, JTBase <$> parseJBaseType] <?> "JType"
 
 -- | Serialize 'JType'
 serializeJType :: JType -> Builder
 serializeJType = \case
-  JTRef r  -> serializeJRefType r
+  JTRef  r -> serializeJRefType r
   JTBase r -> serializeJBaseType r
 
 instance TextSerializable JType where
@@ -293,7 +297,7 @@ instance TextSerializable JType where
 jTypeSize :: JType -> Int
 jTypeSize = \case
   JTBase a -> jBaseTypeSize a
-  JTRef _ -> 1
+  JTRef  _ -> 1
 
 -- | A ReturnDescriptor is maybe a type, otherwise it is void.
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.3.3
@@ -309,15 +313,14 @@ newtype ReturnDescriptor =
 -- >>> parseTest parseReturnDescriptor "[I"
 -- Right (Just "[I")
 parseReturnDescriptor :: Parser ReturnDescriptor
-parseReturnDescriptor = ReturnDescriptor <$> choice
-    [ char 'V' >> return Nothing
-    , Just <$> parseJType
-    ] <?> "return type"
+parseReturnDescriptor =
+  ReturnDescriptor
+    <$> choice [char 'V' >> return Nothing, Just <$> parseJType]
+    <?> "return type"
 
 serializeReturnDescriptor :: ReturnDescriptor -> Builder
 serializeReturnDescriptor =
-  maybe (Builder.singleton 'V') serializeJType
-  . asMaybeJType
+  maybe (Builder.singleton 'V') serializeJType . asMaybeJType
 
 instance TextSerializable ReturnDescriptor where
   toBuilder = serializeReturnDescriptor
@@ -340,8 +343,10 @@ parseMethodDescriptor = (<?> "MethodDescriptor") $ do
 
 serializeMethodDescriptor :: MethodDescriptor -> Builder
 serializeMethodDescriptor (MethodDescriptor args rt) =
-  singleton '(' <> foldMap serializeJType args <> singleton ')'
-  <> serializeReturnDescriptor rt
+  singleton '('
+    <> foldMap serializeJType args
+    <> singleton ')'
+    <> serializeReturnDescriptor rt
 
 instance TextSerializable MethodDescriptor where
   toBuilder = serializeMethodDescriptor
@@ -361,8 +366,7 @@ parseFieldDescriptor = (<?> "FieldDescriptor") $ do
   FieldDescriptor <$> parseJType
 
 serializeFieldDescriptor :: FieldDescriptor -> Builder
-serializeFieldDescriptor =
-   serializeJType . fieldDescriptorType
+serializeFieldDescriptor = serializeJType . fieldDescriptorType
 
 instance TextSerializable FieldDescriptor where
   parseText = parseFieldDescriptor
@@ -398,8 +402,8 @@ instance AsNameAndType (NameAndType a) where
 -- Right "method:(I)V"
 parseNameAndType :: Parser a -> Parser (NameAndType a)
 parseNameAndType parser = (<?> "NameAndType") $ do
-    _name <- many1 (notChar ':') <* char ':'
-    NameAndType (Text.pack _name) <$> parser
+  _name <- many1 (notChar ':') <* char ':'
+  NameAndType (Text.pack _name) <$> parser
 
 serializeNameAndType :: (a -> Builder) -> NameAndType a -> Builder
 serializeNameAndType serializer (NameAndType _name descr) =
@@ -414,7 +418,8 @@ parseFieldId :: Parser FieldId
 parseFieldId = FieldId <$> parseNameAndType parseFieldDescriptor
 
 serializeFieldId :: FieldId -> Builder
-serializeFieldId = serializeNameAndType serializeFieldDescriptor . fieldIdAsNameAndType
+serializeFieldId =
+  serializeNameAndType serializeFieldDescriptor . fieldIdAsNameAndType
 
 instance TextSerializable FieldId where
   parseText = parseFieldId
@@ -438,7 +443,8 @@ parseMethodId :: Parser MethodId
 parseMethodId = MethodId <$> parseNameAndType parseMethodDescriptor
 
 serializeMethodId :: MethodId -> Builder
-serializeMethodId = serializeNameAndType serializeMethodDescriptor . methodIdAsNameAndType
+serializeMethodId =
+  serializeNameAndType serializeMethodDescriptor . methodIdAsNameAndType
 
 instance TextSerializable MethodId where
   parseText = parseMethodId
@@ -483,8 +489,12 @@ serializeInRefType serializeRefTypeId (InRefType n cid) =
 -- | Convert a InRefType to a InClass by casting
 -- all arrays to classes.
 inRefTypeAsInClass :: InRefType a -> InClass a
-inRefTypeAsInClass (InRefType rt rtid) =
-  InClass (case rt of JTArray _ -> "java/lang/Object"; JTClass a -> a) rtid
+inRefTypeAsInClass (InRefType rt rtid) = InClass
+  (case rt of
+    JTArray _ -> "java/lang/Object"
+    JTClass a -> a
+  )
+  rtid
 
 -- | A FieldId
 newtype AbsFieldId =

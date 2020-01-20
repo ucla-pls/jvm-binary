@@ -19,6 +19,10 @@ spec :: Spec
 spec = do
   it "can do a roundtrip" $ property $ prop_roundtrip_SignatureSpec
 
+  prop "can do handle field" $ prop_field_signature
+  prop "can do handle class" $ prop_class_signature
+  prop "can do handle method" $ prop_method_signature
+
   spec_real_signatures
 
 prop_roundtrip_SignatureSpec :: Signature High -> Property
@@ -51,6 +55,15 @@ spec_real_signatures = do
     let sig = "Ljava/lang/Object;"
     parseOnly referenceTypeP sig `shouldBe` Right
       (RefClassType (ClassType "java/lang/Object" Nothing []))
+
+  it "can handle this class type Lqueues/Deque<TItem;>.Node;" $ do
+    let sig = "Lqueues/Deque<TItem;>.Node;"
+    parseOnly classTypeP sig `shouldBe` Right
+      (ClassType
+        "queues/Deque"
+        (Just (InnerClassType "Node" Nothing []))
+        [Just (TypeArgument Nothing (RefTypeVariable (TypeVariable "Item")))]
+      )
 
   it "can handle this type parameter E:Ljava/lang/Object;" $ do
     let sig = "E:Ljava/lang/Object;"
@@ -187,14 +200,14 @@ instance Arbitrary (FieldSignature) where
   arbitrary = genericArbitraryU
 
 instance Arbitrary (ReferenceType) where
-  arbitrary = do
+  arbitrary = scale (`div` 2) $ do
     n <- getSize
     if n == 0
       then pure (RefTypeVariable $ TypeVariable "X")
       else scale (\s -> s `div` 2) $ genericArbitraryU
 
 instance Arbitrary (ClassType) where
-  arbitrary = do
+  arbitrary = scale (`div` 2) $ do
     s <- getSize
     n <- choose (0, s)
     x <- vectorOf n (resize (s `div` n) arbitrary)
@@ -232,7 +245,11 @@ instance Arbitrary (TypeArgument) where
 
 instance Arbitrary (TypeParameter) where
   arbitrary =
-    TypeParameter <$> elements ["A", "B", "C", "HJ"] <*> arbitrary <*> arbitrary
+    scale (`div` 2)
+      $   TypeParameter
+      <$> elements ["A", "B", "C", "HJ"]
+      <*> arbitrary
+      <*> arbitrary
 
 instance Arbitrary (Wildcard) where
   arbitrary = genericArbitraryU

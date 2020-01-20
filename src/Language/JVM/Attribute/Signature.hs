@@ -256,7 +256,6 @@ isSimpleThrowsSignature = \case
   ThrowsTypeVariable _ -> False
 
 
-
 instance TextSerializable ClassSignature where
   parseText = classSignatureP
   toBuilder = classSignatureT
