@@ -30,6 +30,10 @@ dependencies:
 - data-binary-ieee754
 - template-haskell
 
+data-files:
+  - test/data/project/*
+  - test/data/*
+
 library:
   source-dirs: src
   ghc-options: -Wall
