@@ -39,7 +39,6 @@ import Data.Monoid
 import           Control.Monad
 import           Control.Applicative
 import           Data.Maybe
-import           Data.Bifunctor
 import qualified Data.List            as List
 
 -- binary
@@ -206,4 +205,8 @@ fromAttributes al attrs f = do
 
 readFromStrict :: Binary a => Attribute r -> Either String a
 readFromStrict =
-    bimap trd trd . decodeOrFail . BL.fromStrict . aInfo
+    either (Left . trd) tst . decodeOrFail . BL.fromStrict . aInfo
+    where
+      tst :: (BL.ByteString, ByteOffset, a) -> Either String a
+      tst (s, _, a) = 
+        if BL.null s then Right a else Left "Incomplete attribute parsing"
