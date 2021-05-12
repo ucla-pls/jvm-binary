@@ -1,5 +1,8 @@
 # Change log
 
+## Version 0.9.1
+- Upgrade to GHC 8.10.4
+
 ## Version 0.9.0
 - Changed attributeError to evolveError
 - Added new instruction NewArray to correctly model array behaviour

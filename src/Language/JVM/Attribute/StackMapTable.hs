@@ -137,7 +137,7 @@ instance Binary (StackMapFrame Low) where
           putWord8 (251 - w)
           putWord16be off
         | otherwise ->
-          fail $ "Can't write a cutoff value outside ]0,3], but was: " ++ show w
+          error $ "Can't write a cutoff value outside ]0,3], but was: " ++ show w
 
       AppendFrame vs
         | length vs <= 3 && 0 < length vs -> do
@@ -145,7 +145,7 @@ instance Binary (StackMapFrame Low) where
           putWord16be off
           mapM_ put vs
         | otherwise ->
-          fail $ "The AppendFrame has to contain at least 1 and at most 3 elements: " ++ show vs
+          error $ "The AppendFrame has to contain at least 1 and at most 3 elements: " ++ show vs
 
       FullFrame ls1 ls2 -> do
         putWord8 255
