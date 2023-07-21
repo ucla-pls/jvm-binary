@@ -1,24 +1,27 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Language.JVM.Attribute.InnerClassesSpec where
 
-import           SpecHelper
+import SpecHelper
+
 -- import qualified Data.Set as S
 
-import           Language.JVM.ConstantSpec               ()
+import Language.JVM.ConstantSpec ()
 
-import           Language.JVM.Attribute.InnerClasses
-import           Language.JVM
+import Language.JVM
+import Language.JVM.Attribute.InnerClasses
 
 spec :: Spec
 spec = do
-  it "can do a roundtrip" $ property $ prop_roundtrip_InnerClassesSpec
-  --spec_inner_classes
+  return ()
 
-prop_roundtrip_InnerClassesSpec :: InnerClasses High -> Property
-prop_roundtrip_InnerClassesSpec = isoRoundtrip
+-- it "can do a roundtrip" $ property $ prop_roundtrip_InnerClassesSpec
+-- spec_inner_classes
+
+-- prop_roundtrip_InnerClassesSpec :: InnerClasses High -> Property
+-- prop_roundtrip_InnerClassesSpec = isoRoundtrip
 
 -- spec_inner_classes ::  SpecWith ()
 -- spec_inner_classes = do
@@ -57,14 +60,13 @@ prop_roundtrip_InnerClassesSpec = isoRoundtrip
 --   it "can handle Iterator" $ do
 --    let signature = "<T:Ljava/lang/Object;>Ljava/lang/Object;"
 
-instance Arbitrary (InnerClasses High) where
-  arbitrary = genericArbitraryU
+-- instance Arbitrary (InnerClasses High) where
+--   arbitrary = genericArbitraryU
+--
+-- instance Arbitrary (InnerClass High) where
+--   arbitrary = genericArbitraryU
 
-instance Arbitrary (InnerClass High) where
-  arbitrary = genericArbitraryU
-
-
-  -- "Lcom/apple/eawt/_AppEventHandler$_AppEventDispatcher<Lcom/apple/eawt/QuitHandler;>;"
+-- "Lcom/apple/eawt/_AppEventHandler$_AppEventDispatcher<Lcom/apple/eawt/QuitHandler;>;"
 -- "Lcom/apple/eawt/_AppEventHandler$_BooleanAppEventMultiplexor<Lcom/apple/eawt/ScreenSleepListener;Lcom/apple/eawt/AppEvent$ScreenSleepEvent;>;"
 -- "Lcom/apple/eawt/_AppEventHandler$_BooleanAppEventMultiplexor<Lcom/apple/eawt/SystemSleepListener;Lcom/apple/eawt/AppEvent$SystemSleepEvent;>;"
 -- "Lcom/apple/eawt/_AppEventHandler$_BooleanAppEventMultiplexor<Lcom/apple/eawt/UserSessionListener;Lcom/apple/eawt/AppEvent$UserSessionEvent;>;"

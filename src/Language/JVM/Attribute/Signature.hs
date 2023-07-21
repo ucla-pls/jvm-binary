@@ -1,12 +1,13 @@
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE LambdaCase     #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell    #-}
-{-|
+{-# LANGUAGE TemplateHaskell #-}
+
+{- |
 Module      : Language.JVM.Attribute.Signature
 Copyright   : (c) Christian Gram Kalhauge, 2018
 License     : MIT
@@ -16,96 +17,96 @@ Based on the Signature Attribute,
 as documented [here](http://docs.oracle.com/javase/specs/jvms/se9/html/jvms-4.html#jvms-4.7.9),
 and the signature syntax defined [here](https://docs.oracle.com/javase/specs/jvms/se9/html/jvms-4.html#jvms-4.7.9.1).
 -}
-
-module Language.JVM.Attribute.Signature
-  ( Signature(..)
-  , signatureToText
-  , signatureFromText
+module Language.JVM.Attribute.Signature (
+  Signature (..),
+  signatureToText,
+  signatureFromText,
 
   -- * Top Level Definitions
-  , ClassSignature(..)
-  , isSimpleClassSignature
-  , classSignatureToText
-  , classSignatureFromText
-  , MethodSignature(..)
-  , isSimpleMethodSignature
-  , methodSignatureToText
-  , methodSignatureFromText
-  , FieldSignature(..)
-  , isSimpleFieldSignature
-  , fieldSignatureToText
-  , fieldSignatureFromText
+  ClassSignature (..),
+  isSimpleClassSignature,
+  classSignatureToText,
+  classSignatureFromText,
+  MethodSignature (..),
+  isSimpleMethodSignature,
+  methodSignatureToText,
+  methodSignatureFromText,
+  FieldSignature (..),
+  isSimpleFieldSignature,
+  fieldSignatureToText,
+  fieldSignatureFromText,
 
   -- ** Handlers
 
-
   -- * Lower Level Definitions
-  , ClassType(..)
-  , isSimpleClassType
-  , classTypeToName
-  , classTypeFromName
-  , InnerClassType(..)
-  , ReferenceType(..)
-  , isSimpleReferenceType
-  , referenceTypeFromRefType
-  , ThrowsSignature(..)
-  , isSimpleThrowsSignature
-  , throwsSignatureFromName
-  , TypeSignature(..)
-  , isSimpleTypeSignature
-  , typeSignatureFromType
-  , TypeArgument(..)
-  , TypeParameter(..)
-  , TypeVariable(..)
-  , Wildcard(..)
+  ClassType (..),
+  isSimpleClassType,
+  classTypeToName,
+  classTypeFromName,
+  InnerClassType (..),
+  ReferenceType (..),
+  isSimpleReferenceType,
+  referenceTypeFromRefType,
+  ThrowsSignature (..),
+  isSimpleThrowsSignature,
+  throwsSignatureFromName,
+  TypeSignature (..),
+  isSimpleTypeSignature,
+  typeSignatureFromType,
+  TypeArgument (..),
+  TypeParameter (..),
+  TypeVariable (..),
+  Wildcard (..),
 
   -- * Parsers
-  , classSignatureP
-  , methodSignatureP
-  , fieldSignatureP
-  , classTypeP
-  , classTypeT
-  , referenceTypeP
-  , referenceTypeT
-  , throwsSignatureP
-  , throwsSignatureT
-  , typeArgumentsT
-  , typeArgumentsP
-  , typeArgumentP
-  , typeArgumentT
-  , typeParameterP
-  , typeParameterT
-  , typeParametersT
-  , typeParametersP
-  , typeSignatureP
-  , typeSignatureT
-  , typeVariableP
-  )
+  classSignatureP,
+  methodSignatureP,
+  fieldSignatureP,
+  classTypeP,
+  classTypeT,
+  referenceTypeP,
+  referenceTypeT,
+  throwsSignatureP,
+  throwsSignatureT,
+  typeArgumentsT,
+  typeArgumentsP,
+  typeArgumentP,
+  typeArgumentT,
+  typeParameterP,
+  typeParameterT,
+  typeParametersT,
+  typeParametersP,
+  typeSignatureP,
+  typeSignatureT,
+  typeVariableP,
+)
 where
 
-import           Control.DeepSeq                ( NFData )
-import qualified Data.Text                     as Text
+import Control.DeepSeq (NFData)
+import qualified Data.Text as Text
 
-import qualified Data.Text.Lazy                as LText
-import           Data.Text.Lazy.Builder        as Text
+import qualified Data.Text.Lazy as LText
+import Data.Text.Lazy.Builder as Text
 
-import           Data.Functor
-import           GHC.Generics                   ( Generic )
+import Data.Functor
+import GHC.Generics (Generic)
 
-import           Data.Attoparsec.Text
-import           Control.Applicative
+import Control.Applicative
+import Data.Attoparsec.Text
 
-import qualified Data.List                     as L
+import qualified Data.List as L
 
-import           Language.JVM.Attribute.Base
-import           Language.JVM.Staged
-import           Language.JVM.Type
+import Language.JVM.Attribute.Base
+import Language.JVM.Staged
+import Language.JVM.Type
+
+newtype Signature a
+  = Signature (Ref Text.Text a)
+
+$(deriveBaseWithBinary ''Signature)
 
 instance IsAttribute (Signature Low) where
   attrName = Const "Signature"
-
-newtype Signature a =
-  Signature (Ref Text.Text a)
 
 signatureToText :: Signature High -> Text.Text
 signatureToText (Signature s) = s
@@ -114,7 +115,7 @@ signatureFromText :: Text.Text -> Signature High
 signatureFromText = Signature
 
 data ClassSignature = ClassSignature
-  { csTypeParameters      :: [TypeParameter]
+  { csTypeParameters :: [TypeParameter]
   , csSuperclassSignature :: ClassType
   , csInterfaceSignatures :: [ClassType]
   }
@@ -122,14 +123,13 @@ data ClassSignature = ClassSignature
 
 data MethodSignature = MethodSignature
   { msTypeParameters :: [TypeParameter]
-  , msArguments      :: [TypeSignature]
-  , msResults        :: Maybe TypeSignature
-  , msThrows         :: [ ThrowsSignature ]
+  , msArguments :: [TypeSignature]
+  , msResults :: Maybe TypeSignature
+  , msThrows :: [ThrowsSignature]
   }
   deriving (Show, Eq, Ord, Generic, NFData)
 
-newtype FieldSignature =
-  FieldSignature {fsRefType :: ReferenceType}
+newtype FieldSignature = FieldSignature {fsRefType :: ReferenceType}
   deriving (Show, Eq, Ord, Generic, NFData)
 
 data TypeSignature
@@ -143,39 +143,37 @@ data ReferenceType
   | RefArrayType TypeSignature
   deriving (Show, Eq, Ord, Generic, NFData)
 
-data ClassType
-  = ClassType
-    { ctsName          :: !ClassName
-    , ctsInnerClass    :: !(Maybe InnerClassType)
-    , ctsTypeArguments :: [Maybe TypeArgument]
-    }
+data ClassType = ClassType
+  { ctsName :: !ClassName
+  , ctsInnerClass :: !(Maybe InnerClassType)
+  , ctsTypeArguments :: [Maybe TypeArgument]
+  }
   deriving (Show, Eq, Ord, Generic, NFData)
 
-data InnerClassType
-  = InnerClassType
-    { ictsName          :: !Text.Text
-    , ictsInnerClass    :: !(Maybe InnerClassType)
-    , ictsTypeArguments :: [Maybe TypeArgument]
-    }
+data InnerClassType = InnerClassType
+  { ictsName :: !Text.Text
+  , ictsInnerClass :: !(Maybe InnerClassType)
+  , ictsTypeArguments :: [Maybe TypeArgument]
+  }
   deriving (Show, Eq, Ord, Generic, NFData)
 
 data TypeArgument = TypeArgument
   { taWildcard :: Maybe Wildcard
-  , taType     :: ReferenceType
-  } deriving (Show, Eq, Ord, Generic, NFData)
-
-data Wildcard =
-  WildPlus | WildMinus
+  , taType :: ReferenceType
+  }
   deriving (Show, Eq, Ord, Generic, NFData)
 
-newtype TypeVariable =
-  TypeVariable { tvAsText :: Text.Text }
+data Wildcard
+  = WildPlus
+  | WildMinus
   deriving (Show, Eq, Ord, Generic, NFData)
 
-data TypeParameter =
-  TypeParameter
-  { tpIdentifier    :: Text.Text
-  , tpClassBound     :: Maybe ReferenceType
+newtype TypeVariable = TypeVariable {tvAsText :: Text.Text}
+  deriving (Show, Eq, Ord, Generic, NFData)
+
+data TypeParameter = TypeParameter
+  { tpIdentifier :: Text.Text
+  , tpClassBound :: Maybe ReferenceType
   , tpInterfaceBound :: [ReferenceType]
   }
   deriving (Show, Eq, Ord, Generic, NFData)
@@ -191,15 +189,16 @@ classTypeToName :: ClassType -> ClassName
 classTypeToName =
   (either error id . textCls . Text.intercalate "$" . getClassName)
  where
-  getClassName (ClassType {..}) =
+  getClassName (ClassType{..}) =
     classNameAsText ctsName : getInnerClassName ctsInnerClass
 
   getInnerClassName = \case
-    Just (InnerClassType {..}) -> ictsName : getInnerClassName ictsInnerClass
-    Nothing                    -> []
+    Just (InnerClassType{..}) -> ictsName : getInnerClassName ictsInnerClass
+    Nothing -> []
 
--- | Create a classType from a Name
--- Note the language is wierd here! Main.A is not Main$A, but Main<T>.A is!
+{- | Create a classType from a Name
+ Note the language is wierd here! Main.A is not Main$A, but Main<T>.A is!
+-}
 classTypeFromName :: ClassName -> ClassType
 classTypeFromName cn = ClassType cn Nothing []
 
@@ -214,47 +213,48 @@ referenceTypeFromRefType = \case
 typeSignatureFromType :: JType -> TypeSignature
 typeSignatureFromType = \case
   JTBase a -> BaseType a
-  JTRef  a -> ReferenceType (referenceTypeFromRefType a)
+  JTRef a -> ReferenceType (referenceTypeFromRefType a)
 
 isSimpleMethodSignature :: MethodSignature -> Bool
-isSimpleMethodSignature MethodSignature {..} = and
-  [ null msTypeParameters
-  , all isSimpleTypeSignature   msArguments
-  , all isSimpleTypeSignature   msResults
-  , all isSimpleThrowsSignature msThrows
-  ]
+isSimpleMethodSignature MethodSignature{..} =
+  and
+    [ null msTypeParameters
+    , all isSimpleTypeSignature msArguments
+    , all isSimpleTypeSignature msResults
+    , all isSimpleThrowsSignature msThrows
+    ]
 
 isSimpleClassSignature :: ClassSignature -> Bool
-isSimpleClassSignature ClassSignature {..} = and
-  [ null csTypeParameters
-  , isSimpleClassType csSuperclassSignature
-  , all isSimpleClassType csInterfaceSignatures
-  ]
+isSimpleClassSignature ClassSignature{..} =
+  and
+    [ null csTypeParameters
+    , isSimpleClassType csSuperclassSignature
+    , all isSimpleClassType csInterfaceSignatures
+    ]
 
 isSimpleFieldSignature :: FieldSignature -> Bool
-isSimpleFieldSignature FieldSignature {..} = isSimpleReferenceType fsRefType
+isSimpleFieldSignature FieldSignature{..} = isSimpleReferenceType fsRefType
 
 isSimpleTypeSignature :: TypeSignature -> Bool
 isSimpleTypeSignature = \case
-  BaseType      _ -> True
+  BaseType _ -> True
   ReferenceType a -> isSimpleReferenceType a
 
 isSimpleReferenceType :: ReferenceType -> Bool
 isSimpleReferenceType = \case
-  RefArrayType    a -> isSimpleTypeSignature a
-  RefClassType    a -> isSimpleClassType a
+  RefArrayType a -> isSimpleTypeSignature a
+  RefClassType a -> isSimpleClassType a
   RefTypeVariable _ -> False
 
 isSimpleClassType :: ClassType -> Bool
 isSimpleClassType = \case
   ClassType _ Nothing [] -> True
-  _                      -> False
+  _ -> False
 
 isSimpleThrowsSignature :: ThrowsSignature -> Bool
 isSimpleThrowsSignature = \case
-  ThrowsClass        a -> isSimpleClassType a
+  ThrowsClass a -> isSimpleClassType a
   ThrowsTypeVariable _ -> False
-
 
 instance TextSerializable ClassSignature where
   parseText = classSignatureP
@@ -317,7 +317,6 @@ classSignatureT :: ClassSignature -> Builder
 classSignatureT (ClassSignature tp ct its) = do
   typeParametersT tp <> foldMap classTypeT (ct : its)
 
-
 typeSignatureP :: Parser TypeSignature
 typeSignatureP = do
   choice
@@ -327,7 +326,7 @@ typeSignatureP = do
 
 typeSignatureT :: TypeSignature -> Builder
 typeSignatureT (ReferenceType t) = referenceTypeT t
-typeSignatureT (BaseType      t) = singleton (jBaseTypeToChar t)
+typeSignatureT (BaseType t) = singleton (jBaseTypeToChar t)
 
 referenceTypeP :: Parser ReferenceType
 referenceTypeP = do
@@ -339,26 +338,26 @@ referenceTypeP = do
 
 referenceTypeT :: ReferenceType -> Builder
 referenceTypeT t = case t of
-  RefClassType    ct -> classTypeT ct
+  RefClassType ct -> classTypeT ct
   RefTypeVariable tv -> typeVariableT tv
-  RefArrayType    at -> singleton '[' <> typeSignatureT at
-
+  RefArrayType at -> singleton '[' <> typeSignatureT at
 
 classTypeP :: Parser ClassType
 classTypeP = nameit "ClassType" $ do
-  _   <- char 'L'
-  cn  <- parseClassName
-  ta  <- option [] typeArgumentsP
+  _ <- char 'L'
+  cn <- parseClassName
+  ta <- option [] typeArgumentsP
   ict <- many' $ do
-    _   <- char '.'
-    i   <- identifierP
+    _ <- char '.'
+    i <- identifierP
     ta' <- option [] typeArgumentsP
     return (i, ta')
   _ <- char ';'
-  return $ ClassType
-    cn
-    (L.foldr (\(i, ta') a -> Just $ InnerClassType i a ta') Nothing ict)
-    ta
+  return $
+    ClassType
+      cn
+      (L.foldr (\(i, ta') a -> Just $ InnerClassType i a ta') Nothing ict)
+      ta
 
 classTypeT :: ClassType -> Builder
 classTypeT (ClassType n ic arg) =
@@ -373,24 +372,23 @@ classTypeT (ClassType n ic arg) =
     Just (InnerClassType n' ic' arg') ->
       singleton '.' <> Text.fromText n' <> typeArgumentsT arg' <> go ic'
 
-
 typeArgumentsP :: Parser [Maybe TypeArgument]
 typeArgumentsP = do
-  _   <- char '<'
+  _ <- char '<'
   tas <- many1' typeArgumentP
-  _   <- char '>'
+  _ <- char '>'
   return tas
 
 typeArgumentP :: Parser (Maybe TypeArgument)
 typeArgumentP = do
   choice
-      [ Just
-        <$> (   TypeArgument
-            <$> option Nothing (Just <$> wildcardP)
-            <*> referenceTypeP
+    [ Just
+        <$> ( TypeArgument
+                <$> option Nothing (Just <$> wildcardP)
+                <*> referenceTypeP
             )
-      , char '*' $> Nothing
-      ]
+    , char '*' $> Nothing
+    ]
     <?> "TypeArgument"
 
 typeArgumentsT :: [Maybe TypeArgument] -> Builder
@@ -404,21 +402,19 @@ typeArgumentT a = do
   case a of
     Nothing -> singleton '*'
     Just (TypeArgument w rt) ->
-      (case w of
-          Just m  -> wildcardT m
+      ( case w of
+          Just m -> wildcardT m
           Nothing -> mempty
-        )
+      )
         <> referenceTypeT rt
-
 
 wildcardP :: Parser Wildcard
 wildcardP = choice [char '+' $> WildPlus, char '-' $> WildMinus]
 
 wildcardT :: Wildcard -> Builder
 wildcardT = \case
-  WildPlus  -> singleton '+'
+  WildPlus -> singleton '+'
   WildMinus -> singleton '-'
-
 
 typeVariableP :: Parser TypeVariable
 typeVariableP = do
@@ -431,12 +427,11 @@ typeVariableT :: TypeVariable -> Builder
 typeVariableT (TypeVariable t) = do
   singleton 'T' <> Text.fromText t <> singleton ';'
 
-
 typeParametersP :: Parser [TypeParameter]
 typeParametersP = nameit "TypeParameters" $ do
-  _   <- char '<'
+  _ <- char '<'
   tps <- many1' typeParameterP
-  _   <- char '>'
+  _ <- char '>'
   return tps
 
 typeParametersT :: [TypeParameter] -> Builder
@@ -448,9 +443,9 @@ typeParametersT args = do
 typeParameterP :: Parser TypeParameter
 typeParameterP = nameit "TypeParameter" $ do
   id_ <- identifierP
-  _   <- char ':'
-  cb  <- optional referenceTypeP
-  ib  <- many' (char ':' >> referenceTypeP)
+  _ <- char ':'
+  cb <- optional referenceTypeP
+  ib <- many' (char ':' >> referenceTypeP)
   return $ TypeParameter id_ cb ib
 
 typeParameterT :: TypeParameter -> Builder
@@ -466,14 +461,13 @@ nameit str m = m <?> str
 identifierP :: Parser Text.Text
 identifierP = takeWhile1 (notInClass ".;[/<>:") <?> "Identifier"
 
-
 methodSignatureP :: Parser MethodSignature
 methodSignatureP = do
-  tps   <- option [] typeParametersP
-  _     <- char '('
-  targ  <- many' typeSignatureP
-  _     <- char ')'
-  res   <- choice [Just <$> typeSignatureP, char 'V' $> Nothing]
+  tps <- option [] typeParametersP
+  _ <- char '('
+  targ <- many' typeSignatureP
+  _ <- char ')'
+  res <- choice [Just <$> typeSignatureP, char 'V' $> Nothing]
   thrws <- many' throwsSignatureP
   return $ MethodSignature tps targ res thrws
 
@@ -492,23 +486,22 @@ methodSignatureT (MethodSignature tp args res thrws) = do
     <> singleton '('
     <> foldMap typeSignatureT args
     <> singleton ')'
-    <> (case res of
-         Nothing -> singleton 'V'
-         Just r  -> typeSignatureT r
+    <> ( case res of
+          Nothing -> singleton 'V'
+          Just r -> typeSignatureT r
        )
     <> foldMap throwsSignatureT thrws
-
 
 throwsSignatureP :: Parser ThrowsSignature
 throwsSignatureP = do
   _ <- char '^'
   choice [ThrowsClass <$> classTypeP, ThrowsTypeVariable <$> typeVariableP]
 
-
 throwsSignatureT :: ThrowsSignature -> Builder
-throwsSignatureT t = singleton '^' <> case t of
-  ThrowsClass        ct -> classTypeT ct
-  ThrowsTypeVariable tt -> typeVariableT tt
+throwsSignatureT t =
+  singleton '^' <> case t of
+    ThrowsClass ct -> classTypeT ct
+    ThrowsTypeVariable tt -> typeVariableT tt
 
 fieldSignatureP :: Parser FieldSignature
 fieldSignatureP = FieldSignature <$> referenceTypeP
@@ -523,5 +516,3 @@ instance Staged Signature where
   evolve (Signature a) = label "Signature" $ Signature <$> link a
 
   devolve (Signature a) = label "Signature" $ Signature <$> unlink a
-
-$(deriveBaseWithBinary ''Signature)

@@ -1,33 +1,35 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Language.JVMSpec where
 
-import           SpecHelper
+import SpecHelper
 
-import Test.Hspec hiding (shouldBe, shouldSatisfy, shouldMatchList)
+import Test.Hspec hiding (shouldBe, shouldMatchList, shouldSatisfy)
 
-import qualified Data.ByteString.Lazy                 as BL
-import           Data.Either
-import           Data.Foldable
-import           Data.List                            as List
-import qualified Data.Text                            as Text
+import qualified Data.ByteString.Lazy as BL
+import Data.Either
+import Data.Foldable
+import Data.List as List
+import qualified Data.Text as Text
 
 -- prelude
+
+import Control.Monad
 import System.Environment
 
 -- filepath
 import System.FilePath
 
 -- vector
-import qualified Data.Vector                          as V
+import qualified Data.Vector as V
 
 -- zip-archive
-import           Codec.Archive.Zip
+import Codec.Archive.Zip
 
-import           Language.JVM
-import qualified Language.JVM.Attribute.Code          as C
-import           Language.JVM.Attribute.StackMapTable
-
+import Language.JVM
+import qualified Language.JVM.Attribute.Code as C
+import Language.JVM.Attribute.StackMapTable
 
 spec :: Spec
 spec = do
@@ -53,7 +55,7 @@ spec = do
   describe "the standard library" $ do
     runIO (lookupEnv "JAVA_HOME") >>= \case
       Just home -> do
-        archive <- runIO $ either (error . ("Could not read zip file: "++) . show) return =<< readZipFile (home </> "jre/lib/rt.jar")
+        archive <- runIO $ either (error . ("Could not read zip file: " ++) . show) return =<< readZipFile (home </> "jre/lib/rt.jar")
 
         let priorities =
               [ "java/lang/Class.class"
@@ -69,8 +71,9 @@ spec = do
                 fail $ show msg
 
         let _classes =
-              filter (\entry -> takeExtension (eRelativePath entry) == ".class")
-              (zEntries archive)
+              filter
+                (\entry -> takeExtension (eRelativePath entry) == ".class")
+                (zEntries archive)
         forM_ _classes $ \entry -> do
           it ("can read " ++ eRelativePath entry) $ do
             case readClassFile (fromEntry entry) of
@@ -88,7 +91,6 @@ spec = do
                 fail $ show msg
       Nothing -> do
         runIO $ putStrLn "Expecting JAVA_HOME to be set"
-
 
 spec_reading_classfile :: Spec
 spec_reading_classfile = testAllFiles $ \bs -> do
@@ -148,14 +150,14 @@ spec_reading_classfile = testAllFiles $ \bs -> do
     let Right x = me
     it "has same or smaller constant pool" $ do
       let d' = devolveClassFile x
-      (poolCount $ cConstantPool d') `shouldSatisfy`
-        (<= (poolCount $ cConstantPool cls))
+      (poolCount $ cConstantPool d')
+        `shouldSatisfy` (<= (poolCount $ cConstantPool cls))
 
     -- it "is the same when devolving with the original constant pool" $
     --   devolveClassFile' (cConstantPool cls) x `shouldMatchClass'` cls
 
     it "can do full read - write - read process" $ do
-      let w  = writeClassFile x
+      let w = writeClassFile x
       let y' = readClassFile w
       y' `shouldSatisfy` isRight
       let Right y = y'
@@ -168,7 +170,7 @@ shouldMatchClass y x = do
   cSuperClass y `shouldBe` cSuperClass x
   cInterfaces y `shouldBe` cInterfaces x
   cFields' y `shouldBe` cFields' x
-  forM_ (zip (cMethods y) (cMethods x)) $ \ (ym, xm) -> do
+  forM_ (zip (cMethods y) (cMethods x)) $ \(ym, xm) -> do
     ym `shouldMatchMethod` xm
   y `shouldBe` x
 
@@ -190,7 +192,7 @@ shouldMatchMethod ym xm = do
   mExceptions ym `shouldMatchList` mExceptions xm
   case (mCode ym, mCode xm) of
     (Just yc, Just xc) -> do
-      cmpOver C.codeByteCodeOprs yc xc $ \ yb xb -> do
+      cmpOver C.codeByteCodeOprs yc xc $ \yb xb -> do
         yb `shouldBe` xb
     _ -> mCode ym `shouldBe` mCode xm
 
@@ -199,16 +201,16 @@ shouldMatchMethod' ym xm = do
   mAccessFlags ym `shouldBe` mAccessFlags xm
   mName ym `shouldBe` mName xm
   mDescriptor ym `shouldBe` mDescriptor xm
-  forM_ (zip (unSizedList $ mAttributes ym ) (unSizedList $ mAttributes xm)) $ \(ya, xa) -> do
+  forM_ (zip (unSizedList $ mAttributes ym) (unSizedList $ mAttributes xm)) $ \(ya, xa) -> do
     case (fromAttribute' ya, fromAttribute' xa) of
       (Right yc, Right xc) -> do
         cmpOn C.codeMaxStack yc xc
         cmpOn C.codeMaxLocals yc xc
         cmpOn (C.codeByteCodeInsts :: Code Low -> V.Vector (ByteCodeInst Low)) yc xc
         cmpOn C.codeExceptionTable yc xc
-        cmpOver (List.sort . unSizedList . C.codeAttributes) yc xc $ \ yca xca -> do
+        cmpOver (List.sort . unSizedList . C.codeAttributes) yc xc $ \yca xca -> do
           case (fromAttribute' yca, fromAttribute' xca)
-             :: (Either String (StackMapTable Low), Either String (StackMapTable Low)) of
+                :: (Either String (StackMapTable Low), Either String (StackMapTable Low)) of
             (Right yst, Right xst) -> do
               cmpOver stackMapTable yst xst $ shouldBe
             (yst, xst) ->

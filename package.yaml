@@ -1,5 +1,5 @@
 name: jvm-binary
-version: '0.10.0'
+version: '0.11.0'
 author: Christian Gram Kalhauge
 maintainer: Christian Gram Kalhauge <kalhauge@cs.ucla.edu>
 synopsis: A library for reading Java class-files
@@ -17,7 +17,7 @@ extra-source-files:
 - README.md
 
 dependencies:
-- base >= 4.9 && < 4.15
+- base >= 4.9 && < 4.18
 - binary
 - bytestring
 - containers
@@ -32,7 +32,6 @@ dependencies:
 
 data-files:
   - test/data/project/*
-  - test/data/*
 
 library:
   source-dirs: src

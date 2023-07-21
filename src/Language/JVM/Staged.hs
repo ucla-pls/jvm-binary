@@ -1,35 +1,35 @@
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-|
+{-# LANGUAGE UndecidableInstances #-}
+
+{- |
 Copyright   : (c) Christian Gram Kalhauge, 2018
 License     : MIT
 Maintainer  : kalhuage@cs.ucla.edu
-
 -}
-module Language.JVM.Staged
-  ( Staged(..)
+module Language.JVM.Staged (
+  Staged (..),
 
   -- * Monad Classes
-  , LabelM(..)
-  , EvolveM(..)
-  , DevolveM(..)
+  LabelM (..),
+  EvolveM (..),
+  DevolveM (..),
 
   -- * AttributeLocation
-  , AttributeLocation(..)
+  AttributeLocation (..),
 
   -- * Re-exports
-  , module Language.JVM.Stage
-  , module Language.JVM.TH
-  )
+  module Language.JVM.Stage,
+  module Language.JVM.TH,
+)
 where
 
-import qualified Data.Text                     as Text
+import qualified Data.Text as Text
 
-import           Language.JVM.Constant
-import           Language.JVM.Stage
-import           Language.JVM.TH
+import Language.JVM.Constant
+import Language.JVM.Stage
+import Language.JVM.TH
 
 class Monad m => LabelM m where
   label :: String -> m a -> m a
@@ -58,7 +58,7 @@ class Staged s where
   stage f a = f a
   {-# INLINE stage #-}
 
-  evolve ::  EvolveM m => s Low -> m (s High)
+  evolve :: EvolveM m => s Low -> m (s High)
   evolve = stage evolve
   {-# INLINE evolve #-}
 
@@ -68,52 +68,51 @@ class Staged s where
 
 instance Staged Constant where
   evolve c = case c of
-    CString    s -> pure $ CString s
-    CInteger   i -> pure $ CInteger i
-    CFloat     d -> pure $ CFloat d
-    CLong      l -> pure $ CLong l
-    CDouble    d -> pure $ CDouble d
-    CClassRef  r -> label "CClassRef" $ CClassRef <$> link r
+    CString s -> pure $ CString s
+    CInteger i -> pure $ CInteger i
+    CFloat d -> pure $ CFloat d
+    CLong l -> pure $ CLong l
+    CDouble d -> pure $ CDouble d
+    CClassRef r -> label "CClassRef" $ CClassRef <$> link r
     CStringRef r -> label "CStringRef" $ CStringRef <$> link r
     CFieldRef (x, y) ->
-      label "CFieldRef"
-        $   CFieldRef
-        .   AbsFieldId
-        <$> (InClass <$> link x <*> link y)
+      label "CFieldRef" $
+        CFieldRef
+          . AbsFieldId
+          <$> (InClass <$> link x <*> link y)
     CMethodRef (x, y) ->
       label "CMethodRef" $ CMethodRef <$> (InRefType <$> link x <*> link y)
     CInterfaceMethodRef (x, y) ->
-      label "CInterfaceMethodRef"
-        $   CInterfaceMethodRef
-        <$> (InRefType <$> link x <*> link y)
+      label "CInterfaceMethodRef" $
+        CInterfaceMethodRef
+          <$> (InRefType <$> link x <*> link y)
     CNameAndType r1 r2 ->
       label "CNameAndType" $ CNameAndType <$> link r1 <*> link r2
-    CMethodHandle  mh -> label "CMethodHandle" $ CMethodHandle <$> evolve mh
-    CMethodType    r  -> label "CMethodType" $ CMethodType <$> link r
-    CInvokeDynamic i  -> label "CInvokeDynamic" $ CInvokeDynamic <$> evolve i
+    CMethodHandle mh -> label "CMethodHandle" $ CMethodHandle <$> evolve mh
+    CMethodType r -> label "CMethodType" $ CMethodType <$> link r
+    CInvokeDynamic i -> label "CInvokeDynamic" $ CInvokeDynamic <$> evolve i
 
   devolve c = case c of
-    CString    s -> pure $ CString s
-    CInteger   i -> pure $ CInteger i
-    CFloat     d -> pure $ CFloat d
-    CLong      l -> pure $ CLong l
-    CDouble    d -> pure $ CDouble d
-    CClassRef  r -> label "CClassRef" $ CClassRef <$> unlink r
+    CString s -> pure $ CString s
+    CInteger i -> pure $ CInteger i
+    CFloat d -> pure $ CFloat d
+    CLong l -> pure $ CLong l
+    CDouble d -> pure $ CDouble d
+    CClassRef r -> label "CClassRef" $ CClassRef <$> unlink r
     CStringRef r -> label "CStringRef" $ CStringRef <$> unlink r
     CFieldRef (AbsFieldId (InClass rt rid)) ->
       label "CFieldRef" $ CFieldRef <$> ((,) <$> unlink rt <*> unlink rid)
     CMethodRef (InRefType rt rid) ->
       label "CMethodRef" $ CMethodRef <$> ((,) <$> unlink rt <*> unlink rid)
     CInterfaceMethodRef (InRefType rt rid) ->
-      label "CInterfaceMethodRef"
-        $   CInterfaceMethodRef
-        <$> ((,) <$> unlink rt <*> unlink rid)
+      label "CInterfaceMethodRef" $
+        CInterfaceMethodRef
+          <$> ((,) <$> unlink rt <*> unlink rid)
     CNameAndType r1 r2 ->
       label "CNameAndType" $ CNameAndType <$> unlink r1 <*> unlink r2
-    CMethodHandle  mh -> label "CMetho" $ CMethodHandle <$> devolve mh
-    CMethodType    r  -> label "CMethodType" $ CMethodType <$> unlink r
-    CInvokeDynamic i  -> label "CInvokeDynamic" $ CInvokeDynamic <$> devolve i
-
+    CMethodHandle mh -> label "CMetho" $ CMethodHandle <$> devolve mh
+    CMethodType r -> label "CMethodType" $ CMethodType <$> unlink r
+    CInvokeDynamic i -> label "CInvokeDynamic" $ CInvokeDynamic <$> devolve i
 
 instance Staged InvokeDynamic where
   evolve (InvokeDynamic w ref) = InvokeDynamic w <$> link ref
@@ -141,26 +140,26 @@ instance Staged InvokeDynamic where
 
 instance Staged MethodHandle where
   evolve m = case m of
-    MHField     r -> MHField <$> evolve r
-    MHMethod    r -> MHMethod <$> evolve r
+    MHField r -> MHField <$> evolve r
+    MHMethod r -> MHMethod <$> evolve r
     MHInterface r -> MHInterface <$> evolve r
 
   devolve m = case m of
-    MHField     r -> MHField <$> devolve r
-    MHMethod    r -> MHMethod <$> devolve r
+    MHField r -> MHField <$> devolve r
+    MHMethod r -> MHMethod <$> devolve r
     MHInterface r -> MHInterface <$> devolve r
 
 instance Staged MethodHandleMethod where
   evolve g = case g of
-    MHInvokeVirtual    m -> MHInvokeVirtual <$> link m
-    MHInvokeStatic     m -> MHInvokeStatic <$> link m
-    MHInvokeSpecial    m -> MHInvokeSpecial <$> link m
+    MHInvokeVirtual m -> MHInvokeVirtual <$> link m
+    MHInvokeStatic m -> MHInvokeStatic <$> link m
+    MHInvokeSpecial m -> MHInvokeSpecial <$> link m
     MHNewInvokeSpecial m -> MHNewInvokeSpecial <$> link m
 
   devolve g = case g of
-    MHInvokeVirtual    m -> MHInvokeVirtual <$> unlink m
-    MHInvokeStatic     m -> MHInvokeStatic <$> unlink m
-    MHInvokeSpecial    m -> MHInvokeSpecial <$> unlink m
+    MHInvokeVirtual m -> MHInvokeVirtual <$> unlink m
+    MHInvokeStatic m -> MHInvokeStatic <$> unlink m
+    MHInvokeSpecial m -> MHInvokeSpecial <$> unlink m
     MHNewInvokeSpecial m -> MHNewInvokeSpecial <$> unlink m
 
 instance Staged MethodHandleField where

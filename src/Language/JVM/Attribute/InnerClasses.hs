@@ -1,10 +1,12 @@
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell    #-}
-{-|
+{-# LANGUAGE TemplateHaskell #-}
+
+{- |
 Module      : Language.JVM.Attribute.InnerClasses
 Copyright   : (c) Christian Gram Kalhauge, 2018
 License     : MIT
@@ -13,24 +15,18 @@ Maintainer  : kalhuage@cs.ucla.edu
 Based on the InnerClasses Attribute,
 as documented [here](http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.6).
 -}
-
-module Language.JVM.Attribute.InnerClasses
-  ( InnerClasses (..)
-  , InnerClass (..)
-  ) where
-
+module Language.JVM.Attribute.InnerClasses (
+  InnerClasses (..),
+  InnerClass (..),
+) where
 
 import qualified Data.Text as Text
 
-import           Language.JVM.Attribute.Base
-import           Language.JVM.Constant
-import           Language.JVM.Utils
-import           Language.JVM.Staged
-import           Language.JVM.AccessFlag
-
--- | 'InnerClasses' is an Attribute.
-instance IsAttribute (InnerClasses Low) where
-  attrName = Const "InnerClasses"
+import Language.JVM.AccessFlag
+import Language.JVM.Attribute.Base
+import Language.JVM.Constant
+import Language.JVM.Staged
+import Language.JVM.Utils
 
 -- | The 'InnerClasses' is a reference to the enclosing method of the class
 newtype InnerClasses r = InnerClasses
@@ -60,12 +56,15 @@ instance Staged InnerClass where
     InnerClass
       <$> unlink cn
       <*> case mn of
-            Nothing -> return 0
-            Just mn' -> unlink mn'
+        Nothing -> return 0
+        Just mn' -> unlink mn'
       <*> case inn of
-            Nothing -> return 0
-            Just inn' -> unlink inn'
+        Nothing -> return 0
+        Just inn' -> unlink inn'
       <*> pure iac
 
-$(deriveBaseWithBinary ''InnerClasses)
-$(deriveBaseWithBinary ''InnerClass)
+$(deriveAll [([''InnerClasses, ''InnerClass], bases ++ [binary])])
+
+-- | 'InnerClasses' is an Attribute.
+instance IsAttribute (InnerClasses Low) where
+  attrName = Const "InnerClasses"
