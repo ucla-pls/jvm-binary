@@ -123,7 +123,7 @@ data ElementValue r
 
 data EnumValue r = EnumValue
   { enumTypeName :: !(Ref FieldDescriptor r)
-  , enunConstName :: !(Ref Text.Text r)
+  , enumConstName :: !(Ref Text.Text r)
   }
 
 -- Type Annoations
