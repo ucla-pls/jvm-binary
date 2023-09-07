@@ -3,10 +3,36 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    commit: bfa377f74eee7293fa6af547e494ddeff910a43a
+    git: https://github.com/kalhauge/cones
+    name: cones
+    pantry-tree:
+      sha256: dd8ef9f6a001aaf01b88920be85a1491d6fea9cacdcfbfda08b52f10db82ac95
+      size: 431
+    subdir: cones
+    version: 0.1.0
+  original:
+    commit: bfa377f74eee7293fa6af547e494ddeff910a43a
+    git: https://github.com/kalhauge/cones
+    subdir: cones
+- completed:
+    commit: bfa377f74eee7293fa6af547e494ddeff910a43a
+    git: https://github.com/kalhauge/cones
+    name: conedec
+    pantry-tree:
+      sha256: cfdb0cb382cf5e53c7874312b94b4cded7439570e1788bfa1573f7d919221bd8
+      size: 432
+    subdir: conedec
+    version: 0.1.0
+  original:
+    commit: bfa377f74eee7293fa6af547e494ddeff910a43a
+    git: https://github.com/kalhauge/cones
+    subdir: conedec
 snapshots:
 - completed:
-    size: 567672
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/17/11.yaml
-    sha256: 03181cdbeb671eb605bbcf6f285bea4d094b6ac7433a0e14a9f1dd54ad995938
-  original: lts-17.11
+    sha256: 5a59b2a405b3aba3c00188453be172b85893cab8ebc352b1ef58b0eae5d248a2
+    size: 650475
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/26.yaml
+  original: lts-20.26

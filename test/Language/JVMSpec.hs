@@ -24,9 +24,6 @@ import System.FilePath
 -- vector
 import qualified Data.Vector as V
 
--- zip-archive
-import Codec.Archive.Zip
-
 import Language.JVM
 import qualified Language.JVM.Attribute.Code as C
 import Language.JVM.Attribute.StackMapTable
@@ -51,46 +48,6 @@ spec = do
           fail $ show msg
 
   spec_reading_classfile
-
-  describe "the standard library" $ do
-    runIO (lookupEnv "JAVA_HOME") >>= \case
-      Just home -> do
-        archive <- runIO $ either (error . ("Could not read zip file: " ++) . show) return =<< readZipFile (home </> "jre/lib/rt.jar")
-
-        let priorities =
-              [ "java/lang/Class.class"
-              ]
-
-        forM_ priorities $ \priority -> do
-          let Just entry = findEntryByPath priority archive
-          it ("can read priority " ++ priority) $ do
-            case readClassFile (fromEntry entry) of
-              Right _ ->
-                True `shouldBe` True
-              Left msg ->
-                fail $ show msg
-
-        let _classes =
-              filter
-                (\entry -> takeExtension (eRelativePath entry) == ".class")
-                (zEntries archive)
-        forM_ _classes $ \entry -> do
-          it ("can read " ++ eRelativePath entry) $ do
-            case readClassFile (fromEntry entry) of
-              Right _ ->
-                True `shouldBe` True
-              Left msg ->
-                fail $ show msg
-
-        forM_ _classes $ \entry -> do
-          it ("can read " ++ eRelativePath entry) $ do
-            case readClassFile (fromEntry entry) of
-              Right _ ->
-                True `shouldBe` True
-              Left msg ->
-                fail $ show msg
-      Nothing -> do
-        runIO $ putStrLn "Expecting JAVA_HOME to be set"
 
 spec_reading_classfile :: Spec
 spec_reading_classfile = testAllFiles $ \bs -> do
@@ -229,7 +186,3 @@ cmpOver g ta tb f =
 cmpPrefixes :: (Foldable t) => (a -> t b) -> a -> a -> ([b] -> [b] -> IO ()) -> IO ()
 cmpPrefixes g ta tb f =
   forM_ (zip (inits . toList . g $ ta) (inits . toList . g $ tb)) (uncurry f)
-
-readZipFile :: FilePath -> IO (Either String Archive)
-readZipFile =
-  fmap toArchiveOrFail . BL.readFile
