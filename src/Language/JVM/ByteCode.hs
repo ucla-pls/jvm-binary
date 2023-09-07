@@ -288,8 +288,8 @@ evolveByteCodeInst g (ByteCodeInst ofs opr) = do
     NewArray r -> label "NewArray" $ NewArray <$> evolveNewArrayType r
     CheckCast r -> label "CheckCast" $ CheckCast <$> link r
     InstanceOf r -> label "InstanceOf" $ InstanceOf <$> link r
-    If cp on r -> label "If" $ If cp on <$> calcOffset r
-    IfRef b on r -> label "IfRef" $ IfRef b on <$> calcOffset r
+    If cp r -> label "If" $ If cp <$> calcOffset r
+    IfZ b r -> label "IfZ" $ IfZ b <$> calcOffset r
     Goto r -> label "Goto" $ Goto <$> calcOffset r
     Jsr r -> label "Jsr" $ Jsr <$> calcOffset r
     TableSwitch i (SwitchTable l ofss) ->
@@ -319,8 +319,8 @@ devolveByteCodeInst g (ByteCodeInst ofs opr) =
     NewArray r -> label "NewArray" $ NewArray <$> devolveNewArrayType r
     CheckCast r -> label "CheckCast" $ CheckCast <$> unlink r
     InstanceOf r -> label "InstanceOf" $ InstanceOf <$> unlink r
-    If cp on r -> label "If" $ If cp on <$> calcOffset r
-    IfRef b on r -> label "IfRef" $ IfRef b on <$> calcOffset r
+    If cp r -> label "IfZ" $ If cp <$> calcOffset r
+    IfZ b r -> label "IfZ" $ IfZ b <$> calcOffset r
     Goto r -> label "Goto" $ Goto <$> calcOffset r
     Jsr r -> label "Jsr" $ Jsr <$> calcOffset r
     TableSwitch i (SwitchTable l ofss) ->
@@ -559,6 +559,8 @@ data CmpOpr
   | CGe
   | CGt
   | CLe
+  | CIs
+  | CIsNot
   deriving (Show, Ord, Eq, Generic, NFData)
 
 data CastOpr
@@ -603,19 +605,17 @@ data ByteCodeOpr r
   | -- | Compare two floating values, #1 indicates if greater-than, #2
     -- is if float or double should be used.
     CompareFloating !Bool !WordSize
-  | -- | compare with 0 if #2 is False, and two ints from the stack if
-    -- True. the last value is the offset
-    If !CmpOpr !OneOrTwo !(ShortRelativeRef r)
-  | -- | check if two objects are equal, or not equal. If #2 is True, compare
-    -- with null.
-    IfRef !Bool !OneOrTwo !(ShortRelativeRef r)
+  | -- | compare two elements (ints or refs) on the stack, the last value is the offset
+    If !CmpOpr !(ShortRelativeRef r)
+  | -- | compare one elemente (int or ref) agaist 0
+    IfZ !CmpOpr !(ShortRelativeRef r)
   | Goto !(LongRelativeRef r)
   | Jsr !(LongRelativeRef r)
   | Ret !LocalAddress
   | -- | a table switch has 2 values a `default` and a `SwitchTable`
     TableSwitch !(LongRelativeRef r) !(SwitchTable r)
   | -- | a lookup switch has a `default` value and a list of pairs.
-    LookupSwitch !(LongRelativeRef r) (V.Vector (Int32, (LongRelativeRef r)))
+    LookupSwitch !(LongRelativeRef r) (V.Vector (Int32, LongRelativeRef r))
   | Get !FieldAccess !(Ref AbsFieldId r)
   | Put !FieldAccess !(Ref AbsFieldId r)
   | Invoke !(Invocation r)
@@ -795,20 +795,20 @@ instance Binary (ByteCodeOpr Low) where
       0x96 -> return $ CompareFloating False One
       0x97 -> return $ CompareFloating True Two
       0x98 -> return $ CompareFloating False Two
-      0x99 -> If CEq One <$> get
-      0x9a -> If CNe One <$> get
-      0x9b -> If CLt One <$> get
-      0x9c -> If CGe One <$> get
-      0x9d -> If CGt One <$> get
-      0x9e -> If CLe One <$> get
-      0x9f -> If CEq Two <$> get
-      0xa0 -> If CNe Two <$> get
-      0xa1 -> If CLt Two <$> get
-      0xa2 -> If CGe Two <$> get
-      0xa3 -> If CGt Two <$> get
-      0xa4 -> If CLe Two <$> get
-      0xa5 -> IfRef True Two <$> get
-      0xa6 -> IfRef False Two <$> get
+      0x99 -> IfZ CEq <$> get
+      0x9a -> IfZ CNe <$> get
+      0x9b -> IfZ CLt <$> get
+      0x9c -> IfZ CGe <$> get
+      0x9d -> IfZ CGt <$> get
+      0x9e -> IfZ CLe <$> get
+      0x9f -> If CEq <$> get
+      0xa0 -> If CNe <$> get
+      0xa1 -> If CLt <$> get
+      0xa2 -> If CGe <$> get
+      0xa3 -> If CGt <$> get
+      0xa4 -> If CLe <$> get
+      0xa5 -> If CIs <$> get
+      0xa6 -> If CIsNot <$> get
       0xa7 -> Goto . fromIntegral <$> getInt16be
       0xa8 -> Jsr . fromIntegral <$> getInt16be
       0xa9 -> Ret . fromIntegral <$> getWord8
@@ -823,7 +823,7 @@ instance Binary (ByteCodeOpr Low) where
         return $ TableSwitch dft (SwitchTable low table)
       0xab -> do
         offset' <- bytesRead
-        let skipAmount = ((4 - offset' `mod` 4) `mod` 4)
+        let skipAmount = (4 - offset' `mod` 4) `mod` 4
         skip $ fromIntegral skipAmount
         dft <- getInt32be
         npairs <- getInt32be
@@ -869,7 +869,7 @@ instance Binary (ByteCodeOpr Low) where
           10 -> return JTInt
           11 -> return JTLong
           _ -> fail $ "Unknown type '0x" ++ showHex x "'."
-      0xbd -> NewArray . (flip ArrayReference 1) <$> get
+      0xbd -> NewArray . flip ArrayReference 1 <$> get
       0xbe -> return ArrayLength
       0xbf -> return Throw
       0xc0 -> CheckCast <$> get
@@ -896,8 +896,8 @@ instance Binary (ByteCodeOpr Low) where
               "Wide does not work for opcode '0x"
                 ++ showHex subopcode "'"
       0xc5 -> NewArray <$> (ArrayReference <$> get <*> get)
-      0xc6 -> IfRef False One <$> get
-      0xc7 -> IfRef True One <$> get
+      0xc6 -> IfZ CIs <$> get
+      0xc7 -> IfZ CIsNot <$> get
       0xc8 -> Goto <$> getInt32be
       0xc9 -> Jsr <$> getInt32be
       _ -> fail $ "I do not know this bytecode '0x" ++ showHex cmd "'."
@@ -1139,22 +1139,22 @@ putByteCode n bc =
     CompareFloating False One -> putWord8 0x96
     CompareFloating True Two -> putWord8 0x97
     CompareFloating False Two -> putWord8 0x98
-    If CEq One a -> putWord8 0x99 >> put a
-    If CNe One a -> putWord8 0x9a >> put a
-    If CLt One a -> putWord8 0x9b >> put a
-    If CGe One a -> putWord8 0x9c >> put a
-    If CGt One a -> putWord8 0x9d >> put a
-    If CLe One a -> putWord8 0x9e >> put a
-    If CEq Two a -> putWord8 0x9f >> put a
-    If CNe Two a -> putWord8 0xa0 >> put a
-    If CLt Two a -> putWord8 0xa1 >> put a
-    If CGe Two a -> putWord8 0xa2 >> put a
-    If CGt Two a -> putWord8 0xa3 >> put a
-    If CLe Two a -> putWord8 0xa4 >> put a
-    IfRef True Two a -> putWord8 0xa5 >> put a
-    IfRef False Two a -> putWord8 0xa6 >> put a
+    IfZ CEq a -> putWord8 0x99 >> put a
+    IfZ CNe a -> putWord8 0x9a >> put a
+    IfZ CLt a -> putWord8 0x9b >> put a
+    IfZ CGe a -> putWord8 0x9c >> put a
+    IfZ CGt a -> putWord8 0x9d >> put a
+    IfZ CLe a -> putWord8 0x9e >> put a
+    If CEq a -> putWord8 0x9f >> put a
+    If CNe a -> putWord8 0xa0 >> put a
+    If CLt a -> putWord8 0xa1 >> put a
+    If CGe a -> putWord8 0xa2 >> put a
+    If CGt a -> putWord8 0xa3 >> put a
+    If CLe a -> putWord8 0xa4 >> put a
+    If CIs a -> putWord8 0xa5 >> put a
+    If CIsNot a -> putWord8 0xa6 >> put a
     Goto a -> do
-      if (abs a) < (2 :: Int32) ^ (15 :: Int32)
+      if abs a < (2 :: Int32) ^ (15 :: Int32)
         then do
           putWord8 0xa7
           putInt16be (fromIntegral a)
@@ -1162,7 +1162,7 @@ putByteCode n bc =
           putWord8 0xc8
           putInt32be a
     Jsr a ->
-      if (abs a) < (2 :: Int32) ^ (15 :: Int32)
+      if abs a < (2 :: Int32) ^ (15 :: Int32)
         then do
           putWord8 0xa8
           putInt16be (fromIntegral a)
@@ -1234,8 +1234,8 @@ putByteCode n bc =
     InstanceOf a -> putWord8 0xc1 >> put a
     Monitor True -> putWord8 0xc2
     Monitor False -> putWord8 0xc3
-    IfRef False One a -> putWord8 0xc6 >> put a
-    IfRef True One a -> putWord8 0xc7 >> put a
+    IfZ CIs a -> putWord8 0xc6 >> put a
+    IfZ CIsNot a -> putWord8 0xc7 >> put a
 
 $(deriveBases [''ByteCodeOpr, ''SwitchTable, ''Invocation, ''CConstant])
 $(deriveThese ''ByteCodeInst [''Show, ''Generic, ''NFData])

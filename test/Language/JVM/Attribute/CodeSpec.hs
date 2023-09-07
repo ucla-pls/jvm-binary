@@ -1,30 +1,30 @@
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TupleSections      #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Language.JVM.Attribute.CodeSpec where
 
-import qualified Data.Vector                                as V
-import           Generic.Random
+import qualified Data.Vector as V
+import Generic.Random
 
+import SpecHelper
 
-import           SpecHelper
+import Language.JVM.Attribute.LineNumberTableSpec ()
+import Language.JVM.Attribute.StackMapTableSpec ()
+import Language.JVM.AttributeSpec ()
+import Language.JVM.UtilsSpec ()
 
-import           Language.JVM.Attribute.LineNumberTableSpec ()
-import           Language.JVM.Attribute.StackMapTableSpec   ()
-import           Language.JVM.AttributeSpec                 ()
-import           Language.JVM.UtilsSpec                     ()
-
-import           Language.JVM
-import           Language.JVM.Attribute.Code
+import Language.JVM
+import Language.JVM.Attribute.Code
 
 spec :: Spec
 spec = do
   prop "can do a roundtrip on Code" prop_roundtrip_Code
   prop "can do a roundtrip on ExceptionTable" prop_roundtrip_ExceptionTable
-  prop "can do a roundtrip on ByteCodeInst"  prop_roundtrip_ByteCodeInst
+  prop "can do a roundtrip on ByteCodeInst" prop_roundtrip_ByteCodeInst
   spec_ByteCode_examples
 
 prop_roundtrip_Code :: Code High -> Property
@@ -38,7 +38,6 @@ prop_roundtrip_ExceptionTable = isoByteCodeRoundtrip
 
 prop_roundtrip_ByteCodeInst :: ByteCodeInst High -> Property
 prop_roundtrip_ByteCodeInst = isoByteCodeRoundtrip
-
 
 spec_ByteCode_examples :: SpecWith ()
 spec_ByteCode_examples = do
@@ -89,28 +88,28 @@ instance Arbitrary (ByteCodeInst High) where
     ByteCodeInst 0 <$> genByteCodeOpr 0xffff
 
 instance Arbitrary ArithmeticType where
-  arbitrary = elements [ MInt, MLong, MFloat, MDouble ]
+  arbitrary = elements [MInt, MLong, MFloat, MDouble]
 
 instance Arbitrary LocalType where
-  arbitrary = elements [ LInt, LLong, LFloat, LDouble, LRef ]
+  arbitrary = elements [LInt, LLong, LFloat, LDouble, LRef]
 
 genByteCodeOpr :: Int -> Gen (ByteCodeOpr High)
 genByteCodeOpr i = do
   x <- (genericArbitraryU :: Gen (ByteCodeOpr High))
   case x of
-    If cp on _   -> If cp on <$> arbitraryRef i
-    IfRef b on _ -> IfRef b on <$> arbitraryRef i
-    Goto _       -> Goto <$> arbitraryRef i
-    Jsr _        -> Jsr <$> arbitraryRef i
+    If cp _ -> If cp <$> arbitraryRef i
+    IfZ b _ -> IfZ b <$> arbitraryRef i
+    Goto _ -> Goto <$> arbitraryRef i
+    Jsr _ -> Jsr <$> arbitraryRef i
     TableSwitch _ (SwitchTable l ofss) ->
       TableSwitch
-      <$> arbitraryRef i
-      <*> (SwitchTable l <$> V.mapM (const $ arbitraryRef i) ofss)
+        <$> arbitraryRef i
+        <*> (SwitchTable l <$> V.mapM (const $ arbitraryRef i) ofss)
     LookupSwitch _ ofss ->
       LookupSwitch
-      <$> arbitraryRef i
-      <*> V.mapM (\(a, _) -> (a,) <$> arbitraryRef i) ofss
-    _            -> return x
+        <$> arbitraryRef i
+        <*> V.mapM (\(a, _) -> (a,) <$> arbitraryRef i) ofss
+    _ -> return x
 
 instance Arbitrary a => Arbitrary (V.Vector a) where
   arbitrary = V.fromList <$> arbitrary
@@ -124,26 +123,22 @@ instance Arbitrary BinOpr where
 instance Arbitrary CastOpr where
   arbitrary =
     oneof . map pure $
-     [ CastTo MInt MLong
-     , CastTo MInt MFloat
-     , CastTo MInt MDouble
-
-     , CastTo MLong MInt
-     , CastTo MLong MFloat
-     , CastTo MLong MDouble
-
-     , CastTo MFloat MInt
-     , CastTo MFloat MLong
-     , CastTo MFloat MDouble
-
-     , CastTo MDouble MInt
-     , CastTo MDouble MLong
-     , CastTo MDouble MFloat
-
-     , CastDown MByte
-     , CastDown MChar
-     , CastDown MShort
-     ]
+      [ CastTo MInt MLong
+      , CastTo MInt MFloat
+      , CastTo MInt MDouble
+      , CastTo MLong MInt
+      , CastTo MLong MFloat
+      , CastTo MLong MDouble
+      , CastTo MFloat MInt
+      , CastTo MFloat MLong
+      , CastTo MFloat MDouble
+      , CastTo MDouble MInt
+      , CastTo MDouble MLong
+      , CastTo MDouble MFloat
+      , CastDown MByte
+      , CastDown MChar
+      , CastDown MShort
+      ]
 
 instance Arbitrary BitOpr where
   arbitrary = genericArbitraryU
@@ -166,12 +161,12 @@ instance Arbitrary FieldAccess where
 instance Arbitrary (Invocation High) where
   arbitrary =
     oneof
-    [ InvkSpecial <$> arbitrary
-    , InvkVirtual <$> arbitrary
-    , InvkStatic <$> arbitrary
-    , InvkInterface <$> (arbitrary `suchThat` \i -> i > 0) <*> arbitrary
-    , InvkDynamic <$> arbitrary
-    ]
+      [ InvkSpecial <$> arbitrary
+      , InvkVirtual <$> arbitrary
+      , InvkStatic <$> arbitrary
+      , InvkInterface <$> (arbitrary `suchThat` \i -> i > 0) <*> arbitrary
+      , InvkDynamic <$> arbitrary
+      ]
 instance Arbitrary (CConstant High) where
   arbitrary = genericArbitraryU
 
