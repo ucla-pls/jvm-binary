@@ -123,7 +123,7 @@ type ByteCodeRef i = Choice ByteCodeOffset ByteCodeIndex i
 type OffsetMap = IM.IntMap ByteCodeIndex
 
 -- | Given an `OffsetMap` turn a offset into a bytecode index
-offsetIndex :: OffsetMap -> ByteCodeOffset -> Maybe (ByteCodeIndex)
+offsetIndex :: OffsetMap -> ByteCodeOffset -> Maybe ByteCodeIndex
 offsetIndex o i = IM.lookup (fromIntegral i) o
 
 -- | Given an `OffsetMap` turn a offset into a bytecode index

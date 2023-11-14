@@ -44,8 +44,8 @@ module Language.JVM.Attribute.Annotations (
   TypeParameterBoundTarget (..),
   FormalParameterTarget,
   ThrowsTarget,
-  LocalvarTarget,
-  LocalvarEntry (..),
+  LocalVarTarget,
+  LocalVarEntry (..),
   CatchTarget,
   OffsetTarget,
   TypeArgumentTarget (..),
@@ -184,9 +184,9 @@ data FieldTypeAnnotation r
 
 data CodeTypeAnnotation r
   = -- | type in local variable declaration (0x40)
-    LocalVariableDeclaration !(LocalvarTarget r)
+    LocalVariableDeclaration !(LocalVarTarget r)
   | -- |  type in resource variable declaration  (0x41)
-    ResourceVariableDeclaration !(LocalvarTarget r)
+    ResourceVariableDeclaration !(LocalVarTarget r)
   | -- | type in exception parameter declaration (0x42)
     ExceptionParameterDeclaration !CatchTarget
   | -- | type in instanceof expression (0x43)
@@ -252,18 +252,21 @@ type FormalParameterTarget = Word8
 -}
 type ThrowsTarget = Word16
 
-{- | The 'LocalvarTarget' item indicates that an annotation appears on the type
+{- | The 'LocalVarTarget' item indicates that an annotation appears on the type
  in a local variable declaration, including a variable declared as a resource
  in a try-with-resources statement.
 
  The table is needed because a variable might span multiple live ranges.
 -}
-type LocalvarTarget r = SizedList16 (LocalvarEntry r)
+type LocalVarTarget r = SizedList16 (LocalVarEntry r)
 
--- | An entry in the Localvar Table
-data LocalvarEntry r = LocalvarEntry
+-- | The end of a bytecode range
+type ByteCodeEnd r = Choice Word16 ByteCodeIndex r
+
+-- | An entry in the LocalVar Table
+data LocalVarEntry r = LocalVarEntry
   { lvStartPc :: !(ByteCodeRef r)
-  , lvLength :: !Word16
+  , lvLength :: !(ByteCodeEnd r)
   , lvLocalVarIndex :: !Word16
   }
 
@@ -318,7 +321,7 @@ $( deriveAll
         [ ''Annotation
         , ''AnnotationDefault
         , ''EnumValue
-        , ''LocalvarEntry
+        , ''LocalVarEntry
         , ''RuntimeInvisibleAnnotations
         , ''RuntimeInvisibleParameterAnnotations
         , ''RuntimeInvisibleTypeAnnotations
@@ -653,12 +656,18 @@ instance ByteCodeStaged CodeTypeAnnotation where
     GenericIdentifierwMethodReferenceExpression a ->
       GenericIdentifierwMethodReferenceExpression <$> devolveBC dev a
 
-instance ByteCodeStaged LocalvarEntry where
-  evolveBC ev LocalvarEntry{..} =
-    LocalvarEntry <$> ev lvStartPc <*> pure lvLength <*> pure lvLocalVarIndex
+instance ByteCodeStaged LocalVarEntry where
+  evolveBC ev LocalVarEntry{..} =
+    LocalVarEntry
+      <$> ev lvStartPc
+      <*> ev (lvStartPc + lvLength)
+      <*> pure lvLocalVarIndex
 
-  devolveBC dev LocalvarEntry{..} =
-    LocalvarEntry <$> dev lvStartPc <*> pure lvLength <*> pure lvLocalVarIndex
+  devolveBC dev LocalVarEntry{..} = do
+    offset <- dev lvStartPc
+    LocalVarEntry offset
+      <$> ((\a -> a - offset) <$> dev lvLength)
+      <*> pure lvLocalVarIndex
 
 instance ByteCodeStaged TypeArgumentTarget where
   evolveBC ev TypeArgumentTarget{..} =

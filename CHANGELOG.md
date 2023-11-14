@@ -1,5 +1,9 @@
 # Change log
 
+## Version 0.13.0
+
+- Many changes; started to record again.
+
 ## Version 0.9.1
 - Upgrade to GHC 8.10.4
 
