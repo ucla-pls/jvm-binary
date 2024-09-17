@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           jvm-binary
-version:        0.13.0
+version:        0.14.0
 synopsis:       A library for reading Java class-files
 description:    A library for reading Java class-files.
 category:       Language, Java, JVM
