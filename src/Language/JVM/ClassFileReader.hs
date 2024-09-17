@@ -160,7 +160,7 @@ instance NFData ClassFileError
 data EvolveConfig = EvolveConfig
   { ecLabel :: [String]
   , ecConstantPool :: ConstantPool High
-  , ecAttributeFilter :: ((AttributeLocation, Text.Text) -> Bool)
+  , ecAttributeFilter :: (AttributeLocation, Text.Text) -> Bool
   }
 
 newtype Evolve a

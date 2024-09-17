@@ -147,11 +147,16 @@ shouldMatchMethod ym xm = do
   mName ym `shouldBe` mName xm
   mDescriptor ym `shouldBe` mDescriptor xm
   mExceptions ym `shouldMatchList` mExceptions xm
-  case (mCode ym, mCode xm) of
+  mAttributes ym `shouldMatchMethodAttributes` mAttributes xm
+
+shouldMatchMethodAttributes :: MethodAttributes High -> MethodAttributes High -> IO ()
+shouldMatchMethodAttributes ym xm = do
+  case (firstOne $ maCode ym, firstOne $ maCode xm) of
     (Just yc, Just xc) -> do
       cmpOver C.codeByteCodeOprs yc xc $ \yb xb -> do
         yb `shouldBe` xb
-    _ -> mCode ym `shouldBe` mCode xm
+    _ -> maCode ym `shouldBe` maCode xm
+  ym `shouldBe` xm
 
 shouldMatchMethod' :: Method Low -> Method Low -> IO ()
 shouldMatchMethod' ym xm = do

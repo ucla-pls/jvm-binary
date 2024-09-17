@@ -36,7 +36,7 @@ newtype MethodParameters r = MethodParameters
 
 -- | A method parameter
 data MethodParameter r = MethodParameter
-  { parameterName :: !(Ref Text.Text r)
+  { parameterName :: !(OptionalRef Text.Text r)
   , parameterAccessFlags :: !(BitSet16 PAccessFlag)
   }
 
@@ -44,12 +44,12 @@ $(deriveAll [([''MethodParameter, ''MethodParameters], bases ++ [binary])])
 
 instance Staged MethodParameters where
   stage f (MethodParameters m) =
-    label "BootstrapMethods" $ MethodParameters <$> mapM f m
+    label "MethodParameters" $ MethodParameters <$> mapM f m
 
 instance Staged MethodParameter where
-  evolve (MethodParameter a m) = MethodParameter <$> link a <*> pure m
+  evolve (MethodParameter a m) = MethodParameter <$> optionalLink a <*> pure m
 
-  devolve (MethodParameter a m) = MethodParameter <$> unlink a <*> pure m
+  devolve (MethodParameter a m) = MethodParameter <$> optionalUnlink a <*> pure m
 
 -- | 'BootstrapMethods' is an Attribute.
 instance IsAttribute (MethodParameters Low) where

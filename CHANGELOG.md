@@ -1,5 +1,10 @@
 # Change log
 
+
+## Version 0.14.0
+
+- Fix problem with method parameter with zero index
+
 ## Version 0.13.0
 
 - Many changes; started to record again.

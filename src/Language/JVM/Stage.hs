@@ -22,6 +22,7 @@ module Language.JVM.Stage (
   Ref,
   Index,
   DeepRef,
+  OptionalRef,
   Choice,
 ) where
 
@@ -51,3 +52,6 @@ type Ref v r = Choice Index v r
 
 -- | A deep reference points to something that itself is staged.
 type DeepRef v r = Ref (v r) r
+
+-- | A reference that might point to 0
+type OptionalRef t r = Choice Index (Maybe t) r

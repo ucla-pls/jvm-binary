@@ -166,6 +166,7 @@ instance Staged Method where
           , mapM toAttribute maExceptions
           , mapM toAttribute maSignatures
           , mapM toAttribute maAnnotationDefault
+          , mapM toAttribute maMethodParameters
           , mapM toAttribute maVisibleAnnotations
           , mapM toAttribute maInvisibleAnnotations
           , mapM toAttribute maVisibleParameterAnnotations

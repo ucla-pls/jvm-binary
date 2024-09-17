@@ -19,6 +19,10 @@ module Language.JVM.Staged (
   -- * AttributeLocation
   AttributeLocation (..),
 
+  -- * Optional Helpers
+  optionalLink,
+  optionalUnlink,
+
   -- * Re-exports
   module Language.JVM.Stage,
   module Language.JVM.TH,
@@ -48,6 +52,16 @@ class LabelM m => EvolveM m where
   link :: Referenceable r => Index -> m r
   attributeFilter :: m ((AttributeLocation, Text.Text) -> Bool)
   evolveError :: String -> m r
+
+optionalLink :: EvolveM m => Referenceable r => Index -> m (Maybe r)
+optionalLink i = case i of
+  0 -> pure Nothing
+  n -> Just <$> link n
+
+optionalUnlink :: DevolveM m => Referenceable r => Maybe r -> m Index
+optionalUnlink r = case r of
+  Just n -> unlink n
+  Nothing -> pure 0
 
 class LabelM m => DevolveM m where
   unlink :: Referenceable r => r -> m Index
