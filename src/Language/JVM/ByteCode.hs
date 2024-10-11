@@ -319,7 +319,7 @@ devolveByteCodeInst g (ByteCodeInst ofs opr) =
     NewArray r -> label "NewArray" $ NewArray <$> devolveNewArrayType r
     CheckCast r -> label "CheckCast" $ CheckCast <$> unlink r
     InstanceOf r -> label "InstanceOf" $ InstanceOf <$> unlink r
-    If cp r -> label "IfZ" $ If cp <$> calcOffset r
+    If cp r -> label "If" $ If cp <$> calcOffset r
     IfZ b r -> label "IfZ" $ IfZ b <$> calcOffset r
     Goto r -> label "Goto" $ Goto <$> calcOffset r
     Jsr r -> label "Jsr" $ Jsr <$> calcOffset r
