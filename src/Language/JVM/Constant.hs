@@ -63,6 +63,7 @@ import Control.DeepSeq (NFData)
 import Control.Monad.Reader
 import Data.Binary
 import Data.Binary.IEEE754
+import Control.Monad
 
 import qualified Data.ByteString as BS
 import Data.Int
