@@ -2,8 +2,11 @@
   description = "A library for reading Java class-files";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/23.05";
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    flake-utils = {
+      url = "github:numtide/flake-utils";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = {
