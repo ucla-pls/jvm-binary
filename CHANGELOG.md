@@ -1,5 +1,8 @@
 # Change log
 
+## Version 0.14.1
+
+- Upgrade to new version.
 
 ## Version 0.14.0
 
