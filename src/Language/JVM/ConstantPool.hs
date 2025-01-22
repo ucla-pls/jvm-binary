@@ -34,7 +34,6 @@ module Language.JVM.ConstantPool (
 ) where
 
 import Control.DeepSeq (NFData)
-import Control.Monad.Except
 import Data.Binary
 
 import Data.Binary.Get
@@ -45,6 +44,7 @@ import GHC.Generics (Generic)
 
 -- base
 import Data.Monoid
+import Data.Foldable
 
 -- containers
 import qualified Data.IntMap as IM

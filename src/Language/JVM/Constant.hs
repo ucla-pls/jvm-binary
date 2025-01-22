@@ -60,7 +60,6 @@ module Language.JVM.Constant (
 where
 
 import Control.DeepSeq (NFData)
-import Control.Monad.Reader
 import Data.Binary
 import Data.Binary.IEEE754
 import Control.Monad
