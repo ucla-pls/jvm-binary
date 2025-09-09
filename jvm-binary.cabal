@@ -1,18 +1,18 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.36.1.
+-- This file has been generated from package.yaml by hpack version 0.38.1.
 --
 -- see: https://github.com/sol/hpack
 
 name:           jvm-binary
-version:        0.14.1
+version:        0.14.2
 synopsis:       A library for reading Java class-files
 description:    A library for reading Java class-files.
 category:       Language, Java, JVM
 homepage:       https://github.com/ucla-pls/jvm-binary#readme
 bug-reports:    https://github.com/ucla-pls/jvm-binary/issues
 author:         Christian Gram Kalhauge
-maintainer:     Christian Gram Kalhauge <kalhauge@cs.ucla.edu>
+maintainer:     Christian Gram Kalhauge <chrg@dtu.dk>
 license:        MIT
 license-file:   LICENSE.md
 build-type:     Simple
@@ -66,7 +66,7 @@ library
   ghc-options: -Wall
   build-depends:
       attoparsec
-    , base >=4.9 && <4.19
+    , base >=4.9 && <4.20
     , binary
     , bytestring
     , containers
@@ -111,7 +111,7 @@ test-suite jvm-binary-test
   build-depends:
       QuickCheck
     , attoparsec
-    , base >=4.9 && <4.19
+    , base >=4.9 && <4.20
     , binary
     , bytestring
     , containers
@@ -142,7 +142,7 @@ benchmark jvm-binary-benchmarks
   ghc-options: -rtsopts -O2 -threaded -funbox-strict-fields -with-rtsopts=-N
   build-depends:
       attoparsec
-    , base >=4.9 && <4.19
+    , base >=4.9 && <4.20
     , binary
     , bytestring
     , containers

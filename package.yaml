@@ -1,7 +1,7 @@
 name: jvm-binary
-version: '0.14.1'
+version: '0.14.2'
 author: Christian Gram Kalhauge
-maintainer: Christian Gram Kalhauge <kalhauge@cs.ucla.edu>
+maintainer: Christian Gram Kalhauge <chrg@dtu.dk>
 synopsis: A library for reading Java class-files
 
 license: MIT
@@ -17,7 +17,7 @@ extra-source-files:
 - README.md
 
 dependencies:
-- base >= 4.9 && < 4.19
+- base >= 4.9 && < 4.20
 - binary
 - bytestring
 - containers
